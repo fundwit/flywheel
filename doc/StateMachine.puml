@@ -1,0 +1,62 @@
+@startuml
+
+
+package "state machine" {
+    class StateMachine {
+        States []State
+        Transitions []Transition
+    }
+
+    StateMachine *--> "1..*" State
+    StateMachine *--> "1..*" Transition
+    Transition --> State
+
+    class State {
+        Name string
+        Category StateCategory
+    }
+    State --> StateCategory
+
+    enum StateCategory {
+        OPEN
+        IN_PROGRESS
+        CLOSED
+    }
+
+    class Transition {
+        Name string
+        From State
+        To   State
+    }
+}
+
+package "work item definition" {
+    class WorkItemDefinition {
+        // story, bug, task
+
+        StateMachine StateMachine
+        PropertyDefinitions []PropertyDefinition
+    }
+
+    WorkItemDefinition ..> "1" StateMachine
+    WorkItemDefinition --> "*" PropertyDefinition
+
+    class PropertyDefinition {
+        Name string
+    }
+}
+
+
+package "work item" {
+    class WorkItem {
+        Type WorkItemDefinition
+        PropertyAssigns []PropertyAssign
+    }
+
+    WorkItem ..> WorkItemDefinition
+    WorkItem *--> PropertyAssign
+
+    PropertyAssign ..> PropertyDefinition
+}
+
+@enduml

@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flywheel
+  namespace: default
+  labels:
+    app: flywheel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flywheel
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: flywheel
+    spec:
+      containers:
+        - name: flywheel
+          image: registry.cn-beijing.aliyuncs.com/fundwit/flywheel:sha-498d460
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: password
+                name: mysql
+          - name: MYSQL_USERNAME
+            valueFrom:
+              secretKeyRef:
+                key: username
+                name: mysql
+          - name: DATABASE_URL
+            value: mysql://${MYSQL_USERNAME}:${MYSQL_PASSWORD}@(mysql.default:3306)/flywheel?charset=utf8mb4&parseTime=True&loc=Local
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+        - name: cr-aliyun
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: flywheel
+  name: flywheel
+  namespace: default
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: flywheel
+  sessionAffinity: None
+  type: ClusterIP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: flywheel
+  namespace: default
+spec:
+  tls:
+    - hosts:
+        - flywheel-core.fundwit.com
+      secretName: tls-fundwit.com
+  rules:
+    - host: flywheel-core.fundwit.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: flywheel
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix

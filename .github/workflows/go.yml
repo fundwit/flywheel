@@ -58,7 +58,7 @@ jobs:
 
     - name: Build and push Docker images
       env:
-        SHOULD_PUBLISH: ${{ github.event_name == 'push' && github.event.ref == 'refs/heads/master' }}
+        SHOULD_PUBLISH: ${{ github.event_name == 'push' && (github.event.ref == 'refs/heads/master' || github.event.ref == 'refs/heads/stage') }}
       run: |
         echo '' >> .docker/Dockerfile
         echo "LABEL build.version="${GITHUB_SHA}" build.timestamp="${BUILD_TIMESTAMP}" build.source.repository="${GITHUB_REPOSITORY}" build.source.ref="${GITHUB_REF}" build.source.reversion="${GITHUB_SHA}"" >> .docker/Dockerfile
@@ -77,7 +77,7 @@ jobs:
         fi
 
     - name: deploy
-      if: ${{ github.event_name == 'push' && github.event.ref == 'refs/heads/master' }}
+      if: ${{ github.event_name == 'push' && (github.event.ref == 'refs/heads/master' || github.event.ref == 'refs/heads/stage') }}
       uses: stefanprodan/kube-tools@v1.5.0
       with:
         command:  |

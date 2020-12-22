@@ -129,12 +129,57 @@ var _ = Describe("WorkHandler", func() {
 	Describe("handleDetail", func() {
 
 	})
+
+	Describe("handleDelete", func() {
+		It("should be able to handle delete work", func() {
+			workManager.DeleteWorkFunc = func(id utils.ID) error {
+				return nil
+			}
+			req := httptest.NewRequest(http.MethodDelete, "/v1/works/123", nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			httpResponse := w.Result()
+			defer httpResponse.Body.Close()
+
+			Expect(httpResponse.StatusCode).To(Equal(http.StatusNoContent))
+			bodyBytes, _ := ioutil.ReadAll(httpResponse.Body)
+			Expect(len(bodyBytes)).To(Equal(0))
+		})
+
+		It("should be able to handle exception of invalid id", func() {
+			req := httptest.NewRequest(http.MethodDelete, "/v1/works/abc", nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			httpResponse := w.Result()
+			defer httpResponse.Body.Close()
+
+			Expect(httpResponse.StatusCode).To(Equal(http.StatusBadRequest))
+			bodyBytes, _ := ioutil.ReadAll(httpResponse.Body)
+			Expect(string(bodyBytes)).To(MatchJSON(`{"code":"common.bad_param","message":"invalid id 'abc'","data":null}`))
+		})
+
+		It("should be able to handle exception of unexpected", func() {
+			workManager.DeleteWorkFunc = func(id utils.ID) error {
+				return errors.New("unexpected exception")
+			}
+			req := httptest.NewRequest(http.MethodDelete, "/v1/works/123", nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			httpResponse := w.Result()
+			defer httpResponse.Body.Close()
+
+			Expect(httpResponse.StatusCode).To(Equal(http.StatusInternalServerError))
+			bodyBytes, _ := ioutil.ReadAll(httpResponse.Body)
+			Expect(string(bodyBytes)).To(MatchJSON(`{"code":"common.internal_server_error","message":"unexpected exception","data":null}`))
+		})
+	})
 })
 
 type workManagerMock struct {
 	QueryWorkFunc  func() (*[]domain.Work, error)
 	WorkDetailFunc func(id utils.ID) (*domain.WorkDetail, error)
 	CreateWorkFunc func(c *domain.WorkCreation) (*domain.WorkDetail, error)
+	DeleteWorkFunc func(id utils.ID) error
 }
 
 func (m *workManagerMock) QueryWork() (*[]domain.Work, error) {
@@ -145,4 +190,7 @@ func (m *workManagerMock) WorkDetail(id utils.ID) (*domain.WorkDetail, error) {
 }
 func (m *workManagerMock) CreateWork(c *domain.WorkCreation) (*domain.WorkDetail, error) {
 	return m.CreateWorkFunc(c)
+}
+func (m *workManagerMock) DeleteWork(id utils.ID) error {
+	return m.DeleteWorkFunc(id)
 }

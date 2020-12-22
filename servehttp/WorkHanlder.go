@@ -17,9 +17,9 @@ func RegisterWorkHandler(r *gin.Engine, m domain.WorkManagerTraits) {
 
 	g.GET("", handler.handleQuery)
 	g.POST("", handler.handleCreate)
-	g.GET("{id}", handler.handleDetail)
+	g.GET(":id", handler.handleDetail)
 	//g.PUT("{id}", handler.handleUpdate)
-	//g.DELETE("{id}", handler.handleDelete)
+	g.DELETE(":id", handler.handleDelete)
 }
 
 type workHandler struct {
@@ -69,4 +69,20 @@ func (h *workHandler) handleQuery(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, &PagedBody{List: works, Total: uint64(len(*works))})
+}
+
+func (h *workHandler) handleDelete(c *gin.Context) {
+	id, err := utils.ParseID(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("id") + "'"})
+		return
+	}
+
+	err = h.workManager.DeleteWork(id)
+	if err != nil {
+		// TODO 区分不存在和其他错误
+		c.JSON(http.StatusInternalServerError, &ErrorBody{Code: "common.internal_server_error", Message: err.Error()})
+		return
+	}
+	c.JSON(http.StatusNoContent, nil)
 }

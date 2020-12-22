@@ -34,7 +34,10 @@ func (m *DataSourceManager) Stop() {
 }
 
 func (m *DataSourceManager) GormDB() *gorm.DB {
-	return m.gormDB
+	if m.gormDB != nil {
+		return m.gormDB.New()
+	}
+	return nil
 }
 
 func connect(config *DatabaseConfig) (*gorm.DB, error) {

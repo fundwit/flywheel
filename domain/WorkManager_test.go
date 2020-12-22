@@ -82,4 +82,24 @@ var _ = Describe("WorkManager", func() {
 			//Expect(len(work1.Properties)).To(Equal(0))
 		})
 	})
+
+	Describe("DeleteWork", func() {
+		It("should be able to delete work by id", func() {
+			_, err := workManager.CreateWork(&domain.WorkCreation{Name: "test work1", Group: "test group"})
+			Expect(err).To(BeZero())
+			_, err = workManager.CreateWork(&domain.WorkCreation{Name: "test work2", Group: "test group"})
+			Expect(err).To(BeZero())
+
+			works, err := workManager.QueryWork()
+			Expect(err).To(BeNil())
+			Expect(works).ToNot(BeNil())
+			Expect(len(*works)).To(Equal(2))
+
+			err = workManager.DeleteWork((*works)[0].ID)
+			Expect(err).To(BeNil())
+			works, err = workManager.QueryWork()
+			Expect(err).To(BeNil())
+			Expect(len(*works)).To(Equal(1))
+		})
+	})
 })

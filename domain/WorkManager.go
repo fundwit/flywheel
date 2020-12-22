@@ -12,6 +12,7 @@ type WorkManagerTraits interface {
 	QueryWork() (*[]Work, error)
 	WorkDetail(id utils.ID) (*WorkDetail, error)
 	CreateWork(c *WorkCreation) (*WorkDetail, error)
+	DeleteWork(id utils.ID) error
 }
 
 type WorkManager struct {
@@ -77,4 +78,12 @@ func (m *WorkManager) CreateWork(c *WorkCreation) (*WorkDetail, error) {
 	}
 
 	return workDetail, nil
+}
+
+func (m *WorkManager) DeleteWork(id utils.ID) error {
+	db := m.dataSource.GormDB()
+	if err := db.Delete(Work{}, "id = ?", id).Error; err != nil {
+		return err
+	}
+	return nil
 }

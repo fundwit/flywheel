@@ -1,8 +1,8 @@
 package domain
 
 import (
+	"flywheel/domain/flow"
 	"flywheel/domain/state"
-	"flywheel/domain/worktype"
 	"flywheel/utils"
 	"time"
 )
@@ -14,25 +14,25 @@ type WorkCreation struct {
 
 type WorkDetail struct {
 	Work
-	Type  worktype.WorkTypeBase `json:"type"`
-	State state.State           `json:"state"`
+	Type  flow.WorkFlowBase `json:"type"`
+	State state.State       `json:"state"`
 }
 
 func (c *WorkCreation) BuildWorkDetail(id utils.ID) *WorkDetail {
-	workType := &worktype.GenericWorkType
-	initState := worktype.GenericWorkType.StateMachine.States[0]
+	workFlow := &flow.GenericWorkFlow
+	initState := flow.GenericWorkFlow.StateMachine.States[0]
 
 	return &WorkDetail{
 		Work: Work{
 			ID:     id,
 			Name:   c.Name,
 			Group:  c.Group,
-			TypeID: workType.ID,
+			FlowID: workFlow.ID,
 
 			StateName:  initState.Name,
 			CreateTime: time.Now(),
 		},
-		Type:  workType.WorkTypeBase,
+		Type:  workFlow.WorkFlowBase,
 		State: initState,
 	}
 }

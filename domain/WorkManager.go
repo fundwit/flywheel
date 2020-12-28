@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"flywheel/domain/worktype"
+	"flywheel/domain/flow"
 	"flywheel/persistence"
 	"flywheel/utils"
 	"github.com/jinzhu/gorm"
@@ -47,9 +47,9 @@ func (m *WorkManager) WorkDetail(id utils.ID) (*WorkDetail, error) {
 	}
 
 	// load type and state
-	gwt := worktype.GenericWorkType
+	gwt := flow.GenericWorkFlow
 
-	workDetail.Type = gwt.WorkTypeBase
+	workDetail.Type = gwt.WorkFlowBase
 	state, err := gwt.FindState(workDetail.StateName)
 	if err != nil {
 		return nil, err

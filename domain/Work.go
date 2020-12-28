@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"flywheel/domain/worktype"
+	"flywheel/domain/flow"
 	"flywheel/utils"
 	"time"
 )
@@ -10,7 +10,7 @@ type Work struct {
 	ID         utils.ID  `json:"id"`
 	Name       string    `json:"name"`
 	Group      string    `json:"group"`
-	TypeID     utils.ID  `json:"typeId"`
+	FlowID     utils.ID  `json:"flowId"`
 	CreateTime time.Time `json:"createTime"`
 
 	StateName string `json:"stateName"`
@@ -18,6 +18,6 @@ type Work struct {
 }
 
 type PropertyAssign struct {
-	Definition *worktype.PropertyDefinition `json:"definition"`
-	Value      string                       `json:"value"`
+	Definition *flow.PropertyDefinition `json:"definition"`
+	Value      string                   `json:"value"`
 }

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flywheel/domain"
-	"flywheel/domain/worktype"
+	"flywheel/domain/flow"
 	"flywheel/servehttp"
 	"flywheel/utils"
 	"github.com/gin-gonic/gin"
@@ -43,12 +43,12 @@ var _ = Describe("WorkHandler", func() {
 							ID:         123,
 							Name:       creation.Name,
 							Group:      creation.Group,
-							TypeID:     worktype.GenericWorkType.ID,
+							FlowID:     flow.GenericWorkFlow.ID,
 							CreateTime: t,
-							StateName:  worktype.GenericWorkType.StateMachine.States[0].Name,
+							StateName:  flow.GenericWorkFlow.StateMachine.States[0].Name,
 						},
-						Type:  worktype.GenericWorkType.WorkTypeBase,
-						State: worktype.GenericWorkType.StateMachine.States[0],
+						Type:  flow.GenericWorkFlow.WorkFlowBase,
+						State: flow.GenericWorkFlow.StateMachine.States[0],
 					}
 					return &detail, nil
 				}
@@ -65,7 +65,7 @@ var _ = Describe("WorkHandler", func() {
 
 			Expect(httpResponse.StatusCode).To(Equal(http.StatusCreated))
 			bodyBytes, _ := ioutil.ReadAll(httpResponse.Body)
-			Expect(string(bodyBytes)).To(MatchJSON(`{"id":"123","name":"test work","group":"test-group","typeId":"1",
+			Expect(string(bodyBytes)).To(MatchJSON(`{"id":"123","name":"test work","group":"test-group","flowId":"1",
 			"createTime":"` + timeString + `","stateName":"PENDING","type":{"id":"1","name":"GenericTask"},"state":{"Name":"PENDING"}}`))
 		})
 
@@ -87,8 +87,8 @@ var _ = Describe("WorkHandler", func() {
 			workManager.QueryWorkFunc = func() (*[]domain.Work, error) {
 				{
 					works := []domain.Work{
-						{ID: 1, Name: "work1", Group: "default", TypeID: 1, CreateTime: t, StateName: "PENDING"},
-						{ID: 2, Name: "work2", Group: "default", TypeID: 1, CreateTime: t, StateName: "PENDING"},
+						{ID: 1, Name: "work1", Group: "default", FlowID: 1, CreateTime: t, StateName: "PENDING"},
+						{ID: 2, Name: "work2", Group: "default", FlowID: 1, CreateTime: t, StateName: "PENDING"},
 					}
 					return &works, nil
 				}
@@ -102,8 +102,8 @@ var _ = Describe("WorkHandler", func() {
 
 			Expect(httpResponse.StatusCode).To(Equal(http.StatusOK))
 			bodyBytes, _ := ioutil.ReadAll(httpResponse.Body)
-			Expect(string(bodyBytes)).To(MatchJSON(`{"data":[{"id":"1","name":"work1","group":"default","typeId":"1",
-			"createTime":"` + timeString + `","stateName":"PENDING"},{"id":"2","name":"work2","group":"default","typeId":"1",
+			Expect(string(bodyBytes)).To(MatchJSON(`{"data":[{"id":"1","name":"work1","group":"default","flowId":"1",
+			"createTime":"` + timeString + `","stateName":"PENDING"},{"id":"2","name":"work2","group":"default","flowId":"1",
 			"createTime":"` + timeString + `","stateName":"PENDING"}],"total": 2}`))
 		})
 

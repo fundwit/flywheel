@@ -2,7 +2,7 @@ package domain_test
 
 import (
 	"flywheel/domain"
-	"flywheel/domain/worktype"
+	"flywheel/domain/flow"
 	"flywheel/testinfra"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -41,8 +41,8 @@ var _ = Describe("WorkManager", func() {
 			Ω(work.Name).Should(Equal(creation.Name))
 			Ω(work.Group).Should(Equal(creation.Group))
 			Ω(work.CreateTime).ShouldNot(BeZero())
-			Ω(work.Type).Should(Equal(worktype.GenericWorkType.WorkTypeBase))
-			Ω(work.State).Should(Equal(worktype.GenericWorkType.StateMachine.States[0]))
+			Ω(work.Type).Should(Equal(flow.GenericWorkFlow.WorkFlowBase))
+			Ω(work.State).Should(Equal(flow.GenericWorkFlow.StateMachine.States[0]))
 			//Ω(len(work.Properties)).Should(Equal(0))
 
 			detail, err := workManager.WorkDetail(work.ID)
@@ -52,10 +52,10 @@ var _ = Describe("WorkManager", func() {
 			Expect(detail.Name).To(Equal(creation.Name))
 			Expect(detail.Group).To(Equal(creation.Group))
 			Expect(detail.CreateTime).ToNot(BeZero())
-			Expect(detail.Type).To(Equal(worktype.GenericWorkType.WorkTypeBase))
-			Expect(detail.State).To(Equal(worktype.GenericWorkType.StateMachine.States[0]))
-			Expect(detail.TypeID).To(Equal(worktype.GenericWorkType.ID))
-			Expect(detail.StateName).To(Equal(worktype.GenericWorkType.StateMachine.States[0].Name))
+			Expect(detail.Type).To(Equal(flow.GenericWorkFlow.WorkFlowBase))
+			Expect(detail.State).To(Equal(flow.GenericWorkFlow.StateMachine.States[0]))
+			Expect(detail.FlowID).To(Equal(flow.GenericWorkFlow.ID))
+			Expect(detail.StateName).To(Equal(flow.GenericWorkFlow.StateMachine.States[0].Name))
 			//Expect(len(work.Properties)).To(Equal(0))
 		})
 	})
@@ -77,8 +77,8 @@ var _ = Describe("WorkManager", func() {
 			Expect(work1.Name).To(Equal("test work1"))
 			Expect(work1.Group).To(Equal("test group"))
 			Expect(work1.CreateTime).ToNot(BeZero())
-			Expect(work1.TypeID).To(Equal(worktype.GenericWorkType.ID))
-			Expect(work1.StateName).To(Equal(worktype.GenericWorkType.StateMachine.States[0].Name))
+			Expect(work1.FlowID).To(Equal(flow.GenericWorkFlow.ID))
+			Expect(work1.StateName).To(Equal(flow.GenericWorkFlow.StateMachine.States[0].Name))
 			//Expect(len(work1.Properties)).To(Equal(0))
 		})
 	})

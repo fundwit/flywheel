@@ -1,4 +1,4 @@
-package worktype
+package flow
 
 import (
 	"errors"
@@ -6,17 +6,17 @@ import (
 	"flywheel/utils"
 )
 
-type WorkTypeFace interface {
+type WorkFlowFace interface {
 	FindState(string) *state.State
 }
 
-type WorkTypeBase struct {
+type WorkFlowBase struct {
 	ID   utils.ID `json:"id"`
 	Name string   `json:"name"`
 }
 
-type WorkType struct {
-	WorkTypeBase
+type WorkFlow struct {
+	WorkFlowBase
 
 	PropertyDefinitions []PropertyDefinition `json:"propertyDefinitions"`
 	StateMachine        state.StateMachine   `json:"stateMachine"`
@@ -26,7 +26,7 @@ type PropertyDefinition struct {
 	Name string `json:"name"`
 }
 
-func (wt *WorkType) FindState(stateName string) (state.State, error) {
+func (wt *WorkFlow) FindState(stateName string) (state.State, error) {
 	for _, s := range wt.StateMachine.States {
 		if stateName == s.Name {
 			return s, nil
@@ -35,8 +35,8 @@ func (wt *WorkType) FindState(stateName string) (state.State, error) {
 	return state.State{}, errors.New("invalid state name")
 }
 
-var GenericWorkType = WorkType{
-	WorkTypeBase: WorkTypeBase{
+var GenericWorkFlow = WorkFlow{
+	WorkFlowBase: WorkFlowBase{
 		ID:   1,
 		Name: "GenericTask",
 	},

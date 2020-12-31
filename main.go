@@ -44,6 +44,7 @@ func main() {
 
 	workSvc := domain.NewWorkManager(ds)
 	servehttp.RegisterWorkHandler(engine, workSvc)
+	servehttp.RegisterWorkflowHandler(engine)
 
 	err = engine.Run(":80")
 	if err != nil {

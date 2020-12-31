@@ -1,7 +1,6 @@
 package flow
 
 import (
-	"errors"
 	"flywheel/domain/state"
 	"flywheel/utils"
 )
@@ -26,13 +25,20 @@ type PropertyDefinition struct {
 	Name string `json:"name"`
 }
 
-func (wt *WorkFlow) FindState(stateName string) (state.State, error) {
+func (wt *WorkFlow) FindState(stateName string) (state.State, bool) {
 	for _, s := range wt.StateMachine.States {
 		if stateName == s.Name {
-			return s, nil
+			return s, true
 		}
 	}
-	return state.State{}, errors.New("invalid state name")
+	return state.State{}, false
+}
+
+func FindWorkflow(ID utils.ID) *WorkFlow {
+	if ID == GenericWorkFlow.ID {
+		return &GenericWorkFlow
+	}
+	return nil
 }
 
 var GenericWorkFlow = WorkFlow{

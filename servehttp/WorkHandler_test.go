@@ -66,7 +66,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(httpResponse.StatusCode).To(Equal(http.StatusCreated))
 			bodyBytes, _ := ioutil.ReadAll(httpResponse.Body)
 			Expect(string(bodyBytes)).To(MatchJSON(`{"id":"123","name":"test work","group":"test-group","flowId":"1",
-			"createTime":"` + timeString + `","stateName":"PENDING","type":{"id":"1","name":"GenericTask"},"state":{"Name":"PENDING"}}`))
+			"createTime":"` + timeString + `","stateName":"PENDING","type":{"id":"1","name":"GenericTask"},"state":{"name":"PENDING"}}`))
 		})
 
 		It("should return 400 when validate failed", func() {

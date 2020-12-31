@@ -4,6 +4,7 @@ import (
 	"flywheel/domain/flow"
 	"flywheel/persistence"
 	"flywheel/utils"
+	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
 )
@@ -50,9 +51,9 @@ func (m *WorkManager) WorkDetail(id utils.ID) (*WorkDetail, error) {
 	gwt := flow.GenericWorkFlow
 
 	workDetail.Type = gwt.WorkFlowBase
-	state, err := gwt.FindState(workDetail.StateName)
-	if err != nil {
-		return nil, err
+	state, found := gwt.FindState(workDetail.StateName)
+	if !found {
+		return nil, fmt.Errorf("invalid state '%s'", workDetail.StateName)
 	}
 	workDetail.State = state
 

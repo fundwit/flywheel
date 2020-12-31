@@ -50,21 +50,39 @@ var _ = Describe("StateMachine", func() {
 			It("should return availableTransitions as expected", func() {
 				Expect(stateMachine).NotTo(BeZero())
 
-				Ω(stateMachine.AvailableTransitions(state.State{Name: "PENDING"})).Should(Equal([]state.Transition{
+				Ω(stateMachine.AvailableTransitions("", "")).Should(Equal([]state.Transition{
+					{Name: "begin", From: state.State{Name: "PENDING"}, To: state.State{Name: "DOING"}},
+					{Name: "close", From: state.State{Name: "PENDING"}, To: state.State{Name: "DONE"}},
+					{Name: "cancel", From: state.State{Name: "DOING"}, To: state.State{Name: "PENDING"}},
+					{Name: "finish", From: state.State{Name: "DOING"}, To: state.State{Name: "DONE"}},
+					{Name: "reopen", From: state.State{Name: "DONE"}, To: state.State{Name: "PENDING"}},
+				}))
+
+				Ω(stateMachine.AvailableTransitions("PENDING", "")).Should(Equal([]state.Transition{
 					{Name: "begin", From: state.State{Name: "PENDING"}, To: state.State{Name: "DOING"}},
 					{Name: "close", From: state.State{Name: "PENDING"}, To: state.State{Name: "DONE"}},
 				}))
 
-				Ω(stateMachine.AvailableTransitions(state.State{Name: "DOING"})).Should(Equal([]state.Transition{
+				Ω(stateMachine.AvailableTransitions("", "PENDING")).Should(Equal([]state.Transition{
+					{Name: "cancel", From: state.State{Name: "DOING"}, To: state.State{Name: "PENDING"}},
+					{Name: "reopen", From: state.State{Name: "DONE"}, To: state.State{Name: "PENDING"}},
+				}))
+
+				Ω(stateMachine.AvailableTransitions("PENDING", "DOING")).Should(Equal([]state.Transition{
+					{Name: "begin", From: state.State{Name: "PENDING"}, To: state.State{Name: "DOING"}},
+				}))
+
+				Ω(stateMachine.AvailableTransitions("DOING", "")).Should(Equal([]state.Transition{
 					{Name: "cancel", From: state.State{Name: "DOING"}, To: state.State{Name: "PENDING"}},
 					{Name: "finish", From: state.State{Name: "DOING"}, To: state.State{Name: "DONE"}},
 				}))
 
-				Ω(stateMachine.AvailableTransitions(state.State{Name: "DONE"})).Should(Equal([]state.Transition{
+				Ω(stateMachine.AvailableTransitions("DONE", "")).Should(Equal([]state.Transition{
 					{Name: "reopen", From: state.State{Name: "DONE"}, To: state.State{Name: "PENDING"}},
 				}))
 
-				Ω(len(stateMachine.AvailableTransitions(state.State{Name: "UNKNOWN"}))).Should(Equal(0))
+				Ω(len(stateMachine.AvailableTransitions("UNKNOWN", ""))).Should(Equal(0))
+
 			})
 		})
 	})

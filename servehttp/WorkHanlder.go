@@ -20,6 +20,11 @@ func RegisterWorkHandler(r *gin.Engine, m domain.WorkManagerTraits) {
 	g.GET(":id", handler.handleDetail)
 	//g.PUT("{id}", handler.handleUpdate)
 	g.DELETE(":id", handler.handleDelete)
+
+	// transition history
+	//g.GET(":id/transitions", handler.)
+	//g.POST(":id/transitions", handler.)
+	//g.GET(":id/transitions/:tid", handler.)
 }
 
 type workHandler struct {

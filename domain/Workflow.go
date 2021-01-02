@@ -1,4 +1,4 @@
-package flow
+package domain
 
 import (
 	"flywheel/domain/state"
@@ -19,10 +19,6 @@ type WorkFlow struct {
 
 	PropertyDefinitions []PropertyDefinition `json:"propertyDefinitions"`
 	StateMachine        state.StateMachine   `json:"stateMachine"`
-}
-
-type PropertyDefinition struct {
-	Name string `json:"name"`
 }
 
 func (wt *WorkFlow) FindState(stateName string) (state.State, bool) {

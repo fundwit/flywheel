@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"flywheel/domain"
-	"flywheel/domain/flow"
 	"flywheel/servehttp"
 	"flywheel/utils"
 	"github.com/gin-gonic/gin"
@@ -43,12 +42,12 @@ var _ = Describe("WorkHandler", func() {
 							ID:         123,
 							Name:       creation.Name,
 							Group:      creation.Group,
-							FlowID:     flow.GenericWorkFlow.ID,
+							FlowID:     domain.GenericWorkFlow.ID,
 							CreateTime: t,
-							StateName:  flow.GenericWorkFlow.StateMachine.States[0].Name,
+							StateName:  domain.GenericWorkFlow.StateMachine.States[0].Name,
 						},
-						Type:  flow.GenericWorkFlow.WorkFlowBase,
-						State: flow.GenericWorkFlow.StateMachine.States[0],
+						Type:  domain.GenericWorkFlow.WorkFlowBase,
+						State: domain.GenericWorkFlow.StateMachine.States[0],
 					}
 					return &detail, nil
 				}

@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"flywheel/domain/flow"
 	"flywheel/utils"
 	"time"
 )
@@ -17,7 +16,11 @@ type Work struct {
 	// Properties []PropertyAssign `json:"properties"`
 }
 
+type PropertyDefinition struct {
+	Name string `json:"name"`
+}
+
 type PropertyAssign struct {
-	Definition *flow.PropertyDefinition `json:"definition"`
-	Value      string                   `json:"value"`
+	Definition *PropertyDefinition `json:"definition"`
+	Value      string              `json:"value"`
 }

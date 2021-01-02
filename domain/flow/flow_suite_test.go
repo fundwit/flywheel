@@ -1,4 +1,4 @@
-package domain_test
+package flow_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestFlywheel(t *testing.T) {
+func TestFlow(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "domain Suite")
+	RunSpecs(t, "Flow Suite")
 }

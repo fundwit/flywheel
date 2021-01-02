@@ -1,7 +1,7 @@
 package servehttp
 
 import (
-	"flywheel/domain/flow"
+	"flywheel/domain"
 	"flywheel/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -40,7 +40,7 @@ func (h *workflowHandler) handleQueryStates(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: "invalid flowId '" + c.Params.ByName("flowId") + "'"})
 		return
 	}
-	workflow := flow.FindWorkflow(query.FlowID)
+	workflow := domain.FindWorkflow(query.FlowID)
 	if workflow == nil {
 		c.JSON(http.StatusNotFound, &ErrorBody{Code: "common.bad_param",
 			Message: "the flow of id " + strconv.FormatUint(uint64(query.FlowID), 10) + " was not found"})
@@ -69,7 +69,7 @@ func (h *workflowHandler) handleQueryTransitions(c *gin.Context) {
 		return
 	}
 
-	workflow := flow.FindWorkflow(query.FlowID)
+	workflow := domain.FindWorkflow(query.FlowID)
 	if workflow == nil {
 		c.JSON(http.StatusNotFound, &ErrorBody{Code: "common.bad_param",
 			Message: "the flow of id " + strconv.FormatUint(uint64(query.FlowID), 10) + " was not found"})

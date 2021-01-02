@@ -1,8 +1,8 @@
-package domain_test
+package work_test
 
 import (
 	"flywheel/domain"
-	"flywheel/domain/flow"
+	"flywheel/domain/work"
 	"flywheel/testinfra"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -11,7 +11,7 @@ import (
 
 var _ = Describe("WorkManager", func() {
 	var (
-		workManager  *domain.WorkManager
+		workManager  *work.WorkManager
 		testDatabase *testinfra.TestDatabase
 	)
 	BeforeEach(func() {
@@ -21,7 +21,7 @@ var _ = Describe("WorkManager", func() {
 		if err != nil {
 			log.Fatalf("database migration failed %v\n", err)
 		}
-		workManager = domain.NewWorkManager(testDatabase.DS)
+		workManager = work.NewWorkManager(testDatabase.DS)
 	})
 	AfterEach(func() {
 		testinfra.StopMysqlTestDatabase(testDatabase)
@@ -41,8 +41,8 @@ var _ = Describe("WorkManager", func() {
 			Ω(work.Name).Should(Equal(creation.Name))
 			Ω(work.Group).Should(Equal(creation.Group))
 			Ω(work.CreateTime).ShouldNot(BeZero())
-			Ω(work.Type).Should(Equal(flow.GenericWorkFlow.WorkFlowBase))
-			Ω(work.State).Should(Equal(flow.GenericWorkFlow.StateMachine.States[0]))
+			Ω(work.Type).Should(Equal(domain.GenericWorkFlow.WorkFlowBase))
+			Ω(work.State).Should(Equal(domain.GenericWorkFlow.StateMachine.States[0]))
 			//Ω(len(work.Properties)).Should(Equal(0))
 
 			detail, err := workManager.WorkDetail(work.ID)
@@ -52,10 +52,10 @@ var _ = Describe("WorkManager", func() {
 			Expect(detail.Name).To(Equal(creation.Name))
 			Expect(detail.Group).To(Equal(creation.Group))
 			Expect(detail.CreateTime).ToNot(BeZero())
-			Expect(detail.Type).To(Equal(flow.GenericWorkFlow.WorkFlowBase))
-			Expect(detail.State).To(Equal(flow.GenericWorkFlow.StateMachine.States[0]))
-			Expect(detail.FlowID).To(Equal(flow.GenericWorkFlow.ID))
-			Expect(detail.StateName).To(Equal(flow.GenericWorkFlow.StateMachine.States[0].Name))
+			Expect(detail.Type).To(Equal(domain.GenericWorkFlow.WorkFlowBase))
+			Expect(detail.State).To(Equal(domain.GenericWorkFlow.StateMachine.States[0]))
+			Expect(detail.FlowID).To(Equal(domain.GenericWorkFlow.ID))
+			Expect(detail.StateName).To(Equal(domain.GenericWorkFlow.StateMachine.States[0].Name))
 			//Expect(len(work.Properties)).To(Equal(0))
 		})
 	})
@@ -77,8 +77,8 @@ var _ = Describe("WorkManager", func() {
 			Expect(work1.Name).To(Equal("test work1"))
 			Expect(work1.Group).To(Equal("test group"))
 			Expect(work1.CreateTime).ToNot(BeZero())
-			Expect(work1.FlowID).To(Equal(flow.GenericWorkFlow.ID))
-			Expect(work1.StateName).To(Equal(flow.GenericWorkFlow.StateMachine.States[0].Name))
+			Expect(work1.FlowID).To(Equal(domain.GenericWorkFlow.ID))
+			Expect(work1.StateName).To(Equal(domain.GenericWorkFlow.StateMachine.States[0].Name))
 			//Expect(len(work1.Properties)).To(Equal(0))
 		})
 	})

@@ -1,7 +1,7 @@
-package domain
+package work
 
 import (
-	"flywheel/domain/flow"
+	"flywheel/domain"
 	"flywheel/persistence"
 	"flywheel/utils"
 	"fmt"
@@ -10,9 +10,9 @@ import (
 )
 
 type WorkManagerTraits interface {
-	QueryWork() (*[]Work, error)
-	WorkDetail(id utils.ID) (*WorkDetail, error)
-	CreateWork(c *WorkCreation) (*WorkDetail, error)
+	QueryWork() (*[]domain.Work, error)
+	WorkDetail(id utils.ID) (*domain.WorkDetail, error)
+	CreateWork(c *domain.WorkCreation) (*domain.WorkDetail, error)
 	DeleteWork(id utils.ID) error
 }
 
@@ -28,27 +28,27 @@ func NewWorkManager(ds *persistence.DataSourceManager) *WorkManager {
 	}
 }
 
-func (m *WorkManager) QueryWork() (*[]Work, error) {
-	var works []Work
+func (m *WorkManager) QueryWork() (*[]domain.Work, error) {
+	var works []domain.Work
 	db := m.dataSource.GormDB()
 
-	if err := db.Model(Work{}).Find(&works).Error; err != nil {
+	if err := db.Model(domain.Work{}).Find(&works).Error; err != nil {
 		return nil, err
 	}
 
 	return &works, nil
 }
 
-func (m *WorkManager) WorkDetail(id utils.ID) (*WorkDetail, error) {
-	workDetail := WorkDetail{}
+func (m *WorkManager) WorkDetail(id utils.ID) (*domain.WorkDetail, error) {
+	workDetail := domain.WorkDetail{}
 	db := m.dataSource.GormDB()
 
-	if err := db.Where(&Work{ID: id}).First(&(workDetail.Work)).Error; err != nil {
+	if err := db.Where(&domain.Work{ID: id}).First(&(workDetail.Work)).Error; err != nil {
 		return nil, err
 	}
 
 	// load type and state
-	gwt := flow.GenericWorkFlow
+	gwt := domain.GenericWorkFlow
 
 	workDetail.Type = gwt.WorkFlowBase
 	state, found := gwt.FindState(workDetail.StateName)
@@ -60,7 +60,7 @@ func (m *WorkManager) WorkDetail(id utils.ID) (*WorkDetail, error) {
 	return &workDetail, nil
 }
 
-func (m *WorkManager) CreateWork(c *WorkCreation) (*WorkDetail, error) {
+func (m *WorkManager) CreateWork(c *domain.WorkCreation) (*domain.WorkDetail, error) {
 	id, err := m.idWorker.NextID()
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (m *WorkManager) CreateWork(c *WorkCreation) (*WorkDetail, error) {
 
 func (m *WorkManager) DeleteWork(id utils.ID) error {
 	db := m.dataSource.GormDB()
-	if err := db.Delete(Work{}, "id = ?", id).Error; err != nil {
+	if err := db.Delete(domain.Work{}, "id = ?", id).Error; err != nil {
 		return err
 	}
 	return nil

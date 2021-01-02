@@ -2,6 +2,7 @@ package servehttp
 
 import (
 	"flywheel/domain"
+	"flywheel/domain/work"
 	"flywheel/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -9,7 +10,7 @@ import (
 	"net/http"
 )
 
-func RegisterWorkHandler(r *gin.Engine, m domain.WorkManagerTraits) {
+func RegisterWorkHandler(r *gin.Engine, m work.WorkManagerTraits) {
 	// group: "", version: v1, resource: work
 	g := r.Group("/v1/works")
 
@@ -28,7 +29,7 @@ func RegisterWorkHandler(r *gin.Engine, m domain.WorkManagerTraits) {
 }
 
 type workHandler struct {
-	workManager domain.WorkManagerTraits
+	workManager work.WorkManagerTraits
 	validator   *validator.Validate
 }
 

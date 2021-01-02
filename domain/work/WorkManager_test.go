@@ -28,11 +28,17 @@ var _ = Describe("WorkManager", func() {
 	})
 
 	Describe("CreateWork and Detail", func() {
+		It("should be able to catch db errors", func() {
+			testDatabase.DS.GormDB().DropTable(&domain.Work{})
+
+			creation := &domain.WorkCreation{Name: "test work", Group: "test group"}
+			work, err := workManager.CreateWork(creation)
+			Expect(work).To(BeNil())
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
+		})
 		It("should create new workManager successfully", func() {
-			creation := &domain.WorkCreation{
-				Name:  "test work",
-				Group: "test group",
-			}
+			creation := &domain.WorkCreation{Name: "test work", Group: "test group"}
 			work, err := workManager.CreateWork(creation)
 
 			Expect(err).To(BeZero())
@@ -83,6 +89,45 @@ var _ = Describe("WorkManager", func() {
 		})
 	})
 
+	Describe("UpdateWork", func() {
+		It("should be able to update work", func() {
+			detail, err := workManager.CreateWork(&domain.WorkCreation{Name: "test work1", Group: "test group"})
+			Expect(err).To(BeZero())
+
+			updatedWork, err := workManager.UpdateWork(detail.ID, &domain.WorkUpdating{Name: "test work1 new"})
+			Expect(err).To(BeZero())
+			Expect(updatedWork).ToNot(BeNil())
+			Expect(updatedWork.ID).To(Equal(detail.ID))
+			Expect(updatedWork.Name).To(Equal("test work1 new"))
+
+			works, err := workManager.QueryWork()
+			Expect(err).To(BeNil())
+			Expect(works).ToNot(BeNil())
+			Expect(len(*works)).To(Equal(1))
+
+			Expect((*works)[0].ID).To(Equal(detail.ID))
+			Expect((*works)[0].Name).To(Equal("test work1 new"))
+		})
+		It("should be able to catch error when work not found", func() {
+			_, err := workManager.CreateWork(&domain.WorkCreation{Name: "test work1", Group: "test group"})
+			Expect(err).To(BeZero())
+
+			updatedWork, err := workManager.UpdateWork(12345, &domain.WorkUpdating{Name: "test work1 new"})
+			Expect(updatedWork).To(BeNil())
+			Expect(err).ToNot(BeZero())
+			Expect(err.Error()).To(Equal("expected affected row is 1, but actual is 0"))
+		})
+
+		It("should be able to catch db errors", func() {
+			testDatabase.DS.GormDB().DropTable(&domain.Work{})
+
+			updatedWork, err := workManager.UpdateWork(12345, &domain.WorkUpdating{Name: "test work1 new"})
+			Expect(updatedWork).To(BeNil())
+			Expect(err).ToNot(BeZero())
+			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
+		})
+	})
+
 	Describe("DeleteWork", func() {
 		It("should be able to delete work by id", func() {
 			_, err := workManager.CreateWork(&domain.WorkCreation{Name: "test work1", Group: "test group"})
@@ -100,6 +145,13 @@ var _ = Describe("WorkManager", func() {
 			works, err = workManager.QueryWork()
 			Expect(err).To(BeNil())
 			Expect(len(*works)).To(Equal(1))
+		})
+
+		It("should be able to catch db errors", func() {
+			testDatabase.DS.GormDB().DropTable(&domain.Work{})
+			err := workManager.DeleteWork(123)
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
 		})
 	})
 })

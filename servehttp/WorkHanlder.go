@@ -18,14 +18,9 @@ func RegisterWorkHandler(r *gin.Engine, m work.WorkManagerTraits) {
 
 	g.GET("", handler.handleQuery)
 	g.POST("", handler.handleCreate)
-	g.GET(":id", handler.handleDetail)
-	//g.PUT("{id}", handler.handleUpdate)
+	//g.GET(":id", handler.handleDetail)
+	g.PUT(":id", handler.handleUpdate)
 	g.DELETE(":id", handler.handleDelete)
-
-	// transition history
-	//g.GET(":id/transitions", handler.)
-	//g.POST(":id/transitions", handler.)
-	//g.GET(":id/transitions/:tid", handler.)
 }
 
 type workHandler struct {
@@ -53,20 +48,20 @@ func (h *workHandler) handleCreate(c *gin.Context) {
 	}
 	c.JSON(http.StatusCreated, detail)
 }
-func (h *workHandler) handleDetail(c *gin.Context) {
-	id, err := utils.ParseID(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("id") + "'"})
-		return
-	}
-	detail, err := h.workManager.WorkDetail(id)
-	if err != nil {
-		// TODO 区分不存在和其他错误
-		c.JSON(http.StatusNotFound, &ErrorBody{Code: "common.not_found", Message: ""})
-		return
-	}
-	c.JSON(http.StatusOK, detail)
-}
+
+//func (h *workHandler) handleDetail(c *gin.Context) {
+//	id, err := utils.ParseID(c.Param("id"))
+//	if err != nil {
+//		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("id") + "'"})
+//		return
+//	}
+//	detail, err := h.workManager.WorkDetail(id)
+//	if err != nil {
+//		c.JSON(http.StatusNotFound, &ErrorBody{Code: "common.not_found", Message: ""})
+//		return
+//	}
+//	c.JSON(http.StatusOK, detail)
+//}
 
 func (h *workHandler) handleQuery(c *gin.Context) {
 	works, err := h.workManager.QueryWork()
@@ -75,6 +70,28 @@ func (h *workHandler) handleQuery(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, &PagedBody{List: works, Total: uint64(len(*works))})
+}
+
+func (h *workHandler) handleUpdate(c *gin.Context) {
+	id, err := utils.ParseID(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("id") + "'"})
+		return
+	}
+
+	updating := domain.WorkUpdating{}
+	err = c.ShouldBindBodyWith(&updating, binding.JSON)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: err.Error()})
+		return
+	}
+
+	updatedWork, err := h.workManager.UpdateWork(id, &updating)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, &ErrorBody{Code: "common.internal_server_error", Message: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, updatedWork)
 }
 
 func (h *workHandler) handleDelete(c *gin.Context) {

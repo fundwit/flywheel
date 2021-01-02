@@ -11,6 +11,10 @@ type WorkCreation struct {
 	Group string `json:"group" validate:"required"`
 }
 
+type WorkUpdating struct {
+	Name string `json:"name"`
+}
+
 type WorkDetail struct {
 	Work
 	Type  WorkFlowBase `json:"type"`

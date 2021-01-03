@@ -5,7 +5,7 @@ import (
 	"flywheel/domain"
 
 	"flywheel/persistence"
-	"flywheel/utils"
+	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
 	"strconv"
@@ -39,11 +39,11 @@ func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief)
 		return nil, errors.New("transition from " + c.FromState + " to " + c.ToState + " is not invalid")
 	}
 
-	id, err := m.idWorker.NextID()
+	newId, err := m.idWorker.NextID()
 	if err != nil {
 		return nil, err
 	}
-	record := &WorkStateTransition{ID: utils.ID(id), CreateTime: time.Now(), WorkStateTransitionBrief: *c}
+	record := &WorkStateTransition{ID: types.ID(newId), CreateTime: time.Now(), WorkStateTransitionBrief: *c}
 
 	db := m.dataSource.GormDB()
 	err = db.Transaction(func(tx *gorm.DB) error {

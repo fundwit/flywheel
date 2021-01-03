@@ -2,7 +2,7 @@ package servehttp
 
 import (
 	"flywheel/domain"
-	"flywheel/utils"
+	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"net/http"
@@ -10,7 +10,7 @@ import (
 )
 
 type TransitionQuery struct {
-	FlowID    utils.ID `uri:"flowId" json:"-" validate:"required,min=1"`
+	FlowID    types.ID `uri:"flowId" json:"-" validate:"required,min=1"`
 	FromState string   `form:"fromState"`
 	ToState   string   `form:"toState"`
 }

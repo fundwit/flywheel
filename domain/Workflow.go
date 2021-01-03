@@ -2,7 +2,7 @@ package domain
 
 import (
 	"flywheel/domain/state"
-	"flywheel/utils"
+	"github.com/fundwit/go-commons/types"
 )
 
 type WorkFlowFace interface {
@@ -10,7 +10,7 @@ type WorkFlowFace interface {
 }
 
 type WorkFlowBase struct {
-	ID   utils.ID `json:"id"`
+	ID   types.ID `json:"id"`
 	Name string   `json:"name"`
 }
 
@@ -30,7 +30,7 @@ func (wt *WorkFlow) FindState(stateName string) (state.State, bool) {
 	return state.State{}, false
 }
 
-func FindWorkflow(ID utils.ID) *WorkFlow {
+func FindWorkflow(ID types.ID) *WorkFlow {
 	if ID == GenericWorkFlow.ID {
 		return &GenericWorkFlow
 	}

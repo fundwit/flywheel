@@ -7,7 +7,7 @@ import (
 	"flywheel/domain"
 	"flywheel/servehttp"
 	"flywheel/testinfra"
-	"flywheel/utils"
+	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -141,7 +141,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid character 'b' looking for beginning of value","data":null}`))
 		})
 		It("should failed when service failed", func() {
-			workManager.UpdateWorkFunc = func(id utils.ID, u *domain.WorkUpdating) (*domain.Work, error) {
+			workManager.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating) (*domain.Work, error) {
 				return nil, errors.New("a mocked error")
 			}
 			req := httptest.NewRequest(http.MethodPut, "/v1/works/100", bytes.NewReader([]byte(
@@ -155,7 +155,7 @@ var _ = Describe("WorkHandler", func() {
 			timeBytes, err := t.MarshalJSON()
 			timeString := strings.Trim(string(timeBytes), `"`)
 			Expect(err).To(BeNil())
-			workManager.UpdateWorkFunc = func(id utils.ID, u *domain.WorkUpdating) (*domain.Work, error) {
+			workManager.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating) (*domain.Work, error) {
 				return &domain.Work{ID: 100, Name: "new-name", Group: "default", FlowID: 1, CreateTime: t, StateName: "PENDING"}, nil
 			}
 			req := httptest.NewRequest(http.MethodPut, "/v1/works/100", bytes.NewReader([]byte(
@@ -168,7 +168,7 @@ var _ = Describe("WorkHandler", func() {
 
 	Describe("handleDelete", func() {
 		It("should be able to handle delete work", func() {
-			workManager.DeleteWorkFunc = func(id utils.ID) error {
+			workManager.DeleteWorkFunc = func(id types.ID) error {
 				return nil
 			}
 			req := httptest.NewRequest(http.MethodDelete, "/v1/works/123", nil)
@@ -185,7 +185,7 @@ var _ = Describe("WorkHandler", func() {
 		})
 
 		It("should be able to handle exception of unexpected", func() {
-			workManager.DeleteWorkFunc = func(id utils.ID) error {
+			workManager.DeleteWorkFunc = func(id types.ID) error {
 				return errors.New("unexpected exception")
 			}
 			req := httptest.NewRequest(http.MethodDelete, "/v1/works/123", nil)
@@ -198,24 +198,24 @@ var _ = Describe("WorkHandler", func() {
 
 type workManagerMock struct {
 	QueryWorkFunc  func() (*[]domain.Work, error)
-	WorkDetailFunc func(id utils.ID) (*domain.WorkDetail, error)
+	WorkDetailFunc func(id types.ID) (*domain.WorkDetail, error)
 	CreateWorkFunc func(c *domain.WorkCreation) (*domain.WorkDetail, error)
-	DeleteWorkFunc func(id utils.ID) error
-	UpdateWorkFunc func(id utils.ID, u *domain.WorkUpdating) (*domain.Work, error)
+	DeleteWorkFunc func(id types.ID) error
+	UpdateWorkFunc func(id types.ID, u *domain.WorkUpdating) (*domain.Work, error)
 }
 
 func (m *workManagerMock) QueryWork() (*[]domain.Work, error) {
 	return m.QueryWorkFunc()
 }
-func (m *workManagerMock) WorkDetail(id utils.ID) (*domain.WorkDetail, error) {
+func (m *workManagerMock) WorkDetail(id types.ID) (*domain.WorkDetail, error) {
 	return m.WorkDetailFunc(id)
 }
 func (m *workManagerMock) CreateWork(c *domain.WorkCreation) (*domain.WorkDetail, error) {
 	return m.CreateWorkFunc(c)
 }
-func (m *workManagerMock) UpdateWork(id utils.ID, u *domain.WorkUpdating) (*domain.Work, error) {
+func (m *workManagerMock) UpdateWork(id types.ID, u *domain.WorkUpdating) (*domain.Work, error) {
 	return m.UpdateWorkFunc(id, u)
 }
-func (m *workManagerMock) DeleteWork(id utils.ID) error {
+func (m *workManagerMock) DeleteWork(id types.ID) error {
 	return m.DeleteWorkFunc(id)
 }

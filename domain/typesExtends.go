@@ -2,7 +2,7 @@ package domain
 
 import (
 	"flywheel/domain/state"
-	"flywheel/utils"
+	"github.com/fundwit/go-commons/types"
 	"time"
 )
 
@@ -21,7 +21,7 @@ type WorkDetail struct {
 	State state.State  `json:"state"`
 }
 
-func (c *WorkCreation) BuildWorkDetail(id utils.ID) *WorkDetail {
+func (c *WorkCreation) BuildWorkDetail(id types.ID) *WorkDetail {
 	workFlow := &GenericWorkFlow
 	initState := GenericWorkFlow.StateMachine.States[0]
 

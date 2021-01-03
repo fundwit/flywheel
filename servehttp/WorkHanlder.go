@@ -3,7 +3,7 @@ package servehttp
 import (
 	"flywheel/domain"
 	"flywheel/domain/work"
-	"flywheel/utils"
+	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
@@ -73,7 +73,7 @@ func (h *workHandler) handleQuery(c *gin.Context) {
 }
 
 func (h *workHandler) handleUpdate(c *gin.Context) {
-	id, err := utils.ParseID(c.Param("id"))
+	parsedId, err := types.ParseID(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("id") + "'"})
 		return
@@ -86,7 +86,7 @@ func (h *workHandler) handleUpdate(c *gin.Context) {
 		return
 	}
 
-	updatedWork, err := h.workManager.UpdateWork(id, &updating)
+	updatedWork, err := h.workManager.UpdateWork(parsedId, &updating)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, &ErrorBody{Code: "common.internal_server_error", Message: err.Error()})
 		return
@@ -95,13 +95,13 @@ func (h *workHandler) handleUpdate(c *gin.Context) {
 }
 
 func (h *workHandler) handleDelete(c *gin.Context) {
-	id, err := utils.ParseID(c.Param("id"))
+	parsedId, err := types.ParseID(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("id") + "'"})
 		return
 	}
 
-	err = h.workManager.DeleteWork(id)
+	err = h.workManager.DeleteWork(parsedId)
 	if err != nil {
 		// TODO 区分不存在和其他错误
 		c.JSON(http.StatusInternalServerError, &ErrorBody{Code: "common.internal_server_error", Message: err.Error()})

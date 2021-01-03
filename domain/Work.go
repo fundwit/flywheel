@@ -1,15 +1,15 @@
 package domain
 
 import (
-	"flywheel/utils"
+	"github.com/fundwit/go-commons/types"
 	"time"
 )
 
 type Work struct {
-	ID         utils.ID  `json:"id"`
+	ID         types.ID  `json:"id"`
 	Name       string    `json:"name"`
 	Group      string    `json:"group"`
-	FlowID     utils.ID  `json:"flowId"`
+	FlowID     types.ID  `json:"flowId"`
 	CreateTime time.Time `json:"createTime"`
 
 	StateName string `json:"stateName"`

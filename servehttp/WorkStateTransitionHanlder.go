@@ -8,8 +8,8 @@ import (
 	"net/http"
 )
 
-func RegisterWorkStateTransitionHer(r *gin.Engine, m flow.WorkflowManagerTraits) {
-	g := r.Group("/v1/transitions")
+func RegisterWorkStateTransitionHer(r *gin.Engine, m flow.WorkflowManagerTraits, middleWares ...gin.HandlerFunc) {
+	g := r.Group("/v1/transitions", middleWares...)
 
 	handler := &workStateTransitionHandler{manager: m, validator: validator.New()}
 	g.POST("", handler.handleCreate)

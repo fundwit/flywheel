@@ -10,5 +10,6 @@ require (
 	github.com/jinzhu/gorm v1.9.16
 	github.com/onsi/ginkgo v1.14.2
 	github.com/onsi/gomega v1.10.4
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/sony/sonyflake v1.0.0
 )

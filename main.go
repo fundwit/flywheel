@@ -5,6 +5,7 @@ import (
 	"flywheel/domain/flow"
 	"flywheel/domain/work"
 	"flywheel/persistence"
+	"flywheel/security"
 	"flywheel/servehttp"
 	"github.com/gin-gonic/gin"
 	"log"
@@ -34,7 +35,7 @@ func main() {
 	defer ds.Stop()
 
 	// database migration (race condition)
-	err = ds.GormDB().AutoMigrate(&domain.Work{}, &flow.WorkStateTransition{}).Error
+	err = ds.GormDB().AutoMigrate(&domain.Work{}, &flow.WorkStateTransition{}, &security.User{}).Error
 	if err != nil {
 		log.Fatalf("database migration failed %v\n", err)
 	}
@@ -44,9 +45,14 @@ func main() {
 		c.String(http.StatusOK, "flywheel")
 	})
 
-	servehttp.RegisterWorkHandler(engine, work.NewWorkManager(ds))
-	servehttp.RegisterWorkflowHandler(engine)
-	servehttp.RegisterWorkStateTransitionHer(engine, flow.NewWorkflowManager(ds))
+	security.DB = ds.GormDB()
+	engine.POST("/login", security.SimpleLoginHandler)
+	securityMiddle := security.SimpleAuthFilter()
+	engine.GET("/me", securityMiddle, security.UserInfoQueryHandler)
+
+	servehttp.RegisterWorkHandler(engine, work.NewWorkManager(ds), securityMiddle)
+	servehttp.RegisterWorkflowHandler(engine, securityMiddle)
+	servehttp.RegisterWorkStateTransitionHer(engine, flow.NewWorkflowManager(ds), securityMiddle)
 
 	err = engine.Run(":80")
 	if err != nil {

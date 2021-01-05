@@ -10,9 +10,9 @@ import (
 	"net/http"
 )
 
-func RegisterWorkHandler(r *gin.Engine, m work.WorkManagerTraits) {
+func RegisterWorkHandler(r *gin.Engine, m work.WorkManagerTraits, middleWares ...gin.HandlerFunc) {
 	// group: "", version: v1, resource: work
-	g := r.Group("/v1/works")
+	g := r.Group("/v1/works", middleWares...)
 
 	handler := &workHandler{workManager: m, validator: validator.New()}
 

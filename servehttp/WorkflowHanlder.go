@@ -15,9 +15,9 @@ type TransitionQuery struct {
 	ToState   string   `form:"toState"`
 }
 
-func RegisterWorkflowHandler(r *gin.Engine) {
+func RegisterWorkflowHandler(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 	// group: "", version: v1, resource: transitions
-	g := r.Group("/v1/workflows")
+	g := r.Group("/v1/workflows", middleWares...)
 
 	handler := &workflowHandler{validator: validator.New()}
 

@@ -17,6 +17,7 @@ var _ = Describe("WorkflowHandler", func() {
 
 	BeforeEach(func() {
 		router = gin.Default()
+		router.Use(servehttp.ErrorHandling())
 		servehttp.RegisterWorkflowHandler(router)
 	})
 

@@ -35,12 +35,13 @@ func main() {
 	defer ds.Stop()
 
 	// database migration (race condition)
-	err = ds.GormDB().AutoMigrate(&domain.Work{}, &flow.WorkStateTransition{}, &security.User{}).Error
+	err = ds.GormDB().AutoMigrate(&domain.Work{}, &flow.WorkStateTransition{}, &security.User{}, &domain.Group{}, &domain.GroupMember{}).Error
 	if err != nil {
 		log.Fatalf("database migration failed %v\n", err)
 	}
 
 	engine := gin.Default()
+	engine.Use(servehttp.ErrorHandling())
 	engine.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "flywheel")
 	})
@@ -52,7 +53,7 @@ func main() {
 
 	servehttp.RegisterWorkHandler(engine, work.NewWorkManager(ds), securityMiddle)
 	servehttp.RegisterWorkflowHandler(engine, securityMiddle)
-	servehttp.RegisterWorkStateTransitionHer(engine, flow.NewWorkflowManager(ds), securityMiddle)
+	servehttp.RegisterWorkStateTransitionHandler(engine, flow.NewWorkflowManager(ds), securityMiddle)
 
 	err = engine.Run(":80")
 	if err != nil {

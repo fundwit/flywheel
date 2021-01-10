@@ -1,6 +1,7 @@
 @startuml
 
 
+
 package "state machine" {
     class StateMachine {
         States []State
@@ -30,16 +31,16 @@ package "state machine" {
     }
 }
 
-package "work item definition" {
-    class WorkItemDefinition {
-        // story, bug, task
-
+package "workflow (work definition)" {
+    class Workflow {
+        ID id
+        String name
         StateMachine StateMachine
         PropertyDefinitions []PropertyDefinition
     }
 
-    WorkItemDefinition ..> "1" StateMachine
-    WorkItemDefinition --> "*" PropertyDefinition
+    Workflow ..> "1" StateMachine
+    Workflow --> "*" PropertyDefinition
 
     class PropertyDefinition {
         Name string
@@ -47,16 +48,30 @@ package "work item definition" {
 }
 
 
-package "work item" {
-    class WorkItem {
-        Type WorkItemDefinition
+package "work" {
+    class Work {
+        Workflow Workflow
         PropertyAssigns []PropertyAssign
     }
 
-    WorkItem ..> WorkItemDefinition
-    WorkItem *--> PropertyAssign
+    class PropertyAssign {
+        PropertyDefinition definition
+        Object value
+    }
+
+    Work ..> Workflow
+    Work *--> PropertyAssign
 
     PropertyAssign ..> PropertyDefinition
+}
+
+package "group" {
+    Group *--> Work
+    Group *--> Workflow
+}
+
+package "account" {
+     Group "1..n" - "1..n" User
 }
 
 @enduml

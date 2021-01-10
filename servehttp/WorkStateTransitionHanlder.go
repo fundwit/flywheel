@@ -1,14 +1,16 @@
 package servehttp
 
 import (
+	"flywheel/common"
 	"flywheel/domain/flow"
+	"flywheel/security"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"net/http"
 )
 
-func RegisterWorkStateTransitionHer(r *gin.Engine, m flow.WorkflowManagerTraits, middleWares ...gin.HandlerFunc) {
+func RegisterWorkStateTransitionHandler(r *gin.Engine, m flow.WorkflowManagerTraits, middleWares ...gin.HandlerFunc) {
 	g := r.Group("/v1/transitions", middleWares...)
 
 	handler := &workStateTransitionHandler{manager: m, validator: validator.New()}
@@ -24,19 +26,16 @@ func (h *workStateTransitionHandler) handleCreate(c *gin.Context) {
 	creation := flow.WorkStateTransitionBrief{}
 	err := c.ShouldBindBodyWith(&creation, binding.JSON)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: err.Error()})
-		return
+		panic(&common.ErrBadParam{Cause: err})
 	}
 
 	if err = h.validator.Struct(creation); err != nil {
-		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: err.Error()})
-		return
+		panic(&common.ErrBadParam{Cause: err})
 	}
 
-	transitionId, err := h.manager.CreateWorkStateTransition(&creation)
+	transitionId, err := h.manager.CreateWorkStateTransition(&creation, security.FindSecurityContext(c))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, &ErrorBody{Code: "common.internal_server_error", Message: err.Error()})
-		return
+		panic(err)
 	}
 	c.JSON(http.StatusCreated, transitionId)
 }

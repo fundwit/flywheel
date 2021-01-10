@@ -2,8 +2,10 @@ package work
 
 import (
 	"errors"
+	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/persistence"
+	"flywheel/security"
 	"fmt"
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
@@ -12,11 +14,11 @@ import (
 )
 
 type WorkManagerTraits interface {
-	QueryWork() (*[]domain.Work, error)
-	WorkDetail(id types.ID) (*domain.WorkDetail, error)
-	CreateWork(c *domain.WorkCreation) (*domain.WorkDetail, error)
-	UpdateWork(id types.ID, u *domain.WorkUpdating) (*domain.Work, error)
-	DeleteWork(id types.ID) error
+	QueryWork(query *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error)
+	WorkDetail(id types.ID, sec *security.Context) (*domain.WorkDetail, error)
+	CreateWork(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error)
+	UpdateWork(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error)
+	DeleteWork(id types.ID, sec *security.Context) error
 }
 
 type WorkManager struct {
@@ -30,24 +32,34 @@ func NewWorkManager(ds *persistence.DataSourceManager) *WorkManager {
 		idWorker:   sonyflake.NewSonyflake(sonyflake.Settings{}),
 	}
 }
-
-func (m *WorkManager) QueryWork() (*[]domain.Work, error) {
+func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
 	var works []domain.Work
 	db := m.dataSource.GormDB()
 
-	if err := db.Model(domain.Work{}).Find(&works).Error; err != nil {
+	q := db.Where(domain.Work{GroupID: query.GroupID})
+	if query.Name != "" {
+		q = q.Where("name like ?", "%"+query.Name+"%")
+	}
+	visibleGroups := sec.VisibleGroups()
+	if len(visibleGroups) == 0 {
+		return &[]domain.Work{}, nil
+	}
+	q = q.Where("group_id in (?)", visibleGroups)
+	if err := q.Find(&works).Error; err != nil {
 		return nil, err
 	}
-
 	return &works, nil
 }
 
-func (m *WorkManager) WorkDetail(id types.ID) (*domain.WorkDetail, error) {
+func (m *WorkManager) WorkDetail(id types.ID, sec *security.Context) (*domain.WorkDetail, error) {
 	workDetail := domain.WorkDetail{}
 	db := m.dataSource.GormDB()
-
 	if err := db.Where(&domain.Work{ID: id}).First(&(workDetail.Work)).Error; err != nil {
 		return nil, err
+	}
+
+	if !sec.HasRoleSuffix("_" + workDetail.GroupID.String()) {
+		return nil, errors.New("forbidden")
 	}
 
 	// load type and state
@@ -63,15 +75,15 @@ func (m *WorkManager) WorkDetail(id types.ID) (*domain.WorkDetail, error) {
 	return &workDetail, nil
 }
 
-func (m *WorkManager) CreateWork(c *domain.WorkCreation) (*domain.WorkDetail, error) {
-	newId, err := m.idWorker.NextID()
-	if err != nil {
-		return nil, err
+func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {
+	if !sec.HasRoleSuffix("_" + c.GroupID.String()) {
+		return nil, errors.New("forbidden")
 	}
-	workDetail := c.BuildWorkDetail(types.ID(newId))
+
+	workDetail := c.BuildWorkDetail(common.NextId(m.idWorker))
 
 	db := m.dataSource.GormDB()
-	err = db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(workDetail.Work).Error; err != nil {
 			return err
 		}
@@ -84,7 +96,11 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation) (*domain.WorkDetail, er
 	return workDetail, nil
 }
 
-func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating) (*domain.Work, error) {
+func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error) {
+	if err := m.checkPerms(id, sec); err != nil {
+		return nil, err
+	}
+
 	var work domain.Work
 	err := m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
 		db := tx.Model(&domain.Work{}).Where(&domain.Work{ID: id}).Update(u)
@@ -106,10 +122,25 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating) (*domain.W
 	return &work, nil
 }
 
-func (m *WorkManager) DeleteWork(id types.ID) error {
+func (m *WorkManager) DeleteWork(id types.ID, sec *security.Context) error {
+	if err := m.checkPerms(id, sec); err != nil {
+		return err
+	}
+
 	db := m.dataSource.GormDB()
 	if err := db.Delete(domain.Work{}, "id = ?", id).Error; err != nil {
 		return err
+	}
+	return nil
+}
+
+func (m *WorkManager) checkPerms(id types.ID, sec *security.Context) error {
+	var work domain.Work
+	if err := m.dataSource.GormDB().Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
+		return err
+	}
+	if !sec.HasRoleSuffix("_" + work.GroupID.String()) {
+		return errors.New("forbidden")
 	}
 	return nil
 }

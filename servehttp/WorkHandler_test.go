@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flywheel/domain"
+	"flywheel/security"
 	"flywheel/servehttp"
 	"flywheel/testinfra"
 	"github.com/fundwit/go-commons/types"
@@ -25,6 +26,7 @@ var _ = Describe("WorkHandler", func() {
 
 	BeforeEach(func() {
 		router = gin.Default()
+		router.Use(servehttp.ErrorHandling())
 		workManager = &workManagerMock{}
 		servehttp.RegisterWorkHandler(router, workManager)
 	})
@@ -35,12 +37,12 @@ var _ = Describe("WorkHandler", func() {
 			timeBytes, err := t.MarshalJSON()
 			timeString := strings.Trim(string(timeBytes), `"`)
 			Expect(err).To(BeNil())
-			workManager.CreateWorkFunc = func(creation *domain.WorkCreation) (*domain.WorkDetail, error) {
+			workManager.CreateWorkFunc = func(creation *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {
 				detail := domain.WorkDetail{
 					Work: domain.Work{
 						ID:         123,
 						Name:       creation.Name,
-						Group:      creation.Group,
+						GroupID:    creation.GroupID,
 						FlowID:     domain.GenericWorkFlow.ID,
 						CreateTime: t,
 						StateName:  domain.GenericWorkFlow.StateMachine.States[0].Name,
@@ -51,13 +53,13 @@ var _ = Describe("WorkHandler", func() {
 				return &detail, nil
 			}
 
-			creation := domain.WorkCreation{Name: "test work", Group: "test-group"}
+			creation := domain.WorkCreation{Name: "test work", GroupID: types.ID(333)}
 			reqBody, err := json.Marshal(creation)
 			Expect(err).To(BeNil())
 			req := httptest.NewRequest(http.MethodPost, "/v1/works", bytes.NewReader(reqBody))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusCreated))
-			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","group":"test-group","flowId":"1",
+			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"333","flowId":"1",
 			"createTime":"` + timeString + `","stateName":"PENDING","type":{"id":"1","name":"GenericTask"},"state":{"name":"PENDING"}}`))
 		})
 
@@ -71,14 +73,18 @@ var _ = Describe("WorkHandler", func() {
 			req := httptest.NewRequest(http.MethodPost, "/v1/works", bytes.NewReader([]byte(`{}`)))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusBadRequest))
-			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"Key: 'WorkCreation.Name' Error:Field validation for 'Name' failed on the 'required' tag\nKey: 'WorkCreation.Group' Error:Field validation for 'Group' failed on the 'required' tag","data":null}`))
+			Expect(body).To(MatchJSON(`{
+			  "code": "common.bad_param",
+			  "message": "Key: 'WorkCreation.Name' Error:Field validation for 'Name' failed on the 'required' tag\nKey: 'WorkCreation.GroupID' Error:Field validation for 'GroupID' failed on the 'required' tag",
+			  "data": null
+			}`))
 		})
 
 		It("should return 500 when service process failed", func() {
-			workManager.CreateWorkFunc = func(creation *domain.WorkCreation) (*domain.WorkDetail, error) {
+			workManager.CreateWorkFunc = func(creation *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {
 				return nil, errors.New("a mocked error")
 			}
-			req := httptest.NewRequest(http.MethodPost, "/v1/works", bytes.NewReader([]byte(`{"name":"test","group":"default"}`)))
+			req := httptest.NewRequest(http.MethodPost, "/v1/works", bytes.NewReader([]byte(`{"name":"test","groupId":"333"}`)))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusInternalServerError))
 			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
@@ -91,26 +97,26 @@ var _ = Describe("WorkHandler", func() {
 			timeBytes, err := t.MarshalJSON()
 			timeString := strings.Trim(string(timeBytes), `"`)
 			Expect(err).To(BeNil())
-			workManager.QueryWorkFunc = func() (*[]domain.Work, error) {
+			workManager.QueryWorkFunc = func(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
 				{
 					works := []domain.Work{
-						{ID: 1, Name: "work1", Group: "default", FlowID: 1, CreateTime: t, StateName: "PENDING"},
-						{ID: 2, Name: "work2", Group: "default", FlowID: 1, CreateTime: t, StateName: "PENDING"},
+						{ID: 1, Name: "work1", GroupID: types.ID(333), FlowID: 1, CreateTime: t, StateName: "PENDING"},
+						{ID: 2, Name: "work2", GroupID: types.ID(333), FlowID: 1, CreateTime: t, StateName: "PENDING"},
 					}
 					return &works, nil
 				}
 			}
 
-			req := httptest.NewRequest(http.MethodGet, "/v1/works", nil)
+			req := httptest.NewRequest(http.MethodGet, "/v1/works?name=aaa", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"data":[{"id":"1","name":"work1","group":"default","flowId":"1",
-			"createTime":"` + timeString + `","stateName":"PENDING"},{"id":"2","name":"work2","group":"default","flowId":"1",
+			Expect(body).To(MatchJSON(`{"data":[{"id":"1","name":"work1","groupId":"333","flowId":"1",
+			"createTime":"` + timeString + `","stateName":"PENDING"},{"id":"2","name":"work2","groupId":"333","flowId":"1",
 			"createTime":"` + timeString + `","stateName":"PENDING"}],"total": 2}`))
 		})
 
 		It("should return 500 when service failed", func() {
-			workManager.QueryWorkFunc = func() (*[]domain.Work, error) {
+			workManager.QueryWorkFunc = func(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
 				{
 					return &[]domain.Work{}, errors.New("a mocked error")
 				}
@@ -141,7 +147,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid character 'b' looking for beginning of value","data":null}`))
 		})
 		It("should failed when service failed", func() {
-			workManager.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating) (*domain.Work, error) {
+			workManager.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error) {
 				return nil, errors.New("a mocked error")
 			}
 			req := httptest.NewRequest(http.MethodPut, "/v1/works/100", bytes.NewReader([]byte(
@@ -155,20 +161,20 @@ var _ = Describe("WorkHandler", func() {
 			timeBytes, err := t.MarshalJSON()
 			timeString := strings.Trim(string(timeBytes), `"`)
 			Expect(err).To(BeNil())
-			workManager.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating) (*domain.Work, error) {
-				return &domain.Work{ID: 100, Name: "new-name", Group: "default", FlowID: 1, CreateTime: t, StateName: "PENDING"}, nil
+			workManager.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error) {
+				return &domain.Work{ID: 100, Name: "new-name", GroupID: types.ID(333), FlowID: 1, CreateTime: t, StateName: "PENDING"}, nil
 			}
 			req := httptest.NewRequest(http.MethodPut, "/v1/works/100", bytes.NewReader([]byte(
 				`{"name": "new-name"}`)))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","stateName":"PENDING","group":"default","flowId":"1","createTime":"` + timeString + `"}`))
+			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","stateName":"PENDING","groupId":"333","flowId":"1","createTime":"` + timeString + `"}`))
 		})
 	})
 
 	Describe("handleDelete", func() {
 		It("should be able to handle delete work", func() {
-			workManager.DeleteWorkFunc = func(id types.ID) error {
+			workManager.DeleteWorkFunc = func(id types.ID, sec *security.Context) error {
 				return nil
 			}
 			req := httptest.NewRequest(http.MethodDelete, "/v1/works/123", nil)
@@ -185,7 +191,7 @@ var _ = Describe("WorkHandler", func() {
 		})
 
 		It("should be able to handle exception of unexpected", func() {
-			workManager.DeleteWorkFunc = func(id types.ID) error {
+			workManager.DeleteWorkFunc = func(id types.ID, sec *security.Context) error {
 				return errors.New("unexpected exception")
 			}
 			req := httptest.NewRequest(http.MethodDelete, "/v1/works/123", nil)
@@ -197,25 +203,25 @@ var _ = Describe("WorkHandler", func() {
 })
 
 type workManagerMock struct {
-	QueryWorkFunc  func() (*[]domain.Work, error)
-	WorkDetailFunc func(id types.ID) (*domain.WorkDetail, error)
-	CreateWorkFunc func(c *domain.WorkCreation) (*domain.WorkDetail, error)
-	DeleteWorkFunc func(id types.ID) error
-	UpdateWorkFunc func(id types.ID, u *domain.WorkUpdating) (*domain.Work, error)
+	QueryWorkFunc  func(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error)
+	WorkDetailFunc func(id types.ID, sec *security.Context) (*domain.WorkDetail, error)
+	CreateWorkFunc func(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error)
+	DeleteWorkFunc func(id types.ID, sec *security.Context) error
+	UpdateWorkFunc func(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error)
 }
 
-func (m *workManagerMock) QueryWork() (*[]domain.Work, error) {
-	return m.QueryWorkFunc()
+func (m *workManagerMock) QueryWork(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
+	return m.QueryWorkFunc(q, sec)
 }
-func (m *workManagerMock) WorkDetail(id types.ID) (*domain.WorkDetail, error) {
-	return m.WorkDetailFunc(id)
+func (m *workManagerMock) WorkDetail(id types.ID, sec *security.Context) (*domain.WorkDetail, error) {
+	return m.WorkDetailFunc(id, sec)
 }
-func (m *workManagerMock) CreateWork(c *domain.WorkCreation) (*domain.WorkDetail, error) {
-	return m.CreateWorkFunc(c)
+func (m *workManagerMock) CreateWork(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {
+	return m.CreateWorkFunc(c, sec)
 }
-func (m *workManagerMock) UpdateWork(id types.ID, u *domain.WorkUpdating) (*domain.Work, error) {
-	return m.UpdateWorkFunc(id, u)
+func (m *workManagerMock) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error) {
+	return m.UpdateWorkFunc(id, u, sec)
 }
-func (m *workManagerMock) DeleteWork(id types.ID) error {
-	return m.DeleteWorkFunc(id)
+func (m *workManagerMock) DeleteWork(id types.ID, sec *security.Context) error {
+	return m.DeleteWorkFunc(id, sec)
 }

@@ -8,6 +8,7 @@ import (
 type WorkStateTransition struct {
 	ID         types.ID  `json:"id"`
 	CreateTime time.Time `json:"createTime"`
+	Creator    types.ID  `json:"creator"`
 
 	WorkStateTransitionBrief
 }

@@ -1,8 +1,11 @@
 package servehttp
 
 import (
+	"errors"
+	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/work"
+	"flywheel/security"
 	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -32,19 +35,16 @@ func (h *workHandler) handleCreate(c *gin.Context) {
 	creation := domain.WorkCreation{}
 	err := c.ShouldBindBodyWith(&creation, binding.JSON)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: err.Error()})
-		return
+		panic(&common.ErrBadParam{Cause: err})
 	}
 
 	if err = h.validator.Struct(creation); err != nil {
-		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: err.Error()})
-		return
+		panic(&common.ErrBadParam{Cause: err})
 	}
 
-	detail, err := h.workManager.CreateWork(&creation)
+	detail, err := h.workManager.CreateWork(&creation, security.FindSecurityContext(c))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, &ErrorBody{Code: "common.internal_server_error", Message: err.Error()})
-		return
+		panic(err)
 	}
 	c.JSON(http.StatusCreated, detail)
 }
@@ -64,32 +64,31 @@ func (h *workHandler) handleCreate(c *gin.Context) {
 //}
 
 func (h *workHandler) handleQuery(c *gin.Context) {
-	works, err := h.workManager.QueryWork()
+	query := domain.WorkQuery{}
+	_ = c.MustBindWith(&query, binding.Query)
+
+	works, err := h.workManager.QueryWork(&query, security.FindSecurityContext(c))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, &ErrorBody{Code: "common.internal_server_error", Message: err.Error()})
-		return
+		panic(err)
 	}
-	c.JSON(http.StatusOK, &PagedBody{List: works, Total: uint64(len(*works))})
+	c.JSON(http.StatusOK, &common.PagedBody{List: works, Total: uint64(len(*works))})
 }
 
 func (h *workHandler) handleUpdate(c *gin.Context) {
 	parsedId, err := types.ParseID(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("id") + "'"})
-		return
+		panic(&common.ErrBadParam{Cause: errors.New("invalid id '" + c.Param("id") + "'")})
 	}
 
 	updating := domain.WorkUpdating{}
 	err = c.ShouldBindBodyWith(&updating, binding.JSON)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: err.Error()})
-		return
+		panic(&common.ErrBadParam{Cause: err})
 	}
 
-	updatedWork, err := h.workManager.UpdateWork(parsedId, &updating)
+	updatedWork, err := h.workManager.UpdateWork(parsedId, &updating, security.FindSecurityContext(c))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, &ErrorBody{Code: "common.internal_server_error", Message: err.Error()})
-		return
+		panic(err)
 	}
 	c.JSON(http.StatusOK, updatedWork)
 }
@@ -97,15 +96,12 @@ func (h *workHandler) handleUpdate(c *gin.Context) {
 func (h *workHandler) handleDelete(c *gin.Context) {
 	parsedId, err := types.ParseID(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("id") + "'"})
-		return
+		panic(&common.ErrBadParam{Cause: errors.New("invalid id '" + c.Param("id") + "'")})
 	}
 
-	err = h.workManager.DeleteWork(parsedId)
+	err = h.workManager.DeleteWork(parsedId, security.FindSecurityContext(c))
 	if err != nil {
-		// TODO 区分不存在和其他错误
-		c.JSON(http.StatusInternalServerError, &ErrorBody{Code: "common.internal_server_error", Message: err.Error()})
-		return
+		panic(err)
 	}
 	c.JSON(http.StatusNoContent, nil)
 }

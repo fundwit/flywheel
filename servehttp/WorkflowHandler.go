@@ -1,9 +1,12 @@
 package servehttp
 
 import (
+	"errors"
+	"flywheel/common"
 	"flywheel/domain"
 	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"net/http"
 	"strconv"
@@ -33,16 +36,14 @@ func (h *workflowHandler) handleQueryStates(c *gin.Context) {
 	query := TransitionQuery{}
 	err := c.ShouldBindUri(&query)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: err.Error()})
-		return
+		panic(&common.ErrBadParam{Cause: err})
 	}
 	if query.FlowID <= 0 {
-		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: "invalid flowId '" + c.Params.ByName("flowId") + "'"})
-		return
+		panic(&common.ErrBadParam{Cause: errors.New("invalid flowId '" + c.Params.ByName("flowId") + "'")})
 	}
 	workflow := domain.FindWorkflow(query.FlowID)
 	if workflow == nil {
-		c.JSON(http.StatusNotFound, &ErrorBody{Code: "common.bad_param",
+		c.JSON(http.StatusNotFound, &common.ErrorBody{Code: "common.bad_param",
 			Message: "the flow of id " + strconv.FormatUint(uint64(query.FlowID), 10) + " was not found"})
 		return
 	}
@@ -53,25 +54,19 @@ func (h *workflowHandler) handleQueryStates(c *gin.Context) {
 
 func (h *workflowHandler) handleQueryTransitions(c *gin.Context) {
 	query := TransitionQuery{}
-	err := c.ShouldBindQuery(&query)
+	_ = c.MustBindWith(&query, binding.Form)
+	err := c.ShouldBindUri(&query)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: err.Error()})
-		return
-	}
-	err = c.ShouldBindUri(&query)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: err.Error()})
-		return
+		panic(&common.ErrBadParam{Cause: err})
 	}
 
 	if err = h.validator.Struct(query); err != nil {
-		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: err.Error()})
-		return
+		panic(&common.ErrBadParam{Cause: err})
 	}
 
 	workflow := domain.FindWorkflow(query.FlowID)
 	if workflow == nil {
-		c.JSON(http.StatusNotFound, &ErrorBody{Code: "common.bad_param",
+		c.JSON(http.StatusNotFound, &common.ErrorBody{Code: "common.bad_param",
 			Message: "the flow of id " + strconv.FormatUint(uint64(query.FlowID), 10) + " was not found"})
 		return
 	}

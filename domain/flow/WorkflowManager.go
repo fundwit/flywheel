@@ -2,10 +2,12 @@ package flow
 
 import (
 	"errors"
+	"flywheel/common"
 	"flywheel/domain"
+	"flywheel/security"
+	"fmt"
 
 	"flywheel/persistence"
-	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
 	"strconv"
@@ -13,7 +15,7 @@ import (
 )
 
 type WorkflowManagerTraits interface {
-	CreateWorkStateTransition(*WorkStateTransitionBrief) (*WorkStateTransition, error)
+	CreateWorkStateTransition(*WorkStateTransitionBrief, *security.Context) (*WorkStateTransition, error)
 }
 
 type WorkflowManager struct {
@@ -28,7 +30,7 @@ func NewWorkflowManager(ds *persistence.DataSourceManager) WorkflowManagerTraits
 	}
 }
 
-func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief) (*WorkStateTransition, error) {
+func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief, sec *security.Context) (*WorkStateTransition, error) {
 	flow := domain.FindWorkflow(c.FlowID)
 	if flow == nil {
 		return nil, errors.New("workflow " + strconv.FormatUint(uint64(c.FlowID), 10) + " not found")
@@ -39,14 +41,20 @@ func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief)
 		return nil, errors.New("transition from " + c.FromState + " to " + c.ToState + " is not invalid")
 	}
 
-	newId, err := m.idWorker.NextID()
-	if err != nil {
-		return nil, err
-	}
-	record := &WorkStateTransition{ID: types.ID(newId), CreateTime: time.Now(), WorkStateTransitionBrief: *c}
+	newId := common.NextId(m.idWorker)
+	record := &WorkStateTransition{ID: newId, CreateTime: time.Now(), Creator: sec.Identity.ID, WorkStateTransitionBrief: *c}
 
 	db := m.dataSource.GormDB()
-	err = db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
+		// check perms
+		work := domain.Work{ID: c.WorkID}
+		if err := tx.Where(&work).First(&work).Error; err != nil {
+			return err
+		}
+		if !sec.HasRole(fmt.Sprintf("%s_%d", domain.RoleOwner, work.GroupID)) {
+			return errors.New("forbidden")
+		}
+
 		// update work.stageName
 		query := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID, StateName: c.FromState}).Update(&domain.Work{StateName: c.ToState})
 		if err := query.Error; err != nil {

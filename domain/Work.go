@@ -8,7 +8,7 @@ import (
 type Work struct {
 	ID         types.ID  `json:"id"`
 	Name       string    `json:"name"`
-	Group      string    `json:"group"`
+	GroupID    types.ID  `json:"groupId"`
 	FlowID     types.ID  `json:"flowId"`
 	CreateTime time.Time `json:"createTime"`
 

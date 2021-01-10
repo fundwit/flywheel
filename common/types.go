@@ -1,4 +1,4 @@
-package servehttp
+package common
 
 type ErrorBody struct {
 	Code    string      `json:"code"`

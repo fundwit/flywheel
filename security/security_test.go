@@ -2,6 +2,8 @@ package security_test
 
 import (
 	"bytes"
+	"errors"
+	"flywheel/domain"
 	"flywheel/security"
 	"flywheel/testinfra"
 	"github.com/gin-gonic/gin"
@@ -13,6 +15,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"time"
 )
 
 var _ = Describe("Security", func() {
@@ -61,7 +64,7 @@ var _ = Describe("Security", func() {
 			router = gin.Default()
 			router.POST("/login", security.SimpleLoginHandler)
 			testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
-			err := testDatabase.DS.GormDB().AutoMigrate(&security.User{}).Error
+			err := testDatabase.DS.GormDB().AutoMigrate(&security.User{}, &domain.GroupMember{}).Error
 			if err != nil {
 				log.Fatalf("database migration failed %v\n", err)
 			}
@@ -87,6 +90,13 @@ var _ = Describe("Security", func() {
 				Expect(body).To(MatchJSON(`{"id":"1", "name":"ann"}`))
 				Expect(resp.Cookies()[0].Name).To(Equal(security.KeySecToken))
 				Expect(resp.Cookies()[0].Value).ToNot(BeEmpty())
+
+				// existed in token cache
+				securityContextValue, found := security.TokenCache.Get(resp.Cookies()[0].Value)
+				Expect(found).To(BeTrue())
+				secCtx, ok := securityContextValue.(*security.Context)
+				Expect(ok).To(BeTrue())
+				Expect(*secCtx).To(Equal(security.Context{Token: resp.Cookies()[0].Value, Identity: security.Identity{ID: 1, Name: "ann"}, Perms: nil}))
 			})
 
 			It("should return 401 when user not exist", func() {
@@ -164,6 +174,38 @@ var _ = Describe("Security", func() {
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusUnauthorized))
 			Expect(body).To(MatchJSON(`{"code":"common.unauthenticated","message":"unauthenticated", "data": null}`))
+		})
+	})
+
+	Describe("LoadPerms", func() {
+		It("should return actual permissions when matched", func() {
+			testDatabase := testinfra.StartMysqlTestDatabase("flywheel")
+			defer testinfra.StopMysqlTestDatabase(testDatabase)
+			Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.GroupMember{}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().Create(
+				&domain.GroupMember{GroupID: 1, MemberId: 3, Role: "owner", CreateTime: time.Now()}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().Create(
+				&domain.GroupMember{GroupID: 10, MemberId: 30, Role: "viewer", CreateTime: time.Now()}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().Create(
+				&domain.GroupMember{GroupID: 20, MemberId: 3, Role: "viewer", CreateTime: time.Now()}).Error).To(BeNil())
+
+			security.DB = testDatabase.DS.GormDB()
+			s := security.LoadPerms(3)
+			Expect(len(s)).To(Equal(2))
+			Expect(s).To(Equal([]string{"owner_1", "viewer_20"}))
+
+			s = security.LoadPerms(1)
+			Expect(len(s)).To(Equal(0))
+		})
+
+		It("should failed when database access failed", func() {
+			func() {
+				defer func() {
+					err := recover()
+					Expect(err).To(Equal(errors.New("sql: database is closed")))
+				}()
+				security.LoadPerms(3)
+			}()
 		})
 	})
 })

@@ -7,8 +7,8 @@ import (
 )
 
 type WorkCreation struct {
-	Name  string `json:"name" validate:"required"`
-	Group string `json:"group" validate:"required"`
+	Name    string   `json:"name" validate:"required"`
+	GroupID types.ID `json:"groupId" validate:"required"`
 }
 
 type WorkUpdating struct {
@@ -21,16 +21,21 @@ type WorkDetail struct {
 	State state.State  `json:"state"`
 }
 
+type WorkQuery struct {
+	Name    string   `json:"name" form:"name"`
+	GroupID types.ID `json:"groupId" form:"groupId"`
+}
+
 func (c *WorkCreation) BuildWorkDetail(id types.ID) *WorkDetail {
 	workFlow := &GenericWorkFlow
 	initState := GenericWorkFlow.StateMachine.States[0]
 
 	return &WorkDetail{
 		Work: Work{
-			ID:     id,
-			Name:   c.Name,
-			Group:  c.Group,
-			FlowID: workFlow.ID,
+			ID:      id,
+			Name:    c.Name,
+			GroupID: c.GroupID,
+			FlowID:  workFlow.ID,
 
 			StateName:  initState.Name,
 			CreateTime: time.Now(),

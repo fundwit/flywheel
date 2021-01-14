@@ -6,6 +6,7 @@ import (
 	"flywheel/domain"
 	"flywheel/security"
 	"flywheel/testinfra"
+	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
@@ -83,7 +84,9 @@ var _ = Describe("Security", func() {
 				w := httptest.NewRecorder()
 				router.ServeHTTP(w, req)
 				resp := w.Result()
-				defer resp.Body.Close()
+				defer func() {
+					_ = resp.Body.Close()
+				}()
 				bodyBytes, _ := ioutil.ReadAll(resp.Body)
 				body := string(bodyBytes)
 				Expect(resp.StatusCode).To(Equal(http.StatusOK))
@@ -146,13 +149,17 @@ var _ = Describe("Security", func() {
 		})
 		It("should success when token is valid", func() {
 			token := uuid.New().String()
-			security.TokenCache.Set(token, &security.Context{Token: token, Identity: security.Identity{Name: "ann", ID: 1}}, cache.DefaultExpiration)
+			security.TokenCache.Set(token, &security.Context{Token: token, Identity: security.Identity{Name: "ann", ID: 1},
+				Perms: []string{"owner_1"}, GroupRoles: []domain.GroupRole{{
+					Role: "owner", GroupName: "group1", GroupID: types.ID(1),
+				}}}, cache.DefaultExpiration)
 
 			req := httptest.NewRequest(http.MethodGet, "/me", nil)
 			req.AddCookie(&http.Cookie{Name: security.KeySecToken, Value: token})
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"id":"1","name":"ann"}`))
+			Expect(body).To(MatchJSON(`{"identity":{"id":"1","name":"ann"}, "token":"` + token +
+				`", "perms":["owner_1"], "groupRoles":[{"groupId":"1", "groupName":"group1", "role":"owner"}]}`))
 		})
 
 		It("should failed when token is missing", func() {
@@ -181,21 +188,30 @@ var _ = Describe("Security", func() {
 		It("should return actual permissions when matched", func() {
 			testDatabase := testinfra.StartMysqlTestDatabase("flywheel")
 			defer testinfra.StopMysqlTestDatabase(testDatabase)
-			Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.GroupMember{}).Error).To(BeNil())
+
+			now := time.Now()
+			Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.GroupMember{}, &domain.Group{}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.GroupMember{GroupID: 1, MemberId: 3, Role: "owner", CreateTime: time.Now()}).Error).To(BeNil())
+				&domain.Group{ID: 1, Name: "group1", Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.GroupMember{GroupID: 10, MemberId: 30, Role: "viewer", CreateTime: time.Now()}).Error).To(BeNil())
+				&domain.Group{ID: 20, Name: "group20", Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
+
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.GroupMember{GroupID: 20, MemberId: 3, Role: "viewer", CreateTime: time.Now()}).Error).To(BeNil())
+				&domain.GroupMember{GroupID: 1, MemberId: 3, Role: "owner", CreateTime: now}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().Create(
+				&domain.GroupMember{GroupID: 10, MemberId: 30, Role: "viewer", CreateTime: now}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().Create(
+				&domain.GroupMember{GroupID: 20, MemberId: 3, Role: "viewer", CreateTime: now}).Error).To(BeNil())
 
 			security.DB = testDatabase.DS.GormDB()
-			s := security.LoadPerms(3)
+			s, gr := security.LoadPerms(3)
 			Expect(len(s)).To(Equal(2))
 			Expect(s).To(Equal([]string{"owner_1", "viewer_20"}))
+			Expect(gr).To(Equal([]domain.GroupRole{{GroupID: 1, GroupName: "group1", Role: "owner"}, {GroupID: 20, GroupName: "group20", Role: "viewer"}}))
 
-			s = security.LoadPerms(1)
+			s, gr = security.LoadPerms(1)
 			Expect(len(s)).To(Equal(0))
+			Expect(len(gr)).To(Equal(0))
 		})
 
 		It("should failed when database access failed", func() {
@@ -204,6 +220,48 @@ var _ = Describe("Security", func() {
 					err := recover()
 					Expect(err).To(Equal(errors.New("sql: database is closed")))
 				}()
+				security.LoadPerms(3)
+			}()
+		})
+
+		It("should panic when group record is not found", func() {
+			func() {
+				testDatabase := testinfra.StartMysqlTestDatabase("flywheel")
+				defer testinfra.StopMysqlTestDatabase(testDatabase)
+				Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.GroupMember{}, &domain.Group{}).Error).To(BeNil())
+				security.DB = testDatabase.DS.GormDB()
+
+				now := time.Now()
+				Expect(testDatabase.DS.GormDB().Create(
+					&domain.GroupMember{GroupID: 1, MemberId: 3, Role: "owner", CreateTime: now}).Error).To(BeNil())
+
+				defer func() {
+					err := recover()
+					Expect(err).To(Equal(errors.New("group 1 is not exist")))
+				}()
+
+				security.LoadPerms(3)
+			}()
+		})
+
+		It("should panic when group query failed", func() {
+			func() {
+				testDatabase := testinfra.StartMysqlTestDatabase("flywheel")
+				defer testinfra.StopMysqlTestDatabase(testDatabase)
+				Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.GroupMember{}).Error).To(BeNil())
+				security.DB = testDatabase.DS.GormDB()
+
+				now := time.Now()
+				Expect(testDatabase.DS.GormDB().Create(
+					&domain.GroupMember{GroupID: 1, MemberId: 3, Role: "owner", CreateTime: now}).Error).To(BeNil())
+
+				defer func() {
+					ret := recover()
+					err, ok := ret.(error)
+					Expect(ok).To(BeTrue())
+					Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".groups' doesn't exist"))
+				}()
+
 				security.LoadPerms(3)
 			}()
 		})

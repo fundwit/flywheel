@@ -3,6 +3,7 @@ package security
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"flywheel/common"
 	"flywheel/domain"
 	"fmt"
@@ -59,7 +60,7 @@ func UserInfoQueryHandler(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, &common.ErrorBody{Code: "common.unauthenticated", Message: "login failed"})
 		return
 	}
-	c.JSON(http.StatusOK, &secCtx.Identity)
+	c.JSON(http.StatusOK, &secCtx)
 }
 
 func SimpleLoginHandler(c *gin.Context) {
@@ -78,7 +79,8 @@ func SimpleLoginHandler(c *gin.Context) {
 		return
 	}
 	token := uuid.New().String()
-	securityContext := Context{Token: token, Identity: identity, Perms: LoadPerms(identity.ID)}
+	perms, groupRoles := LoadPerms(identity.ID)
+	securityContext := Context{Token: token, Identity: identity, Perms: perms, GroupRoles: groupRoles}
 	TokenCache.Set(token, &securityContext, cache.DefaultExpiration)
 
 	c.SetCookie(KeySecToken, token, int(TokenExpiration/time.Second), "/", "", false, false)
@@ -86,19 +88,42 @@ func SimpleLoginHandler(c *gin.Context) {
 }
 
 // as a simple initial solution, we use group member relationship as the metadata of permissions
-func LoadPerms(uid types.ID) []string {
+func LoadPerms(uid types.ID) ([]string, []domain.GroupRole) {
 	var gms []domain.GroupMember
 	if err := DB.Model(&domain.GroupMember{}).Where(&domain.GroupMember{MemberId: uid}).Scan(&gms).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return []string{}
-		}
 		panic(err)
 	}
 	var roles []string
+	var groupRoles []domain.GroupRole
+	var groupIds []types.ID
 	for _, gm := range gms {
 		roles = append(roles, fmt.Sprintf("%s_%d", gm.Role, gm.GroupID))
+		groupRoles = append(groupRoles, domain.GroupRole{Role: gm.Role, GroupID: gm.GroupID})
+		groupIds = append(groupIds, gm.GroupID)
 	}
-	return roles
+
+	m := map[types.ID]domain.Group{}
+	if len(groupIds) > 0 {
+		var groups []domain.Group
+		if err := DB.Model(&domain.Group{}).Where("id in (?)", groupIds).Scan(&groups).Error; err != nil {
+			panic(err)
+		}
+		for _, group := range groups {
+			m[group.ID] = group
+		}
+	}
+
+	for i := 0; i < len(groupRoles); i++ {
+		groupRole := groupRoles[i]
+		name := m[groupRole.GroupID].Name
+		if name == "" {
+			panic(errors.New("group " + groupRole.GroupID.String() + " is not exist"))
+		}
+		groupRole.GroupName = name
+		groupRoles[i] = groupRole
+	}
+
+	return roles, groupRoles
 }
 
 func SimpleAuthFilter() gin.HandlerFunc {

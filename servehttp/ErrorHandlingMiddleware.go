@@ -6,6 +6,7 @@ import (
 	"flywheel/i18n"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"runtime/debug"
 )
 
 func ErrorHandling() gin.HandlerFunc {
@@ -31,6 +32,7 @@ func handle(c *gin.Context) {
 
 func handleError(err error, c *gin.Context) {
 	common.Log.Error(err)
+	debug.Stack()
 
 	genericErr := err
 	var ginErr *gin.Error

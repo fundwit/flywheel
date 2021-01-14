@@ -26,6 +26,12 @@ type WorkQuery struct {
 	GroupID types.ID `json:"groupId" form:"groupId"`
 }
 
+type GroupRole struct {
+	GroupID   types.ID `json:"groupId"`
+	GroupName string   `json:"groupName"`
+	Role      string   `json:"role"`
+}
+
 func (c *WorkCreation) BuildWorkDetail(id types.ID) *WorkDetail {
 	workFlow := &GenericWorkFlow
 	initState := GenericWorkFlow.StateMachine.States[0]

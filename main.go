@@ -47,7 +47,8 @@ func main() {
 	})
 
 	security.DB = ds.GormDB()
-	engine.POST("/login", security.SimpleLoginHandler)
+	security.RegisterWorkHandler(engine)
+
 	securityMiddle := security.SimpleAuthFilter()
 	engine.GET("/me", securityMiddle, security.UserInfoQueryHandler)
 

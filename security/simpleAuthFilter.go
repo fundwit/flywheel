@@ -63,6 +63,21 @@ func UserInfoQueryHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, &secCtx)
 }
 
+func RegisterWorkHandler(r *gin.Engine) {
+	g := r.Group("/v1/sessions")
+	g.POST("", SimpleLoginHandler)
+	g.DELETE("", SimpleLogoutHandler)
+}
+
+func SimpleLogoutHandler(c *gin.Context) {
+	token, _ := c.Cookie(KeySecToken) // ErrNoCookie
+	if token != "" {
+		TokenCache.Delete(token)
+	}
+	c.SetCookie(KeySecToken, "", -1, "/", "", false, false)
+	c.AbortWithStatus(http.StatusNoContent)
+}
+
 func SimpleLoginHandler(c *gin.Context) {
 	login := LoginRequest{}
 	if err := c.ShouldBindBodyWith(&login, binding.JSON); err != nil {
@@ -84,7 +99,7 @@ func SimpleLoginHandler(c *gin.Context) {
 	TokenCache.Set(token, &securityContext, cache.DefaultExpiration)
 
 	c.SetCookie(KeySecToken, token, int(TokenExpiration/time.Second), "/", "", false, false)
-	c.JSON(http.StatusOK, &identity)
+	c.JSON(http.StatusOK, &securityContext)
 }
 
 // as a simple initial solution, we use group member relationship as the metadata of permissions
@@ -123,6 +138,12 @@ func LoadPerms(uid types.ID) ([]string, []domain.GroupRole) {
 		groupRoles[i] = groupRole
 	}
 
+	if roles == nil {
+		roles = []string{}
+	}
+	if groupRoles == nil {
+		groupRoles = []domain.GroupRole{}
+	}
 	return roles, groupRoles
 }
 

@@ -7,11 +7,13 @@ import (
 	"net/http/httptest"
 )
 
-func ExecuteRequest(req *http.Request, engine *gin.Engine) (int, string, http.Header) {
+func ExecuteRequest(req *http.Request, engine *gin.Engine) (int, string, *http.Response) {
 	w := httptest.NewRecorder()
 	engine.ServeHTTP(w, req)
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
-	return resp.StatusCode, string(bodyBytes), resp.Header
+	return resp.StatusCode, string(bodyBytes), resp
 }

@@ -2,12 +2,15 @@ package work_test
 
 import (
 	"flywheel/domain"
+	"flywheel/domain/flow"
 	"flywheel/domain/work"
 	"flywheel/testinfra"
 	"github.com/fundwit/go-commons/types"
+	"github.com/jinzhu/gorm"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"log"
+	"time"
 )
 
 var _ = Describe("WorkManager", func() {
@@ -223,11 +226,31 @@ var _ = Describe("WorkManager", func() {
 			Expect(works).ToNot(BeNil())
 			Expect(len(*works)).To(Equal(2))
 
+			testDatabase.DS.GormDB().AutoMigrate(&flow.WorkStateTransition{})
+			err = testDatabase.DS.GormDB().Create(&flow.WorkStateTransition{ID: 1, CreateTime: time.Now(), Creator: 1,
+				WorkStateTransitionBrief: flow.WorkStateTransitionBrief{FlowID: 1, WorkID: (*works)[0].ID, FromState: "PENDING", ToState: "DOING"}}).Error
+			Expect(err).To(BeNil())
+			err = testDatabase.DS.GormDB().Create(&flow.WorkStateTransition{ID: 2, CreateTime: time.Now(), Creator: 1,
+				WorkStateTransitionBrief: flow.WorkStateTransitionBrief{FlowID: 1, WorkID: 2, FromState: "PENDING", ToState: "DOING"}}).Error
+			Expect(err).To(BeNil())
+			transition := flow.WorkStateTransition{}
+			Expect(testDatabase.DS.GormDB().First(&transition, flow.WorkStateTransition{ID: 1}).Error).To(BeNil())
+			Expect(transition.WorkID).To(Equal((*works)[0].ID))
+			transition = flow.WorkStateTransition{}
+			Expect(testDatabase.DS.GormDB().First(&transition, flow.WorkStateTransition{ID: 2}).Error).To(BeNil())
+			Expect(transition.WorkID).To(Equal(types.ID(2)))
+
 			err = workManager.DeleteWork((*works)[0].ID, testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeNil())
 			works, err = workManager.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeNil())
 			Expect(len(*works)).To(Equal(1))
+
+			transition = flow.WorkStateTransition{}
+			Expect(testDatabase.DS.GormDB().First(&transition, flow.WorkStateTransition{ID: 1}).Error).To(Equal(gorm.ErrRecordNotFound))
+			transition = flow.WorkStateTransition{}
+			Expect(testDatabase.DS.GormDB().First(&transition, flow.WorkStateTransition{ID: 2}).Error).To(BeNil())
+			Expect(transition.WorkID).To(Equal(types.ID(2)))
 		})
 
 		It("should forbid to delete without permissions", func() {
@@ -242,8 +265,17 @@ var _ = Describe("WorkManager", func() {
 		})
 
 		It("should be able to catch db errors", func() {
+			detail, err := workManager.CreateWork(
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1)},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeZero())
+
+			err = workManager.DeleteWork(detail.ID, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".work_state_transitions' doesn't exist"))
+
 			testDatabase.DS.GormDB().DropTable(&domain.Work{})
-			err := workManager.DeleteWork(123, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			err = workManager.DeleteWork(detail.ID, testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
 		})

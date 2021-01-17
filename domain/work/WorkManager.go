@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flywheel/common"
 	"flywheel/domain"
+	"flywheel/domain/flow"
 	"flywheel/persistence"
 	"flywheel/security"
 	"fmt"
@@ -127,11 +128,17 @@ func (m *WorkManager) DeleteWork(id types.ID, sec *security.Context) error {
 		return err
 	}
 
-	db := m.dataSource.GormDB()
-	if err := db.Delete(domain.Work{}, "id = ?", id).Error; err != nil {
-		return err
-	}
-	return nil
+	err := m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(domain.Work{}, "id = ?", id).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(flow.WorkStateTransition{}, "work_id = ?", id).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return err
 }
 
 func (m *WorkManager) checkPerms(id types.ID, sec *security.Context) error {

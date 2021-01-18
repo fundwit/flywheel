@@ -1,42 +1,44 @@
-package worktype
+package domain
 
 import (
-	"errors"
 	"flywheel/domain/state"
-	"flywheel/utils"
+	"github.com/fundwit/go-commons/types"
 )
 
-type WorkTypeFace interface {
+type WorkFlowFace interface {
 	FindState(string) *state.State
 }
 
-type WorkTypeBase struct {
-	ID   utils.ID `json:"id"`
+type WorkFlowBase struct {
+	ID   types.ID `json:"id"`
 	Name string   `json:"name"`
 }
 
-type WorkType struct {
-	WorkTypeBase
+type WorkFlow struct {
+	WorkFlowBase
 
 	PropertyDefinitions []PropertyDefinition `json:"propertyDefinitions"`
 	StateMachine        state.StateMachine   `json:"stateMachine"`
 }
 
-type PropertyDefinition struct {
-	Name string `json:"name"`
-}
-
-func (wt *WorkType) FindState(stateName string) (state.State, error) {
+func (wt *WorkFlow) FindState(stateName string) (state.State, bool) {
 	for _, s := range wt.StateMachine.States {
 		if stateName == s.Name {
-			return s, nil
+			return s, true
 		}
 	}
-	return state.State{}, errors.New("invalid state name")
+	return state.State{}, false
 }
 
-var GenericWorkType = WorkType{
-	WorkTypeBase: WorkTypeBase{
+func FindWorkflow(ID types.ID) *WorkFlow {
+	if ID == GenericWorkFlow.ID {
+		return &GenericWorkFlow
+	}
+	return nil
+}
+
+var GenericWorkFlow = WorkFlow{
+	WorkFlowBase: WorkFlowBase{
 		ID:   1,
 		Name: "GenericTask",
 	},

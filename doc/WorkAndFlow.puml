@@ -1,0 +1,39 @@
+@startuml
+class Work {
+    ID  ID
+    Name string
+    Group string
+    FlowID  ID
+    CreateTime time.Time
+
+    StateName string
+}
+
+Work --> WorkFlow
+Work *--> PropertyAssign
+PropertyAssign --> PropertyDefinition
+WorkFlow --> PropertyDefinition
+WorkFlow --> StateMachine
+
+class WorkFlow {
+    ID ID
+    Name string
+
+    PropertyDefinitions []PropertyDefinition
+    StateMachine        state.StateMachine
+}
+
+class PropertyDefinition {
+    Name string
+}
+
+class PropertyAssign {
+    Definition PropertyDefinition
+    Value string
+}
+
+class WorkManager {
+}
+
+WorkManager --> Work
+@enduml

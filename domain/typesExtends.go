@@ -2,37 +2,51 @@ package domain
 
 import (
 	"flywheel/domain/state"
-	"flywheel/domain/worktype"
-	"flywheel/utils"
+	"github.com/fundwit/go-commons/types"
 	"time"
 )
 
 type WorkCreation struct {
-	Name  string `json:"name" validate:"required"`
-	Group string `json:"group" validate:"required"`
+	Name    string   `json:"name" validate:"required"`
+	GroupID types.ID `json:"groupId" validate:"required"`
+}
+
+type WorkUpdating struct {
+	Name string `json:"name"`
 }
 
 type WorkDetail struct {
 	Work
-	Type  worktype.WorkTypeBase `json:"type"`
-	State state.State           `json:"state"`
+	Type  WorkFlowBase `json:"type"`
+	State state.State  `json:"state"`
 }
 
-func (c *WorkCreation) BuildWorkDetail(id utils.ID) *WorkDetail {
-	workType := &worktype.GenericWorkType
-	initState := worktype.GenericWorkType.StateMachine.States[0]
+type WorkQuery struct {
+	Name    string   `json:"name" form:"name"`
+	GroupID types.ID `json:"groupId" form:"groupId"`
+}
+
+type GroupRole struct {
+	GroupID   types.ID `json:"groupId"`
+	GroupName string   `json:"groupName"`
+	Role      string   `json:"role"`
+}
+
+func (c *WorkCreation) BuildWorkDetail(id types.ID) *WorkDetail {
+	workFlow := &GenericWorkFlow
+	initState := GenericWorkFlow.StateMachine.States[0]
 
 	return &WorkDetail{
 		Work: Work{
-			ID:     id,
-			Name:   c.Name,
-			Group:  c.Group,
-			TypeID: workType.ID,
+			ID:      id,
+			Name:    c.Name,
+			GroupID: c.GroupID,
+			FlowID:  workFlow.ID,
 
 			StateName:  initState.Name,
 			CreateTime: time.Now(),
 		},
-		Type:  workType.WorkTypeBase,
+		Type:  workFlow.WorkFlowBase,
 		State: initState,
 	}
 }

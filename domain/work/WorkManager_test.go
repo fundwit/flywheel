@@ -1,6 +1,7 @@
 package work_test
 
 import (
+	"errors"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/work"
@@ -50,7 +51,9 @@ var _ = Describe("WorkManager", func() {
 			Expect(work.ID).ToNot(BeZero())
 			Expect(work.Name).To(Equal(creation.Name))
 			Expect(work.GroupID).To(Equal(creation.GroupID))
-			Expect(work.CreateTime).ToNot(BeZero())
+			Expect(work.CreateTime.Sub(time.Now()) < time.Minute).To(BeTrue())
+			Expect(work.FlowID).To(Equal(types.ID(1)))
+			Expect(work.OrderInState).To(Equal(work.CreateTime.UnixNano() / 1e6))
 			Expect(work.Type).To(Equal(domain.GenericWorkFlow.WorkFlowBase))
 			Expect(work.State).To(Equal(domain.GenericWorkFlow.StateMachine.States[0]))
 
@@ -60,10 +63,11 @@ var _ = Describe("WorkManager", func() {
 			Expect(detail.ID).To(Equal(work.ID))
 			Expect(detail.Name).To(Equal(creation.Name))
 			Expect(detail.GroupID).To(Equal(creation.GroupID))
-			Expect(detail.CreateTime).ToNot(BeZero())
+			Expect(work.CreateTime.Sub(time.Now()) < time.Minute).To(BeTrue())
 			Expect(detail.Type).To(Equal(domain.GenericWorkFlow.WorkFlowBase))
 			Expect(detail.State).To(Equal(domain.GenericWorkFlow.StateMachine.States[0]))
 			Expect(detail.FlowID).To(Equal(domain.GenericWorkFlow.ID))
+			Expect(work.OrderInState).To(Equal(work.CreateTime.UnixNano() / 1e6))
 			Expect(detail.StateName).To(Equal(domain.GenericWorkFlow.StateMachine.States[0].Name))
 			//Expect(len(work.Properties)).To(Equal(0))
 		})
@@ -147,6 +151,25 @@ var _ = Describe("WorkManager", func() {
 			Expect(work1.CreateTime).ToNot(BeZero())
 			Expect(work1.FlowID).To(Equal(domain.GenericWorkFlow.ID))
 			Expect(work1.StateName).To(Equal(domain.GenericWorkFlow.StateMachine.States[0].Name))
+		})
+
+		It("works should be ordered by orderInState asc and id asc", func() {
+			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", GroupID: 1,
+				CreateTime: time.Now(), FlowID: 1, OrderInState: 2, StateName: "PENDING"}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 1, Name: "w2", GroupID: 1,
+				CreateTime: time.Now(), FlowID: 1, OrderInState: 2, StateName: "PENDING"}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 3, Name: "w3", GroupID: 1,
+				CreateTime: time.Now(), FlowID: 1, OrderInState: 1, StateName: "PENDING"}).Error).To(BeNil())
+
+			// order by orderInState:    w3(1) > w2(2) = w1(2)
+			// order by id (default):         w2(1) > w1(2)
+			works, err := workManager.QueryWork(&domain.WorkQuery{GroupID: types.ID(1)},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+			Expect(len(*works)).To(Equal(3))
+			Expect((*works)[0].Name).To(Equal("w3"))
+			Expect((*works)[1].Name).To(Equal("w2"))
+			Expect((*works)[2].Name).To(Equal("w1"))
 		})
 	})
 
@@ -278,6 +301,61 @@ var _ = Describe("WorkManager", func() {
 			err = workManager.DeleteWork(detail.ID, testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
+		})
+	})
+
+	Describe("UpdateStateRangeOrders", func() {
+		It("should do nothing when input is empty", func() {
+			Expect(workManager.UpdateStateRangeOrders(nil, nil)).To(BeNil())
+			Expect(workManager.UpdateStateRangeOrders(&[]domain.StageRangeOrderUpdating{}, nil)).To(BeNil())
+		})
+
+		It("should be able to handle forbidden access", func() {
+			Expect(workManager.UpdateStateRangeOrders(&[]domain.StageRangeOrderUpdating{
+				{ID: 1, NewOlder: 3, OldOlder: 2}}, nil)).To(Equal(errors.New("record not found")))
+			Expect(workManager.UpdateStateRangeOrders(&[]domain.StageRangeOrderUpdating{
+				{ID: 1, NewOlder: 3, OldOlder: 2}}, testinfra.BuildSecCtx(1, []string{"owner_404"}))).To(Equal(errors.New("record not found")))
+		})
+
+		It("should update order", func() {
+			secCtx := testinfra.BuildSecCtx(1, []string{"owner_1"})
+			_, err := workManager.CreateWork(&domain.WorkCreation{Name: "w1", GroupID: types.ID(1)}, secCtx)
+			Expect(err).To(BeZero())
+			_, err = workManager.CreateWork(&domain.WorkCreation{Name: "w2", GroupID: types.ID(1)}, secCtx)
+			Expect(err).To(BeZero())
+			_, err = workManager.CreateWork(&domain.WorkCreation{Name: "w3", GroupID: types.ID(1)}, secCtx)
+			Expect(err).To(BeZero())
+
+			// default w1 > w2 > w3
+			listPtr, err := workManager.QueryWork(&domain.WorkQuery{}, secCtx)
+			Expect(err).To(BeNil())
+			list := *listPtr
+			Expect(len(list)).To(Equal(3))
+			Expect([]string{list[0].Name, list[1].Name, list[2].Name}).To(Equal([]string{"w1", "w2", "w3"}))
+			Expect(list[0].OrderInState < list[1].OrderInState && list[1].OrderInState < list[2].OrderInState).To(BeTrue())
+
+			// invalid data
+			Expect(workManager.UpdateStateRangeOrders(&[]domain.StageRangeOrderUpdating{{ID: list[0].ID, NewOlder: 3, OldOlder: 2}}, secCtx)).
+				To(Equal(errors.New("expected affected row is 1, but actual is 0")))
+
+			listPtr, err = workManager.QueryWork(&domain.WorkQuery{}, secCtx)
+			Expect(err).To(BeNil())
+			list = *listPtr
+			Expect(len(list)).To(Equal(3))
+			Expect([]string{list[0].Name, list[1].Name, list[2].Name}).To(Equal([]string{"w1", "w2", "w3"}))
+			Expect(list[0].OrderInState < list[1].OrderInState && list[1].OrderInState < list[2].OrderInState).To(BeTrue())
+
+			// valid data: w3 > w2 > w1
+			Expect(workManager.UpdateStateRangeOrders(&[]domain.StageRangeOrderUpdating{
+				{ID: list[0].ID, NewOlder: list[2].OrderInState + 2, OldOlder: list[0].OrderInState},
+				{ID: list[1].ID, NewOlder: list[2].OrderInState + 1, OldOlder: list[1].OrderInState}}, secCtx)).To(BeNil())
+
+			listPtr, err = workManager.QueryWork(&domain.WorkQuery{}, secCtx)
+			Expect(err).To(BeNil())
+			list = *listPtr
+			Expect(len(list)).To(Equal(3))
+			Expect([]string{list[0].Name, list[1].Name, list[2].Name}).To(Equal([]string{"w3", "w2", "w1"}))
+			Expect(list[0].OrderInState < list[1].OrderInState && list[1].OrderInState < list[2].OrderInState).To(BeTrue())
 		})
 	})
 })

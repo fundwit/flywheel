@@ -20,6 +20,7 @@ type WorkManagerTraits interface {
 	CreateWork(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error)
 	UpdateWork(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error)
 	DeleteWork(id types.ID, sec *security.Context) error
+	UpdateStateRangeOrders(wantedOrders *[]domain.StageRangeOrderUpdating, sec *security.Context) error
 }
 
 type WorkManager struct {
@@ -33,6 +34,7 @@ func NewWorkManager(ds *persistence.DataSourceManager) *WorkManager {
 		idWorker:   sonyflake.NewSonyflake(sonyflake.Settings{}),
 	}
 }
+
 func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
 	var works []domain.Work
 	db := m.dataSource.GormDB()
@@ -45,7 +47,7 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 	if len(visibleGroups) == 0 {
 		return &[]domain.Work{}, nil
 	}
-	q = q.Where("group_id in (?)", visibleGroups)
+	q = q.Where("group_id in (?)", visibleGroups).Order("order_in_state ASC")
 	if err := q.Find(&works).Error; err != nil {
 		return nil, err
 	}
@@ -123,6 +125,29 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *secur
 	return &work, nil
 }
 
+func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.StageRangeOrderUpdating, sec *security.Context) error {
+	if wantedOrders == nil || len(*wantedOrders) == 0 {
+		return nil
+	}
+
+	return m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
+		for _, orderUpdating := range *wantedOrders {
+			if err := m.checkPerms(orderUpdating.ID, sec); err != nil {
+				return err
+			}
+			db := tx.Model(&domain.Work{}).Where(&domain.Work{ID: orderUpdating.ID, OrderInState: orderUpdating.OldOlder}).
+				Update(&domain.Work{OrderInState: orderUpdating.NewOlder})
+			if err := db.Error; err != nil {
+				return err
+			}
+			if db.RowsAffected != 1 {
+				return errors.New("expected affected row is 1, but actual is " + strconv.FormatInt(db.RowsAffected, 10))
+			}
+		}
+		return nil
+	})
+}
+
 func (m *WorkManager) DeleteWork(id types.ID, sec *security.Context) error {
 	if err := m.checkPerms(id, sec); err != nil {
 		return err
@@ -146,7 +171,7 @@ func (m *WorkManager) checkPerms(id types.ID, sec *security.Context) error {
 	if err := m.dataSource.GormDB().Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
 		return err
 	}
-	if !sec.HasRoleSuffix("_" + work.GroupID.String()) {
+	if sec == nil || !sec.HasRoleSuffix("_"+work.GroupID.String()) {
 		return errors.New("forbidden")
 	}
 	return nil

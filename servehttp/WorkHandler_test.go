@@ -14,6 +14,7 @@ import (
 	. "github.com/onsi/gomega"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -40,12 +41,13 @@ var _ = Describe("WorkHandler", func() {
 			workManager.CreateWorkFunc = func(creation *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {
 				detail := domain.WorkDetail{
 					Work: domain.Work{
-						ID:         123,
-						Name:       creation.Name,
-						GroupID:    creation.GroupID,
-						FlowID:     domain.GenericWorkFlow.ID,
-						CreateTime: t,
-						StateName:  domain.GenericWorkFlow.StateMachine.States[0].Name,
+						ID:           123,
+						Name:         creation.Name,
+						GroupID:      creation.GroupID,
+						FlowID:       domain.GenericWorkFlow.ID,
+						OrderInState: t.UnixNano() / 1e6,
+						CreateTime:   t,
+						StateName:    domain.GenericWorkFlow.StateMachine.States[0].Name,
 					},
 					Type:  domain.GenericWorkFlow.WorkFlowBase,
 					State: domain.GenericWorkFlow.StateMachine.States[0],
@@ -59,8 +61,9 @@ var _ = Describe("WorkHandler", func() {
 			req := httptest.NewRequest(http.MethodPost, "/v1/works", bytes.NewReader(reqBody))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusCreated))
-			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"333","flowId":"1",
-			"createTime":"` + timeString + `","stateName":"PENDING","type":{"id":"1","name":"GenericTask"},"state":{"name":"PENDING"}}`))
+			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"333","flowId":"1", "orderInState": ` +
+				strconv.FormatInt(t.UnixNano()/1e6, 10) + `, "createTime":"` + timeString + `",
+				"stateName":"PENDING","type":{"id":"1","name":"GenericTask"},"state":{"name":"PENDING"}}`))
 		})
 
 		It("should return 400 when bind failed", func() {
@@ -98,21 +101,20 @@ var _ = Describe("WorkHandler", func() {
 			timeString := strings.Trim(string(timeBytes), `"`)
 			Expect(err).To(BeNil())
 			workManager.QueryWorkFunc = func(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
-				{
-					works := []domain.Work{
-						{ID: 1, Name: "work1", GroupID: types.ID(333), FlowID: 1, CreateTime: t, StateName: "PENDING"},
-						{ID: 2, Name: "work2", GroupID: types.ID(333), FlowID: 1, CreateTime: t, StateName: "PENDING"},
-					}
-					return &works, nil
+				works := []domain.Work{
+					{ID: 1, Name: "work1", GroupID: types.ID(333), FlowID: 1, CreateTime: t, OrderInState: t.UnixNano() / 1e6, StateName: "PENDING"},
+					{ID: 2, Name: "work2", GroupID: types.ID(333), FlowID: 1, CreateTime: t, OrderInState: t.UnixNano() / 1e6, StateName: "PENDING"},
 				}
+				return &works, nil
 			}
 
 			req := httptest.NewRequest(http.MethodGet, "/v1/works?name=aaa", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"data":[{"id":"1","name":"work1","groupId":"333","flowId":"1",
-			"createTime":"` + timeString + `","stateName":"PENDING"},{"id":"2","name":"work2","groupId":"333","flowId":"1",
-			"createTime":"` + timeString + `","stateName":"PENDING"}],"total": 2}`))
+				"createTime":"` + timeString + `","orderInState": ` + strconv.FormatInt(t.UnixNano()/1e6, 10) + ` ,"stateName":"PENDING"},
+				{"id":"2","name":"work2","groupId":"333","flowId":"1", "orderInState": ` + strconv.FormatInt(t.UnixNano()/1e6, 10) + `,
+				"createTime":"` + timeString + `","stateName":"PENDING"}],"total": 2}`))
 		})
 
 		It("should return 500 when service failed", func() {
@@ -162,13 +164,15 @@ var _ = Describe("WorkHandler", func() {
 			timeString := strings.Trim(string(timeBytes), `"`)
 			Expect(err).To(BeNil())
 			workManager.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error) {
-				return &domain.Work{ID: 100, Name: "new-name", GroupID: types.ID(333), FlowID: 1, CreateTime: t, StateName: "PENDING"}, nil
+				return &domain.Work{ID: 100, Name: "new-name", GroupID: types.ID(333), CreateTime: t,
+					FlowID: 1, OrderInState: t.UnixNano() / 1e6, StateName: "PENDING"}, nil
 			}
 			req := httptest.NewRequest(http.MethodPut, "/v1/works/100", bytes.NewReader([]byte(
 				`{"name": "new-name"}`)))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","stateName":"PENDING","groupId":"333","flowId":"1","createTime":"` + timeString + `"}`))
+			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","stateName":"PENDING","groupId":"333","flowId":"1","createTime":"` +
+				timeString + `", "orderInState": ` + strconv.FormatInt(t.UnixNano()/1e6, 10) + `}`))
 		})
 	})
 
@@ -200,14 +204,42 @@ var _ = Describe("WorkHandler", func() {
 			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"unexpected exception","data":null}`))
 		})
 	})
+
+	Describe("handleUpdateOrders", func() {
+		It("should be able to handle bind error", func() {
+			req := httptest.NewRequest(http.MethodPut, "/v1/work-orders", bytes.NewReader([]byte(`{}`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"json: cannot unmarshal object into Go value of type []domain.StageRangeOrderUpdating","data":null}`))
+		})
+		It("should be able to handle process error", func() {
+			workManager.UpdateStateRangeOrdersFunc = func(wantedOrders *[]domain.StageRangeOrderUpdating, sec *security.Context) error {
+				return errors.New("unexpected exception")
+			}
+			req := httptest.NewRequest(http.MethodPut, "/v1/work-orders", bytes.NewReader([]byte(`[]`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusInternalServerError))
+			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"unexpected exception","data":null}`))
+		})
+		It("should be able to handle update", func() {
+			workManager.UpdateStateRangeOrdersFunc = func(wantedOrders *[]domain.StageRangeOrderUpdating, sec *security.Context) error {
+				return nil
+			}
+			req := httptest.NewRequest(http.MethodPut, "/v1/work-orders", bytes.NewReader([]byte(`[]`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusOK))
+			Expect(body).To(BeEmpty())
+		})
+	})
 })
 
 type workManagerMock struct {
-	QueryWorkFunc  func(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error)
-	WorkDetailFunc func(id types.ID, sec *security.Context) (*domain.WorkDetail, error)
-	CreateWorkFunc func(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error)
-	DeleteWorkFunc func(id types.ID, sec *security.Context) error
-	UpdateWorkFunc func(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error)
+	QueryWorkFunc              func(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error)
+	WorkDetailFunc             func(id types.ID, sec *security.Context) (*domain.WorkDetail, error)
+	CreateWorkFunc             func(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error)
+	DeleteWorkFunc             func(id types.ID, sec *security.Context) error
+	UpdateWorkFunc             func(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error)
+	UpdateStateRangeOrdersFunc func(wantedOrders *[]domain.StageRangeOrderUpdating, sec *security.Context) error
 }
 
 func (m *workManagerMock) QueryWork(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
@@ -224,4 +256,7 @@ func (m *workManagerMock) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *s
 }
 func (m *workManagerMock) DeleteWork(id types.ID, sec *security.Context) error {
 	return m.DeleteWorkFunc(id, sec)
+}
+func (m *workManagerMock) UpdateStateRangeOrders(wantedOrders *[]domain.StageRangeOrderUpdating, sec *security.Context) error {
+	return m.UpdateStateRangeOrdersFunc(wantedOrders, sec)
 }

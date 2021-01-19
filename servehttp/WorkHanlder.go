@@ -14,16 +14,18 @@ import (
 )
 
 func RegisterWorkHandler(r *gin.Engine, m work.WorkManagerTraits, middleWares ...gin.HandlerFunc) {
-	// group: "", version: v1, resource: work
-	g := r.Group("/v1/works", middleWares...)
-
 	handler := &workHandler{workManager: m, validator: validator.New()}
 
+	// group: "", version: v1, resource: work
+	g := r.Group("/v1/works", middleWares...)
 	g.GET("", handler.handleQuery)
 	g.POST("", handler.handleCreate)
 	//g.GET(":id", handler.handleDetail)
 	g.PUT(":id", handler.handleUpdate)
 	g.DELETE(":id", handler.handleDelete)
+
+	o := r.Group("/v1/work-orders")
+	o.PUT("", handler.handleUpdateOrders)
 }
 
 type workHandler struct {
@@ -91,6 +93,19 @@ func (h *workHandler) handleUpdate(c *gin.Context) {
 		panic(err)
 	}
 	c.JSON(http.StatusOK, updatedWork)
+}
+
+func (h *workHandler) handleUpdateOrders(c *gin.Context) {
+	var updating []domain.StageRangeOrderUpdating
+	err := c.ShouldBindBodyWith(&updating, binding.JSON)
+	if err != nil {
+		panic(&common.ErrBadParam{Cause: err})
+	}
+	err = h.workManager.UpdateStateRangeOrders(&updating, security.FindSecurityContext(c))
+	if err != nil {
+		panic(err)
+	}
+	c.AbortWithStatus(http.StatusOK)
 }
 
 func (h *workHandler) handleDelete(c *gin.Context) {

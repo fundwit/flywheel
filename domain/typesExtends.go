@@ -15,6 +15,12 @@ type WorkUpdating struct {
 	Name string `json:"name"`
 }
 
+type StageRangeOrderUpdating struct {
+	ID       types.ID `json:"id" validate:"required"`
+	NewOlder int64    `json:"newOrder"`
+	OldOlder int64    `json:"oldOrder"`
+}
+
 type WorkDetail struct {
 	Work
 	Type  WorkFlowBase `json:"type"`
@@ -36,15 +42,17 @@ func (c *WorkCreation) BuildWorkDetail(id types.ID) *WorkDetail {
 	workFlow := &GenericWorkFlow
 	initState := GenericWorkFlow.StateMachine.States[0]
 
+	now := time.Now()
 	return &WorkDetail{
 		Work: Work{
-			ID:      id,
-			Name:    c.Name,
-			GroupID: c.GroupID,
-			FlowID:  workFlow.ID,
+			ID:         id,
+			Name:       c.Name,
+			GroupID:    c.GroupID,
+			CreateTime: now,
 
-			StateName:  initState.Name,
-			CreateTime: time.Now(),
+			FlowID:       workFlow.ID,
+			OrderInState: now.UnixNano() / 1e6,
+			StateName:    initState.Name,
 		},
 		Type:  workFlow.WorkFlowBase,
 		State: initState,

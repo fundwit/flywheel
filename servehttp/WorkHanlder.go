@@ -24,7 +24,7 @@ func RegisterWorkHandler(r *gin.Engine, m work.WorkManagerTraits, middleWares ..
 	g.PUT(":id", handler.handleUpdate)
 	g.DELETE(":id", handler.handleDelete)
 
-	o := r.Group("/v1/work-orders")
+	o := r.Group("/v1/work-orders", middleWares...)
 	o.PUT("", handler.handleUpdateOrders)
 }
 

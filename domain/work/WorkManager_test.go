@@ -151,6 +151,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(work1.CreateTime).ToNot(BeZero())
 			Expect(work1.FlowID).To(Equal(domain.GenericWorkFlow.ID))
 			Expect(work1.StateName).To(Equal(domain.GenericWorkFlow.StateMachine.States[0].Name))
+			Expect(work1.State).To(Equal(domain.GenericWorkFlow.StateMachine.States[0]))
 		})
 
 		It("works should be ordered by orderInState asc and id asc", func() {
@@ -171,6 +172,16 @@ var _ = Describe("WorkManager", func() {
 			Expect((*works)[1].Name).To(Equal("w2"))
 			Expect((*works)[2].Name).To(Equal("w1"))
 		})
+
+		It("should return error if failed to find state", func() {
+			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", GroupID: 1,
+				CreateTime: time.Now(), FlowID: 1, OrderInState: 2, StateName: "UNKNOWN"}).Error).To(BeNil())
+			works, err := workManager.QueryWork(&domain.WorkQuery{GroupID: types.ID(1)},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).ToNot(BeNil())
+			Expect(works).To(BeNil())
+			Expect(err.Error()).To(Equal("invalid state 'UNKNOWN'"))
+		})
 	})
 
 	Describe("UpdateWork", func() {
@@ -186,6 +197,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(updatedWork).ToNot(BeNil())
 			Expect(updatedWork.ID).To(Equal(detail.ID))
 			Expect(updatedWork.Name).To(Equal("test work1 new"))
+			Expect(updatedWork.State).To(Equal(domain.GenericWorkFlow.StateMachine.States[0]))
 
 			works, err := workManager.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeNil())
@@ -194,6 +206,7 @@ var _ = Describe("WorkManager", func() {
 
 			Expect((*works)[0].ID).To(Equal(detail.ID))
 			Expect((*works)[0].Name).To(Equal("test work1 new"))
+			Expect((*works)[0].State).To(Equal(domain.GenericWorkFlow.StateMachine.States[0]))
 		})
 		It("should be able to catch error when work not found", func() {
 			_, err := workManager.CreateWork(
@@ -230,6 +243,17 @@ var _ = Describe("WorkManager", func() {
 			Expect(updatedWork).To(BeNil())
 			Expect(err).ToNot(BeZero())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
+		})
+
+		It("should return error if failed to find state", func() {
+			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", GroupID: 1,
+				CreateTime: time.Now(), FlowID: 1, OrderInState: 2, StateName: "UNKNOWN"}).Error).To(BeNil())
+			updatedWork, err := workManager.UpdateWork(2,
+				&domain.WorkUpdating{Name: "test work1 new"},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).ToNot(BeNil())
+			Expect(updatedWork).To(BeNil())
+			Expect(err.Error()).To(Equal("invalid state 'UNKNOWN'"))
 		})
 	})
 

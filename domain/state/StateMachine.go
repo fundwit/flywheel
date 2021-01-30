@@ -10,8 +10,17 @@ type StateMachine struct {
 	Transitions []Transition `json:"transitions"`
 }
 
+type Category uint
+
+const (
+	InBacklog Category = iota
+	InProcess
+	Done
+)
+
 type State struct {
-	Name string `json:"name"`
+	Name     string   `json:"name"`
+	Category Category `json:"category"`
 }
 
 type Transition struct {

@@ -5,6 +5,7 @@ import (
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
+	"flywheel/domain/state"
 	"flywheel/persistence"
 	"flywheel/security"
 	"fmt"
@@ -51,6 +52,15 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 	if err := q.Find(&works).Error; err != nil {
 		return nil, err
 	}
+
+	for i := len(works) - 1; i >= 0; i-- {
+		stateFound, err := findState(works[i].StateName)
+		if err != nil {
+			return nil, err
+		}
+		works[i].State = stateFound
+	}
+
 	return &works, nil
 }
 
@@ -66,14 +76,12 @@ func (m *WorkManager) WorkDetail(id types.ID, sec *security.Context) (*domain.Wo
 	}
 
 	// load type and state
-	gwt := domain.GenericWorkFlow
-
-	workDetail.Type = gwt.WorkFlowBase
-	state, found := gwt.FindState(workDetail.StateName)
-	if !found {
-		return nil, fmt.Errorf("invalid state '%s'", workDetail.StateName)
+	workDetail.Type = domain.GenericWorkFlow.WorkFlowBase
+	stateFound, err := findState(workDetail.StateName)
+	if err != nil {
+		return nil, err
 	}
-	workDetail.State = state
+	workDetail.State = stateFound
 
 	return &workDetail, nil
 }
@@ -122,6 +130,11 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *secur
 		return nil, err
 	}
 
+	stateFound, err := findState(work.StateName)
+	if err != nil {
+		return nil, err
+	}
+	work.State = stateFound
 	return &work, nil
 }
 
@@ -175,4 +188,12 @@ func (m *WorkManager) checkPerms(id types.ID, sec *security.Context) error {
 		return errors.New("forbidden")
 	}
 	return nil
+}
+
+func findState(stateName string) (state.State, error) {
+	stateFound, found := domain.GenericWorkFlow.FindState(stateName)
+	if !found {
+		return state.State{}, fmt.Errorf("invalid state '%s'", stateName)
+	}
+	return stateFound, nil
 }

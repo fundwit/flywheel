@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"flywheel/domain/state"
 	"github.com/fundwit/go-commons/types"
 	"time"
 )
@@ -23,8 +22,7 @@ type StageRangeOrderUpdating struct {
 
 type WorkDetail struct {
 	Work
-	Type  WorkFlowBase `json:"type"`
-	State state.State  `json:"state"`
+	Type WorkFlowBase `json:"type"`
 }
 
 type WorkQuery struct {
@@ -53,8 +51,8 @@ func (c *WorkCreation) BuildWorkDetail(id types.ID) *WorkDetail {
 			FlowID:       workFlow.ID,
 			OrderInState: now.UnixNano() / 1e6,
 			StateName:    initState.Name,
+			State:        initState,
 		},
-		Type:  workFlow.WorkFlowBase,
-		State: initState,
+		Type: workFlow.WorkFlowBase,
 	}
 }

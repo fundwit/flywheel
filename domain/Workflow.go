@@ -37,17 +37,21 @@ func FindWorkflow(ID types.ID) *WorkFlow {
 	return nil
 }
 
+var StatePending = state.State{Name: "PENDING", Category: state.InBacklog}
+var StateDoing = state.State{Name: "DOING", Category: state.InProcess}
+var StateDone = state.State{Name: "DONE", Category: state.Done}
+
 var GenericWorkFlow = WorkFlow{
 	WorkFlowBase: WorkFlowBase{
 		ID:   1,
 		Name: "GenericTask",
 	},
-	StateMachine: *state.NewStateMachine([]state.State{{Name: "PENDING"}, {Name: "DOING"}, {Name: "DONE"}}, []state.Transition{
-		{Name: "begin", From: state.State{Name: "PENDING"}, To: state.State{Name: "DOING"}},
-		{Name: "close", From: state.State{Name: "PENDING"}, To: state.State{Name: "DONE"}},
-		{Name: "cancel", From: state.State{Name: "DOING"}, To: state.State{Name: "PENDING"}},
-		{Name: "finish", From: state.State{Name: "DOING"}, To: state.State{Name: "DONE"}},
-		{Name: "reopen", From: state.State{Name: "DONE"}, To: state.State{Name: "PENDING"}},
+	StateMachine: *state.NewStateMachine([]state.State{StatePending, StateDoing, StateDone}, []state.Transition{
+		{Name: "begin", From: StatePending, To: StateDoing},
+		{Name: "close", From: StatePending, To: StateDone},
+		{Name: "cancel", From: StateDoing, To: StatePending},
+		{Name: "finish", From: StateDoing, To: StateDone},
+		{Name: "reopen", From: StateDone, To: StatePending},
 	}),
 	PropertyDefinitions: []PropertyDefinition{
 		{Name: "description"}, {Name: "creatorId"},

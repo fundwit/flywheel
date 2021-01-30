@@ -118,5 +118,5 @@ func (h *workHandler) handleDelete(c *gin.Context) {
 	if err != nil {
 		panic(err)
 	}
-	c.JSON(http.StatusNoContent, nil)
+	c.AbortWithStatus(http.StatusNoContent)
 }

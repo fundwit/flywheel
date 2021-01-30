@@ -26,7 +26,7 @@ var _ = Describe("WorkflowHandler", func() {
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/1/states", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`[{"name": "PENDING"},{"name": "DOING"},{"name": "DONE"}]`))
+			Expect(body).To(MatchJSON(`[{"name": "PENDING","category":0},{"name": "DOING","category":1},{"name": "DONE","category":2}]`))
 		})
 
 		It("should return 404 when workflow is not exists", func() {
@@ -57,15 +57,15 @@ var _ = Describe("WorkflowHandler", func() {
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/1/transitions?fromState=PENDING", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`[{"name":"begin","from":{"name": "PENDING"},"to":{"name": "DOING"}},
-				{"name":"close","from":{"name": "PENDING"},"to":{"name": "DONE"}}]`))
+			Expect(body).To(MatchJSON(`[{"name":"begin","from":{"name": "PENDING", "category": 0},"to":{"name": "DOING", "category": 1}},
+				{"name":"close","from":{"name": "PENDING", "category": 0},"to":{"name": "DONE", "category":2}}]`))
 		})
 
 		It("should be able to query transitions with query: fromState and toState", func() {
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/1/transitions?fromState=PENDING&toState=DONE", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`[{"name":"close","from":{"name": "PENDING"},"to":{"name": "DONE"}}]`))
+			Expect(body).To(MatchJSON(`[{"name":"close","from":{"name": "PENDING", "category": 0},"to":{"name": "DONE", "category": 2}}]`))
 		})
 
 		It("should be able to query transitions with unknown state", func() {

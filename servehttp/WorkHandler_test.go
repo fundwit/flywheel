@@ -48,9 +48,9 @@ var _ = Describe("WorkHandler", func() {
 						OrderInState: t.UnixNano() / 1e6,
 						CreateTime:   t,
 						StateName:    domain.GenericWorkFlow.StateMachine.States[0].Name,
+						State:        domain.GenericWorkFlow.StateMachine.States[0],
 					},
-					Type:  domain.GenericWorkFlow.WorkFlowBase,
-					State: domain.GenericWorkFlow.StateMachine.States[0],
+					Type: domain.GenericWorkFlow.WorkFlowBase,
 				}
 				return &detail, nil
 			}
@@ -63,7 +63,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(status).To(Equal(http.StatusCreated))
 			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"333","flowId":"1", "orderInState": ` +
 				strconv.FormatInt(t.UnixNano()/1e6, 10) + `, "createTime":"` + timeString + `",
-				"stateName":"PENDING","type":{"id":"1","name":"GenericTask"},"state":{"name":"PENDING"}}`))
+				"stateName":"PENDING","type":{"id":"1","name":"GenericTask"},"state":{"name":"PENDING","category":0}}`))
 		})
 
 		It("should return 400 when bind failed", func() {
@@ -102,8 +102,8 @@ var _ = Describe("WorkHandler", func() {
 			Expect(err).To(BeNil())
 			workManager.QueryWorkFunc = func(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
 				works := []domain.Work{
-					{ID: 1, Name: "work1", GroupID: types.ID(333), FlowID: 1, CreateTime: t, OrderInState: t.UnixNano() / 1e6, StateName: "PENDING"},
-					{ID: 2, Name: "work2", GroupID: types.ID(333), FlowID: 1, CreateTime: t, OrderInState: t.UnixNano() / 1e6, StateName: "PENDING"},
+					{ID: 1, Name: "work1", GroupID: types.ID(333), FlowID: 1, CreateTime: t, OrderInState: t.UnixNano() / 1e6, StateName: "PENDING", State: domain.StatePending},
+					{ID: 2, Name: "work2", GroupID: types.ID(333), FlowID: 1, CreateTime: t, OrderInState: t.UnixNano() / 1e6, StateName: "PENDING", State: domain.StatePending},
 				}
 				return &works, nil
 			}
@@ -112,9 +112,10 @@ var _ = Describe("WorkHandler", func() {
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"data":[{"id":"1","name":"work1","groupId":"333","flowId":"1",
-				"createTime":"` + timeString + `","orderInState": ` + strconv.FormatInt(t.UnixNano()/1e6, 10) + ` ,"stateName":"PENDING"},
+				"createTime":"` + timeString + `","orderInState": ` + strconv.FormatInt(t.UnixNano()/1e6, 10) + ` ,
+				"stateName":"PENDING","state":{"name":"PENDING", "category":0}},
 				{"id":"2","name":"work2","groupId":"333","flowId":"1", "orderInState": ` + strconv.FormatInt(t.UnixNano()/1e6, 10) + `,
-				"createTime":"` + timeString + `","stateName":"PENDING"}],"total": 2}`))
+				"createTime":"` + timeString + `","stateName":"PENDING","state":{"name":"PENDING", "category":0}}],"total": 2}`))
 		})
 
 		It("should return 500 when service failed", func() {
@@ -165,13 +166,14 @@ var _ = Describe("WorkHandler", func() {
 			Expect(err).To(BeNil())
 			workManager.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error) {
 				return &domain.Work{ID: 100, Name: "new-name", GroupID: types.ID(333), CreateTime: t,
-					FlowID: 1, OrderInState: t.UnixNano() / 1e6, StateName: "PENDING"}, nil
+					FlowID: 1, OrderInState: t.UnixNano() / 1e6, StateName: "PENDING", State: domain.StatePending}, nil
 			}
 			req := httptest.NewRequest(http.MethodPut, "/v1/works/100", bytes.NewReader([]byte(
 				`{"name": "new-name"}`)))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","stateName":"PENDING","groupId":"333","flowId":"1","createTime":"` +
+			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","stateName":"PENDING","state":{"name":"PENDING", "category":0},
+				"groupId":"333","flowId":"1","createTime":"` +
 				timeString + `", "orderInState": ` + strconv.FormatInt(t.UnixNano()/1e6, 10) + `}`))
 		})
 	})

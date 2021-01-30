@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestFlywheel(t *testing.T) {
+func TestDomainWork(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "domain Suite")
 }

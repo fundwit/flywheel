@@ -22,7 +22,7 @@ var _ = Describe("WorkManager", func() {
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
 		// migration
-		err := testDatabase.DS.GormDB().AutoMigrate(&domain.Work{}).Error
+		err := testDatabase.DS.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{}).Error
 		if err != nil {
 			log.Fatalf("database migration failed %v\n", err)
 		}
@@ -70,6 +70,14 @@ var _ = Describe("WorkManager", func() {
 			Expect(work.OrderInState).To(Equal(work.CreateTime.UnixNano() / 1e6))
 			Expect(detail.StateName).To(Equal(domain.GenericWorkFlow.StateMachine.States[0].Name))
 			//Expect(len(work.Properties)).To(Equal(0))
+
+			// should create init process step
+			var initProcessStep []domain.WorkProcessStep
+			Expect(testDatabase.DS.GormDB().Model(&domain.WorkProcessStep{}).Scan(&initProcessStep).Error).To(BeNil())
+			Expect(initProcessStep).ToNot(BeNil())
+			Expect(len(initProcessStep)).To(Equal(1))
+			Expect(initProcessStep[0]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
+				StateName: detail.StateName, StateCategory: detail.State.Category, BeginTime: &detail.CreateTime, EndTime: nil}))
 		})
 		It("should forbid to create to other group", func() {
 			creation := &domain.WorkCreation{Name: "test work", GroupID: types.ID(1)}

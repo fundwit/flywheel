@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flywheel/common"
 	"flywheel/domain"
+	"flywheel/domain/state"
 	"flywheel/security"
 	"fmt"
 
@@ -41,8 +42,18 @@ func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief,
 		return nil, errors.New("transition from " + c.FromState + " to " + c.ToState + " is not invalid")
 	}
 
+	now := time.Now()
 	newId := common.NextId(m.idWorker)
-	record := &WorkStateTransition{ID: newId, CreateTime: time.Now(), Creator: sec.Identity.ID, WorkStateTransitionBrief: *c}
+	transition := &WorkStateTransition{ID: newId, CreateTime: now, Creator: sec.Identity.ID, WorkStateTransitionBrief: *c}
+
+	fromState, found := flow.FindState(c.FromState)
+	if !found {
+		return nil, errors.New("invalid state " + fromState.Name)
+	}
+	toState, found := flow.FindState(c.ToState)
+	if !found {
+		return nil, errors.New("invalid state " + toState.Name)
+	}
 
 	db := m.dataSource.GormDB()
 	err := db.Transaction(func(tx *gorm.DB) error {
@@ -63,14 +74,30 @@ func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief,
 		if query.RowsAffected != 1 {
 			return errors.New("expected affected row is 1, but actual is " + strconv.FormatInt(query.RowsAffected, 10))
 		}
-		// create transition record
-		if err := tx.Create(record).Error; err != nil {
+		// create transition transition
+		if err := tx.Create(transition).Error; err != nil {
 			return err
 		}
+
+		// update process step
+		if fromState.Category != state.Done {
+			if err := tx.Model(&domain.WorkProcessStep{}).Where(&domain.WorkProcessStep{WorkID: c.WorkID, FlowID: flow.ID, StateName: fromState.Name}).
+				Where("end_time is null").Update(&domain.WorkProcessStep{EndTime: &now}).Error; err != nil {
+				return err
+			}
+		}
+		if toState.Category != state.Done {
+			nextProcessStep := domain.WorkProcessStep{WorkID: work.ID, FlowID: work.FlowID,
+				StateName: toState.Name, StateCategory: toState.Category, BeginTime: &now}
+			if err := tx.Create(nextProcessStep).Error; err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return record, nil
+	return transition, nil
 }

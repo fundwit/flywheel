@@ -35,7 +35,8 @@ func main() {
 	defer ds.Stop()
 
 	// database migration (race condition)
-	err = ds.GormDB().AutoMigrate(&domain.Work{}, &flow.WorkStateTransition{}, &security.User{}, &domain.Group{}, &domain.GroupMember{}).Error
+	err = ds.GormDB().AutoMigrate(&domain.Work{}, &flow.WorkStateTransition{}, &domain.WorkProcessStep{},
+		&security.User{}, &domain.Group{}, &domain.GroupMember{}).Error
 	if err != nil {
 		log.Fatalf("database migration failed %v\n", err)
 	}

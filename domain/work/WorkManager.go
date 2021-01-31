@@ -92,10 +92,15 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 	}
 
 	workDetail := c.BuildWorkDetail(common.NextId(m.idWorker))
+	initProcessStep := domain.WorkProcessStep{WorkID: workDetail.ID, FlowID: workDetail.FlowID,
+		StateName: workDetail.State.Name, StateCategory: workDetail.State.Category, BeginTime: &workDetail.CreateTime}
 
 	db := m.dataSource.GormDB()
 	err := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(workDetail.Work).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(initProcessStep).Error; err != nil {
 			return err
 		}
 		return nil

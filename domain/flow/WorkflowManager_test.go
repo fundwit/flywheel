@@ -19,7 +19,7 @@ var _ = Describe("WorkflowManager", func() {
 	)
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
-		err := testDatabase.DS.GormDB().AutoMigrate(&domain.Work{}, &flow.WorkStateTransition{}).Error
+		err := testDatabase.DS.GormDB().AutoMigrate(&domain.Work{}, &flow.WorkStateTransition{}, &domain.WorkProcessStep{}).Error
 		if err != nil {
 			log.Fatalf("database migration failed %v\n", err)
 		}
@@ -125,6 +125,17 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(records[0].FromState).To(Equal(creation.FromState))
 			Expect(records[0].ToState).To(Equal(creation.ToState))
 			Expect(records[0].Creator).To(Equal(sec.Identity.ID))
+
+			handleTime := records[0].CreateTime
+			// should handle process step
+			var processSteps []domain.WorkProcessStep
+			Expect(testDatabase.DS.GormDB().Model(&domain.WorkProcessStep{}).Scan(&processSteps).Error).To(BeNil())
+			Expect(processSteps).ToNot(BeNil())
+			Expect(len(processSteps)).To(Equal(2))
+			Expect(processSteps[0]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
+				StateName: creation.FromState, StateCategory: 0, BeginTime: &detail.CreateTime, EndTime: &handleTime}))
+			Expect(processSteps[1]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
+				StateName: creation.ToState, StateCategory: 1, BeginTime: &handleTime, EndTime: nil}))
 		})
 	})
 })

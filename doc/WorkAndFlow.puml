@@ -10,11 +10,22 @@ class Work {
     State State
 }
 
-Work --> WorkFlow
+Work ..> WorkFlow :reference
 Work *--> PropertyAssign
-PropertyAssign --> PropertyDefinition
-WorkFlow --> PropertyDefinition
-WorkFlow --> StateMachine
+PropertyAssign ..> PropertyDefinition
+WorkFlow ..> PropertyDefinition
+WorkFlow *--> StateMachine
+Work *--> WorkProcessStep
+
+class WorkProcessStep {
+    WorkID ID
+    FlowID ID
+    StateName string
+    StateCategory StateCategory
+
+    BeginTime time.Time
+    EndTime time.Time
+}
 
 class WorkFlow {
     ID ID

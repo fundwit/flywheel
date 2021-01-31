@@ -299,17 +299,28 @@ var _ = Describe("WorkManager", func() {
 			Expect(testDatabase.DS.GormDB().First(&transition, flow.WorkStateTransition{ID: 2}).Error).To(BeNil())
 			Expect(transition.WorkID).To(Equal(types.ID(2)))
 
-			err = workManager.DeleteWork((*works)[0].ID, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			// do delete work
+			workIdToDelete := (*works)[0].ID
+			err = workManager.DeleteWork(workIdToDelete, testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeNil())
 			works, err = workManager.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeNil())
 			Expect(len(*works)).To(Equal(1))
 
+			// transitions should also be deleted
+			// transition of id 1 was deleted
 			transition = flow.WorkStateTransition{}
 			Expect(testDatabase.DS.GormDB().First(&transition, flow.WorkStateTransition{ID: 1}).Error).To(Equal(gorm.ErrRecordNotFound))
+			// transition of id 2 still remains
 			transition = flow.WorkStateTransition{}
 			Expect(testDatabase.DS.GormDB().First(&transition, flow.WorkStateTransition{ID: 2}).Error).To(BeNil())
 			Expect(transition.WorkID).To(Equal(types.ID(2)))
+
+			// work process steps should also be deleted
+			processStep := domain.WorkProcessStep{}
+			Expect(testDatabase.DS.GormDB().First(&processStep, domain.WorkProcessStep{WorkID: workIdToDelete}).Error).To(Equal(gorm.ErrRecordNotFound))
+			processStep = domain.WorkProcessStep{}
+			Expect(testDatabase.DS.GormDB().First(&processStep).Error).To(BeNil())
 		})
 
 		It("should forbid to delete without permissions", func() {

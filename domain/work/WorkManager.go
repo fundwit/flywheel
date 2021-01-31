@@ -178,6 +178,9 @@ func (m *WorkManager) DeleteWork(id types.ID, sec *security.Context) error {
 		if err := tx.Delete(flow.WorkStateTransition{}, "work_id = ?", id).Error; err != nil {
 			return err
 		}
+		if err := tx.Delete(domain.WorkProcessStep{}, "work_id = ?", id).Error; err != nil {
+			return err
+		}
 		return nil
 	})
 

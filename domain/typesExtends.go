@@ -48,10 +48,11 @@ func (c *WorkCreation) BuildWorkDetail(id types.ID) *WorkDetail {
 			GroupID:    c.GroupID,
 			CreateTime: now,
 
-			FlowID:       workFlow.ID,
-			OrderInState: now.UnixNano() / 1e6,
-			StateName:    initState.Name,
-			State:        initState,
+			FlowID:         workFlow.ID,
+			OrderInState:   now.UnixNano() / 1e6,
+			StateName:      initState.Name,
+			StateBeginTime: now,
+			State:          initState,
 		},
 		Type: workFlow.WorkFlowBase,
 	}

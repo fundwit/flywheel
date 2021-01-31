@@ -67,7 +67,8 @@ func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief,
 		}
 
 		// update work.stageName
-		query := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID, StateName: c.FromState}).Update(&domain.Work{StateName: c.ToState})
+		query := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID, StateName: c.FromState}).
+			Update(&domain.Work{StateName: c.ToState, StateBeginTime: now})
 		if err := query.Error; err != nil {
 			return err
 		}

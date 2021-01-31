@@ -99,7 +99,6 @@ var _ = Describe("WorkflowManager", func() {
 		It("should success when all conditions be satisfied", func() {
 			sec := testinfra.BuildSecCtx(types.ID(123), []string{"owner_333"})
 			detail := testinfra.BuildWorker(workManager, "test work", types.ID(333), sec)
-
 			creation := flow.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DOING"}
 			transition, err := manager.CreateWorkStateTransition(&creation, sec)
 			Expect(err).To(BeNil())
@@ -112,6 +111,7 @@ var _ = Describe("WorkflowManager", func() {
 			detail, err = workManager.WorkDetail(detail.ID, sec)
 			Expect(err).To(BeNil())
 			Expect(detail.StateName).To(Equal("DOING"))
+			Expect(detail.StateBeginTime.UnixNano() >= detail.CreateTime.UnixNano()).To(BeTrue())
 
 			// record is created
 			var records []flow.WorkStateTransition
@@ -127,6 +127,8 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(records[0].Creator).To(Equal(sec.Identity.ID))
 
 			handleTime := records[0].CreateTime
+			Expect(detail.StateBeginTime).To(Equal(handleTime))
+
 			// should handle process step
 			var processSteps []domain.WorkProcessStep
 			Expect(testDatabase.DS.GormDB().Model(&domain.WorkProcessStep{}).Scan(&processSteps).Error).To(BeNil())

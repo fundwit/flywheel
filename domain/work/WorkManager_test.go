@@ -42,7 +42,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
 		})
-		It("should create new workManager successfully", func() {
+		It("should create new work successfully", func() {
 			creation := &domain.WorkCreation{Name: "test work", GroupID: types.ID(1)}
 			work, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
 
@@ -56,6 +56,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(work.OrderInState).To(Equal(work.CreateTime.UnixNano() / 1e6))
 			Expect(work.Type).To(Equal(domain.GenericWorkFlow.WorkFlowBase))
 			Expect(work.State).To(Equal(domain.GenericWorkFlow.StateMachine.States[0]))
+			Expect(work.StateBeginTime).To(Equal(work.CreateTime))
 
 			detail, err := workManager.WorkDetail(work.ID, testinfra.BuildSecCtx(100, []string{"owner_1"}))
 			Expect(err).To(BeNil())
@@ -164,11 +165,11 @@ var _ = Describe("WorkManager", func() {
 
 		It("works should be ordered by orderInState asc and id asc", func() {
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", GroupID: 1,
-				CreateTime: time.Now(), FlowID: 1, OrderInState: 2, StateName: "PENDING"}).Error).To(BeNil())
+				CreateTime: time.Now(), FlowID: 1, OrderInState: 2, StateName: "PENDING", StateBeginTime: time.Now()}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 1, Name: "w2", GroupID: 1,
-				CreateTime: time.Now(), FlowID: 1, OrderInState: 2, StateName: "PENDING"}).Error).To(BeNil())
+				CreateTime: time.Now(), FlowID: 1, OrderInState: 2, StateName: "PENDING", StateBeginTime: time.Now()}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 3, Name: "w3", GroupID: 1,
-				CreateTime: time.Now(), FlowID: 1, OrderInState: 1, StateName: "PENDING"}).Error).To(BeNil())
+				CreateTime: time.Now(), FlowID: 1, OrderInState: 1, StateName: "PENDING", StateBeginTime: time.Now()}).Error).To(BeNil())
 
 			// order by orderInState:    w3(1) > w2(2) = w1(2)
 			// order by id (default):         w2(1) > w1(2)
@@ -183,7 +184,7 @@ var _ = Describe("WorkManager", func() {
 
 		It("should return error if failed to find state", func() {
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", GroupID: 1,
-				CreateTime: time.Now(), FlowID: 1, OrderInState: 2, StateName: "UNKNOWN"}).Error).To(BeNil())
+				CreateTime: time.Now(), FlowID: 1, OrderInState: 2, StateName: "UNKNOWN", StateBeginTime: time.Now()}).Error).To(BeNil())
 			works, err := workManager.QueryWork(&domain.WorkQuery{GroupID: types.ID(1)},
 				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).ToNot(BeNil())
@@ -255,7 +256,7 @@ var _ = Describe("WorkManager", func() {
 
 		It("should return error if failed to find state", func() {
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", GroupID: 1,
-				CreateTime: time.Now(), FlowID: 1, OrderInState: 2, StateName: "UNKNOWN"}).Error).To(BeNil())
+				CreateTime: time.Now(), FlowID: 1, OrderInState: 2, StateName: "UNKNOWN", StateBeginTime: time.Now()}).Error).To(BeNil())
 			updatedWork, err := workManager.UpdateWork(2,
 				&domain.WorkUpdating{Name: "test work1 new"},
 				testinfra.BuildSecCtx(1, []string{"owner_1"}))

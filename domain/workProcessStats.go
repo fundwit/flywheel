@@ -16,16 +16,15 @@ type WorkProcessStep struct {
 	EndTime   *time.Time
 }
 
-// state transition record + state  record
-
 // how long a work is existing:  now - work.createTime
-// how long a work is been processed:
-//    if the work's state is not stated:  0
+// how long a work has been processed:
+//    if the work's state is not stated:  sum(WorkProcessStep of this work)
 //    if the work's state is WIP:         now - time of first enter WIP state
-//    if the work's state is finished:    time of last enter to finished state  - time of first enter WIP state
+//    if the work's state is finished:    sum(WorkProcessStep of this work)
+
 // how long a work is spend at one state
-//    if the state is not started:        0
-//    if the state is current state:      (now - time of last enter to the status)
+//    if the state is current state:      (now - time of last enter to the status) + sum(WorkProcessStep of this state)
+//    if the state is not current state:  sum(WorkProcessStep of this state)
 type WorkProcessStats struct {
 	WorkID    types.ID
 	FlowID    types.ID

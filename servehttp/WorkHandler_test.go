@@ -63,7 +63,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(status).To(Equal(http.StatusCreated))
 			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"333","flowId":"1", "orderInState": ` +
 				strconv.FormatInt(t.UnixNano()/1e6, 10) + `, "createTime":"` + timeString + `",
-				"stateName":"PENDING","type":{"id":"1","name":"GenericTask"},"state":{"name":"PENDING","category":0}}`))
+				"stateName":"PENDING","type":{"id":"1","name":"GenericTask"},"stateBeginTime": "0001-01-01T00:00:00Z","state":{"name":"PENDING","category":0}}`))
 		})
 
 		It("should return 400 when bind failed", func() {
@@ -113,9 +113,10 @@ var _ = Describe("WorkHandler", func() {
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"data":[{"id":"1","name":"work1","groupId":"333","flowId":"1",
 				"createTime":"` + timeString + `","orderInState": ` + strconv.FormatInt(t.UnixNano()/1e6, 10) + ` ,
-				"stateName":"PENDING","state":{"name":"PENDING", "category":0}},
+				"stateName":"PENDING","stateBeginTime": "0001-01-01T00:00:00Z","state":{"name":"PENDING", "category":0}},
 				{"id":"2","name":"work2","groupId":"333","flowId":"1", "orderInState": ` + strconv.FormatInt(t.UnixNano()/1e6, 10) + `,
-				"createTime":"` + timeString + `","stateName":"PENDING","state":{"name":"PENDING", "category":0}}],"total": 2}`))
+				"createTime":"` + timeString + `","stateName":"PENDING","stateBeginTime": "0001-01-01T00:00:00Z",
+				"state":{"name":"PENDING", "category":0}}],"total": 2}`))
 		})
 
 		It("should return 500 when service failed", func() {
@@ -172,8 +173,8 @@ var _ = Describe("WorkHandler", func() {
 				`{"name": "new-name"}`)))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","stateName":"PENDING","state":{"name":"PENDING", "category":0},
-				"groupId":"333","flowId":"1","createTime":"` +
+			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","stateName":"PENDING","stateBeginTime": "0001-01-01T00:00:00Z",
+				"state":{"name":"PENDING", "category":0},"groupId":"333","flowId":"1","createTime":"` +
 				timeString + `", "orderInState": ` + strconv.FormatInt(t.UnixNano()/1e6, 10) + `}`))
 		})
 	})

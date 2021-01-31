@@ -127,7 +127,9 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(records[0].Creator).To(Equal(sec.Identity.ID))
 
 			handleTime := records[0].CreateTime
-			Expect(detail.StateBeginTime).To(Equal(handleTime))
+			Expect(detail.StateBeginTime).To(Equal(&handleTime))
+			Expect(detail.ProcessBeginTime).To(Equal(&handleTime))
+			Expect(detail.ProcessEndTime).To(BeNil())
 
 			// should handle process step
 			var processSteps []domain.WorkProcessStep
@@ -138,6 +140,26 @@ var _ = Describe("WorkflowManager", func() {
 				StateName: creation.FromState, StateCategory: 0, BeginTime: &detail.CreateTime, EndTime: &handleTime}))
 			Expect(processSteps[1]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
 				StateName: creation.ToState, StateCategory: 1, BeginTime: &handleTime, EndTime: nil}))
+
+			// transit to done state: processEndTime should be set
+			creation = flow.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DOING", ToState: "DONE"}
+			transition, err = manager.CreateWorkStateTransition(&creation, sec)
+			Expect(err).To(BeNil())
+			detail, err = workManager.WorkDetail(detail.ID, sec)
+			Expect(err).To(BeNil())
+			Expect(detail.StateBeginTime).ToNot(BeNil())
+			Expect(detail.ProcessBeginTime).ToNot(BeNil())
+			Expect(detail.ProcessEndTime).ToNot(BeNil())
+
+			// transit back to process state: processEndTime should be reset to nil
+			creation = flow.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DONE", ToState: "PENDING"}
+			transition, err = manager.CreateWorkStateTransition(&creation, sec)
+			Expect(err).To(BeNil())
+			detail, err = workManager.WorkDetail(detail.ID, sec)
+			Expect(err).To(BeNil())
+			Expect(detail.StateBeginTime).ToNot(BeNil())
+			Expect(detail.ProcessBeginTime).ToNot(BeNil())
+			Expect(detail.ProcessEndTime).To(BeNil())
 		})
 	})
 })

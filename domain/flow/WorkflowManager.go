@@ -66,15 +66,31 @@ func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief,
 			return errors.New("forbidden")
 		}
 
-		// update work.stageName
 		query := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID, StateName: c.FromState}).
-			Update(&domain.Work{StateName: c.ToState, StateBeginTime: now})
+			Update(&domain.Work{StateName: c.ToState, StateBeginTime: &now})
 		if err := query.Error; err != nil {
 			return err
 		}
 		if query.RowsAffected != 1 {
 			return errors.New("expected affected row is 1, but actual is " + strconv.FormatInt(query.RowsAffected, 10))
 		}
+
+		// update beginProcessTime and endProcessTime
+		if work.ProcessBeginTime == nil && toState.Category != state.InBacklog {
+			if err := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID}).Update("process_begin_time", &now).Error; err != nil {
+				return err
+			}
+		}
+		if work.ProcessEndTime == nil && toState.Category == state.Done {
+			if err := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID}).Update("process_end_time", &now).Error; err != nil {
+				return err
+			}
+		} else if work.ProcessEndTime != nil && toState.Category != state.Done {
+			if err := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID}).Update("process_end_time", nil).Error; err != nil {
+				return err
+			}
+		}
+
 		// create transition transition
 		if err := tx.Create(transition).Error; err != nil {
 			return err

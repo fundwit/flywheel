@@ -63,7 +63,7 @@ func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief,
 			return err
 		}
 		if !sec.HasRole(fmt.Sprintf("%s_%d", domain.RoleOwner, work.GroupID)) {
-			return errors.New("forbidden")
+			return common.ErrForbidden
 		}
 
 		query := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID, StateName: c.FromState}).

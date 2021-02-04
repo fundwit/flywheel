@@ -32,7 +32,7 @@ var _ = Describe("WorkManager", func() {
 		testinfra.StopMysqlTestDatabase(testDatabase)
 	})
 
-	Describe("CreateWork and Detail", func() {
+	Describe("CreateWork", func() {
 		It("should be able to catch db errors", func() {
 			testDatabase.DS.GormDB().DropTable(&domain.Work{})
 
@@ -89,7 +89,7 @@ var _ = Describe("WorkManager", func() {
 		})
 	})
 
-	Describe("CreateWork and Detail", func() {
+	Describe("DetailWork", func() {
 		It("should forbid to get work detail with permissions", func() {
 			creation := &domain.WorkCreation{Name: "test work", GroupID: types.ID(1)}
 			work, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))

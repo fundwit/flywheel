@@ -72,7 +72,7 @@ func (m *WorkManager) WorkDetail(id types.ID, sec *security.Context) (*domain.Wo
 	}
 
 	if !sec.HasRoleSuffix("_" + workDetail.GroupID.String()) {
-		return nil, errors.New("forbidden")
+		return nil, common.ErrForbidden
 	}
 
 	// load type and state
@@ -88,7 +88,7 @@ func (m *WorkManager) WorkDetail(id types.ID, sec *security.Context) (*domain.Wo
 
 func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {
 	if !sec.HasRoleSuffix("_" + c.GroupID.String()) {
-		return nil, errors.New("forbidden")
+		return nil, common.ErrForbidden
 	}
 
 	workDetail := c.BuildWorkDetail(common.NextId(m.idWorker))
@@ -193,7 +193,7 @@ func (m *WorkManager) checkPerms(id types.ID, sec *security.Context) error {
 		return err
 	}
 	if sec == nil || !sec.HasRoleSuffix("_"+work.GroupID.String()) {
-		return errors.New("forbidden")
+		return common.ErrForbidden
 	}
 	return nil
 }

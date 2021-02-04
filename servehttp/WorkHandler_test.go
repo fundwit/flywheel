@@ -136,9 +136,48 @@ var _ = Describe("WorkHandler", func() {
 		})
 	})
 
-	//Describe("handleDetail", func() {
-	//
-	//})
+	Describe("handleDetail", func() {
+		It("should failed when id is invalid", func() {
+			req := httptest.NewRequest(http.MethodGet, "/v1/works/abc", bytes.NewReader([]byte(`bad json`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid id 'abc'","data":null}`))
+		})
+		It("should return 500 when service failed", func() {
+			workManager.WorkDetailFunc = func(id types.ID, sec *security.Context) (*domain.WorkDetail, error) {
+				return nil, errors.New("a mocked error")
+			}
+			req := httptest.NewRequest(http.MethodGet, "/v1/works/123", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusInternalServerError))
+			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
+		})
+
+		It("should return work detail as expected when everything is ok", func() {
+			t := time.Date(2020, 1, 1, 1, 0, 0, 0, time.Now().Location())
+			timeBytes, err := t.MarshalJSON()
+			timeString := strings.Trim(string(timeBytes), `"`)
+			Expect(err).To(BeNil())
+			workManager.WorkDetailFunc = func(id types.ID, sec *security.Context) (*domain.WorkDetail, error) {
+				return &domain.WorkDetail{
+					Work: domain.Work{
+						ID: 123, Name: "test work", GroupID: 100, CreateTime: t, FlowID: 1, OrderInState: 999,
+						StateName: "DOING", State: domain.GenericWorkFlow.StateMachine.States[1],
+						StateBeginTime: &t, ProcessBeginTime: &t, ProcessEndTime: &t,
+					},
+					Type: domain.GenericWorkFlow.WorkFlowBase,
+				}, nil
+			}
+			req := httptest.NewRequest(http.MethodGet, "/v1/works/123", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusOK))
+			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"100","flowId":"1",
+				"createTime":"` + timeString + `","orderInState": 999,
+				"stateName":"DOING","state":{"name":"DOING", "category":1},
+				"stateBeginTime": "` + timeString + `", "processBeginTime": "` + timeString + `", "processEndTime": "` + timeString + `",
+				"type": {"id": "1", "name": "GenericTask"}}`))
+		})
+	})
 
 	Describe("handleUpdate", func() {
 		It("should failed when id is invalid", func() {

@@ -20,7 +20,7 @@ func RegisterWorkHandler(r *gin.Engine, m work.WorkManagerTraits, middleWares ..
 	g := r.Group("/v1/works", middleWares...)
 	g.GET("", handler.handleQuery)
 	g.POST("", handler.handleCreate)
-	//g.GET(":id", handler.handleDetail)
+	g.GET(":id", handler.handleDetail)
 	g.PUT(":id", handler.handleUpdate)
 	g.DELETE(":id", handler.handleDelete)
 
@@ -51,19 +51,19 @@ func (h *workHandler) handleCreate(c *gin.Context) {
 	c.JSON(http.StatusCreated, detail)
 }
 
-//func (h *workHandler) handleDetail(c *gin.Context) {
-//	id, err := utils.ParseID(c.Param("id"))
-//	if err != nil {
-//		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("id") + "'"})
-//		return
-//	}
-//	detail, err := h.workManager.WorkDetail(id)
-//	if err != nil {
-//		c.JSON(http.StatusNotFound, &ErrorBody{Code: "common.not_found", Message: ""})
-//		return
-//	}
-//	c.JSON(http.StatusOK, detail)
-//}
+func (h *workHandler) handleDetail(c *gin.Context) {
+	id, err := types.ParseID(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("id") + "'"})
+		return
+	}
+	detail, err := h.workManager.WorkDetail(id, security.FindSecurityContext(c))
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, detail)
+}
 
 func (h *workHandler) handleQuery(c *gin.Context) {
 	query := domain.WorkQuery{}

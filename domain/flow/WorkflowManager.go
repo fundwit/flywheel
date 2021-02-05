@@ -105,7 +105,7 @@ func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief,
 		}
 		if toState.Category != state.Done {
 			nextProcessStep := domain.WorkProcessStep{WorkID: work.ID, FlowID: work.FlowID,
-				StateName: toState.Name, StateCategory: toState.Category, BeginTime: &now}
+				StateName: toState.Name, StateCategory: toState.Category, BeginTime: now}
 			if err := tx.Create(nextProcessStep).Error; err != nil {
 				return err
 			}

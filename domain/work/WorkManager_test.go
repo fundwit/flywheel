@@ -78,7 +78,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(initProcessStep).ToNot(BeNil())
 			Expect(len(initProcessStep)).To(Equal(1))
 			Expect(initProcessStep[0]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
-				StateName: detail.StateName, StateCategory: detail.State.Category, BeginTime: &detail.CreateTime, EndTime: nil}))
+				StateName: detail.StateName, StateCategory: detail.State.Category, BeginTime: detail.CreateTime, EndTime: nil}))
 		})
 		It("should forbid to create to other group", func() {
 			creation := &domain.WorkCreation{Name: "test work", GroupID: types.ID(1)}

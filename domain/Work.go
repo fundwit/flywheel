@@ -10,7 +10,7 @@ type Work struct {
 	ID         types.ID  `json:"id"`
 	Name       string    `json:"name"`
 	GroupID    types.ID  `json:"groupId"`
-	CreateTime time.Time `json:"createTime"`
+	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
 
 	FlowID types.ID `json:"flowId"`
 
@@ -20,9 +20,9 @@ type Work struct {
 	OrderInState     int64       `json:"orderInState"`
 	StateName        string      `json:"stateName"`
 	State            state.State `json:"state"`
-	StateBeginTime   *time.Time  `json:"stateBeginTime"`
-	ProcessBeginTime *time.Time  `json:"processBeginTime"`
-	ProcessEndTime   *time.Time  `json:"processEndTime"`
+	StateBeginTime   *time.Time  `json:"stateBeginTime" sql:"type:DATETIME(3)"`
+	ProcessBeginTime *time.Time  `json:"processBeginTime" sql:"type:DATETIME(3)"`
+	ProcessEndTime   *time.Time  `json:"processEndTime" sql:"type:DATETIME(3)"`
 
 	// Properties []PropertyAssign `json:"properties"`
 }

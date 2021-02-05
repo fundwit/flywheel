@@ -56,6 +56,7 @@ func main() {
 	servehttp.RegisterWorkHandler(engine, work.NewWorkManager(ds), securityMiddle)
 	servehttp.RegisterWorkflowHandler(engine, securityMiddle)
 	servehttp.RegisterWorkStateTransitionHandler(engine, flow.NewWorkflowManager(ds), securityMiddle)
+	servehttp.RegisterWorkProcessStepHandler(engine, work.NewWorkProcessManager(ds), securityMiddle)
 
 	err = engine.Run(":80")
 	if err != nil {

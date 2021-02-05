@@ -137,9 +137,9 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(processSteps).ToNot(BeNil())
 			Expect(len(processSteps)).To(Equal(2))
 			Expect(processSteps[0]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
-				StateName: creation.FromState, StateCategory: 0, BeginTime: &detail.CreateTime, EndTime: &handleTime}))
+				StateName: creation.FromState, StateCategory: 0, BeginTime: detail.CreateTime, EndTime: &handleTime}))
 			Expect(processSteps[1]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
-				StateName: creation.ToState, StateCategory: 1, BeginTime: &handleTime, EndTime: nil}))
+				StateName: creation.ToState, StateCategory: 1, BeginTime: handleTime, EndTime: nil}))
 
 			// transit to done state: processEndTime should be set
 			creation = flow.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DOING", ToState: "DONE"}

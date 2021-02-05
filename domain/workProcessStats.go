@@ -7,13 +7,17 @@ import (
 )
 
 type WorkProcessStep struct {
-	WorkID        types.ID
-	FlowID        types.ID
-	StateName     string
-	StateCategory state.Category
+	WorkID        types.ID       `json:"workId"`
+	FlowID        types.ID       `json:"flowId"`
+	StateName     string         `json:"stateName"`
+	StateCategory state.Category `json:"stateCategory"`
 
-	BeginTime *time.Time
-	EndTime   *time.Time
+	BeginTime time.Time  `json:"beginTime" sql:"type:DATETIME(3) NOT NULL"`
+	EndTime   *time.Time `json:"endTime" sql:"type:DATETIME(3)"`
+}
+
+type WorkProcessStepQuery struct {
+	WorkID types.ID `json:"workId" form:"workId" binding:"required" validate:"required"`
 }
 
 // how long a work is existing:  now - work.createTime

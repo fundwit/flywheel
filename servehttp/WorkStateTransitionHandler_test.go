@@ -3,6 +3,7 @@ package servehttp_test
 import (
 	"bytes"
 	"errors"
+	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/security"
 	"flywheel/servehttp"
@@ -77,9 +78,17 @@ var _ = Describe("WorkStateTransitionHandler", func() {
 
 type workflowManagerMock struct {
 	CreateWorkStateTransitionFunc func(t *flow.WorkStateTransitionBrief, sec *security.Context) (*flow.WorkStateTransition, error)
+	QueryWorkflowsFunc            func(sec *security.Context) (*[]domain.WorkFlow, error)
+	DetailWorkflowFunc            func(ID types.ID, sec *security.Context) (*domain.WorkFlow, error)
 }
 
 func (m *workflowManagerMock) CreateWorkStateTransition(
 	c *flow.WorkStateTransitionBrief, sec *security.Context) (*flow.WorkStateTransition, error) {
 	return m.CreateWorkStateTransitionFunc(c, sec)
+}
+func (m *workflowManagerMock) QueryWorkflows(sec *security.Context) (*[]domain.WorkFlow, error) {
+	return m.QueryWorkflowsFunc(sec)
+}
+func (m *workflowManagerMock) DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkFlow, error) {
+	return m.DetailWorkflowFunc(ID, sec)
 }

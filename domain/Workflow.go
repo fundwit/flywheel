@@ -5,10 +5,6 @@ import (
 	"github.com/fundwit/go-commons/types"
 )
 
-type WorkFlowFace interface {
-	FindState(string) *state.State
-}
-
 type WorkFlowBase struct {
 	ID   types.ID `json:"id"`
 	Name string   `json:"name"`
@@ -28,13 +24,6 @@ func (wt *WorkFlow) FindState(stateName string) (state.State, bool) {
 		}
 	}
 	return state.State{}, false
-}
-
-func FindWorkflow(ID types.ID) *WorkFlow {
-	if ID == GenericWorkFlow.ID {
-		return &GenericWorkFlow
-	}
-	return nil
 }
 
 var StatePending = state.State{Name: "PENDING", Category: state.InBacklog}

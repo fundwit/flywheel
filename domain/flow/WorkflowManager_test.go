@@ -30,6 +30,28 @@ var _ = Describe("WorkflowManager", func() {
 		testinfra.StopMysqlTestDatabase(testDatabase)
 	})
 
+	Describe("QueryWorkflows", func() {
+		It("should return generic workflow", func() {
+			list, err := manager.QueryWorkflows(testinfra.BuildSecCtx(123, []string{}))
+			Expect(err).To(BeNil())
+			Expect(len(*list)).To(Equal(1))
+			Expect((*list)[0]).To(Equal(domain.GenericWorkFlow))
+		})
+	})
+
+	Describe("DetailWorkflow", func() {
+		It("should return generic workflow detail", func() {
+			detail, err := manager.DetailWorkflow(1, testinfra.BuildSecCtx(123, []string{}))
+			Expect(err).To(BeNil())
+			Expect(*detail).To(Equal(domain.GenericWorkFlow))
+		})
+		It("should return generic workflow detail", func() {
+			detail, err := manager.DetailWorkflow(404, testinfra.BuildSecCtx(123, []string{}))
+			Expect(err).To(Equal(domain.ErrNotFound))
+			Expect(detail).To(BeNil())
+		})
+	})
+
 	Describe("CreateWorkStateTransition", func() {
 		It("should failed if workflow is not exist", func() {
 			id, err := manager.CreateWorkStateTransition(&flow.WorkStateTransitionBrief{FlowID: 2}, testinfra.BuildSecCtx(123, []string{}))

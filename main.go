@@ -54,7 +54,7 @@ func main() {
 	engine.GET("/me", securityMiddle, security.UserInfoQueryHandler)
 
 	servehttp.RegisterWorkHandler(engine, work.NewWorkManager(ds), securityMiddle)
-	servehttp.RegisterWorkflowHandler(engine, securityMiddle)
+	servehttp.RegisterWorkflowHandler(engine, flow.NewWorkflowManager(ds), securityMiddle)
 	servehttp.RegisterWorkStateTransitionHandler(engine, flow.NewWorkflowManager(ds), securityMiddle)
 	servehttp.RegisterWorkProcessStepHandler(engine, work.NewWorkProcessManager(ds), securityMiddle)
 

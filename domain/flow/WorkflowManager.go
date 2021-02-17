@@ -7,6 +7,7 @@ import (
 	"flywheel/domain/state"
 	"flywheel/security"
 	"fmt"
+	"github.com/fundwit/go-commons/types"
 
 	"flywheel/persistence"
 	"github.com/jinzhu/gorm"
@@ -16,6 +17,9 @@ import (
 )
 
 type WorkflowManagerTraits interface {
+	QueryWorkflows(sec *security.Context) (*[]domain.WorkFlow, error)
+	DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkFlow, error)
+
 	CreateWorkStateTransition(*WorkStateTransitionBrief, *security.Context) (*WorkStateTransition, error)
 }
 
@@ -31,8 +35,19 @@ func NewWorkflowManager(ds *persistence.DataSourceManager) WorkflowManagerTraits
 	}
 }
 
+func (m *WorkflowManager) DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkFlow, error) {
+	if ID == domain.GenericWorkFlow.ID {
+		return &domain.GenericWorkFlow, nil
+	}
+	return nil, domain.ErrNotFound
+}
+
+func (m *WorkflowManager) QueryWorkflows(sec *security.Context) (*[]domain.WorkFlow, error) {
+	return &[]domain.WorkFlow{domain.GenericWorkFlow}, nil
+}
+
 func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief, sec *security.Context) (*WorkStateTransition, error) {
-	flow := domain.FindWorkflow(c.FlowID)
+	flow, err := m.DetailWorkflow(c.FlowID, sec)
 	if flow == nil {
 		return nil, errors.New("workflow " + strconv.FormatUint(uint64(c.FlowID), 10) + " not found")
 	}
@@ -56,7 +71,7 @@ func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief,
 	}
 
 	db := m.dataSource.GormDB()
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		// check perms
 		work := domain.Work{ID: c.WorkID}
 		if err := tx.Where(&work).First(&work).Error; err != nil {

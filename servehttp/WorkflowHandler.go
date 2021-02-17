@@ -3,7 +3,8 @@ package servehttp
 import (
 	"errors"
 	"flywheel/common"
-	"flywheel/domain"
+	"flywheel/domain/flow"
+	"flywheel/security"
 	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -18,18 +19,32 @@ type TransitionQuery struct {
 	ToState   string   `form:"toState"`
 }
 
-func RegisterWorkflowHandler(r *gin.Engine, middleWares ...gin.HandlerFunc) {
-	// group: "", version: v1, resource: transitions
+func RegisterWorkflowHandler(r *gin.Engine, flowManager flow.WorkflowManagerTraits, middleWares ...gin.HandlerFunc) {
 	g := r.Group("/v1/workflows", middleWares...)
 
-	handler := &workflowHandler{validator: validator.New()}
+	handler := &workflowHandler{
+		validator:       validator.New(),
+		workflowManager: flowManager,
+	}
 
+	g.GET("", handler.handleQueryWorkflows)
 	g.GET(":flowId/transitions", handler.handleQueryTransitions)
 	g.GET(":flowId/states", handler.handleQueryStates)
 }
 
 type workflowHandler struct {
-	validator *validator.Validate
+	validator       *validator.Validate
+	workflowManager flow.WorkflowManagerTraits
+}
+
+func (h *workflowHandler) handleQueryWorkflows(c *gin.Context) {
+	flows, err := h.workflowManager.QueryWorkflows(security.FindSecurityContext(c))
+	if err != nil {
+		_ = c.Error(err)
+		c.Abort()
+		return
+	}
+	c.JSON(http.StatusOK, flows)
 }
 
 func (h *workflowHandler) handleQueryStates(c *gin.Context) {
@@ -41,7 +56,7 @@ func (h *workflowHandler) handleQueryStates(c *gin.Context) {
 	if query.FlowID <= 0 {
 		panic(&common.ErrBadParam{Cause: errors.New("invalid flowId '" + c.Params.ByName("flowId") + "'")})
 	}
-	workflow := domain.FindWorkflow(query.FlowID)
+	workflow, err := h.workflowManager.DetailWorkflow(query.FlowID, security.FindSecurityContext(c))
 	if workflow == nil {
 		c.JSON(http.StatusNotFound, &common.ErrorBody{Code: "common.bad_param",
 			Message: "the flow of id " + strconv.FormatUint(uint64(query.FlowID), 10) + " was not found"})
@@ -64,7 +79,7 @@ func (h *workflowHandler) handleQueryTransitions(c *gin.Context) {
 		panic(&common.ErrBadParam{Cause: err})
 	}
 
-	workflow := domain.FindWorkflow(query.FlowID)
+	workflow, err := h.workflowManager.DetailWorkflow(query.FlowID, security.FindSecurityContext(c))
 	if workflow == nil {
 		c.JSON(http.StatusNotFound, &common.ErrorBody{Code: "common.bad_param",
 			Message: "the flow of id " + strconv.FormatUint(uint64(query.FlowID), 10) + " was not found"})

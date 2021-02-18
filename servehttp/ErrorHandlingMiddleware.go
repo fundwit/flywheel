@@ -3,6 +3,7 @@ package servehttp
 import (
 	"errors"
 	"flywheel/common"
+	"flywheel/domain"
 	"flywheel/i18n"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -54,7 +55,7 @@ func handleError(err error, c *gin.Context) {
 		c.Abort()
 		return
 	}
-	if errors.Is(genericErr, gorm.ErrRecordNotFound) {
+	if errors.Is(genericErr, gorm.ErrRecordNotFound) || errors.Is(genericErr, domain.ErrNotFound) {
 		c.JSON(http.StatusNotFound, &common.ErrorBody{Code: "common.record_not_found", Message: "record not found"})
 		c.Abort()
 		return

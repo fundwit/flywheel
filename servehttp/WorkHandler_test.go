@@ -63,7 +63,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(status).To(Equal(http.StatusCreated))
 			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"333","flowId":"1", "orderInState": ` +
 				strconv.FormatInt(t.UnixNano()/1e6, 10) + `, "createTime":"` + timeString + `",
-				"stateName":"PENDING","type":{"id":"1","name":"GenericTask"},"state":{"name":"PENDING","category":0},
+				"stateName":"PENDING","type":{"id":"1","name":"GenericTask", "groupId": "0", "createTime": "2020-01-01T00:00:00+08:00"},"state":{"name":"PENDING","category":0},
 				"stateBeginTime": null,"processBeginTime":null, "processEndTime":null}`))
 		})
 
@@ -175,7 +175,7 @@ var _ = Describe("WorkHandler", func() {
 				"createTime":"` + timeString + `","orderInState": 999,
 				"stateName":"DOING","state":{"name":"DOING", "category":1},
 				"stateBeginTime": "` + timeString + `", "processBeginTime": "` + timeString + `", "processEndTime": "` + timeString + `",
-				"type": {"id": "1", "name": "GenericTask"}}`))
+				"type": {"id": "1", "name": "GenericTask", "groupId": "0", "createTime": "2020-01-01T00:00:00+08:00"}}`))
 		})
 	})
 

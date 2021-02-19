@@ -3,11 +3,15 @@ package domain
 import (
 	"flywheel/domain/state"
 	"github.com/fundwit/go-commons/types"
+	"time"
 )
 
 type WorkFlowBase struct {
 	ID   types.ID `json:"id"`
 	Name string   `json:"name"`
+
+	GroupID    types.ID  `json:"groupId"`
+	CreateTime time.Time `json:"createTime"`
 }
 
 type WorkFlow struct {
@@ -32,8 +36,10 @@ var StateDone = state.State{Name: "DONE", Category: state.Done}
 
 var GenericWorkFlow = WorkFlow{
 	WorkFlowBase: WorkFlowBase{
-		ID:   1,
-		Name: "GenericTask",
+		ID:         1,
+		Name:       "GenericTask",
+		GroupID:    0,
+		CreateTime: time.Date(2020, 1, 1, 0, 0, 0, 0, time.Now().Location()),
 	},
 	StateMachine: *state.NewStateMachine([]state.State{StatePending, StateDoing, StateDone}, []state.Transition{
 		{Name: "begin", From: StatePending, To: StateDoing},

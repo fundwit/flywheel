@@ -37,7 +37,7 @@ var _ = Describe("WorkflowHandler", func() {
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`[{"id": "1", "name": "GenericTask",
+			Expect(body).To(MatchJSON(`[{"id": "1", "name": "GenericTask", "groupId": "0", "createTime": "2020-01-01T00:00:00+08:00",
 				"propertyDefinitions":[{"name": "description"}, {"name": "creatorId"}],
 				"stateMachine": {
 					"states": [{"name":"PENDING", "category": 0}, {"name":"DOING", "category": 1}, {"name":"DONE", "category": 2}],
@@ -70,7 +70,7 @@ var _ = Describe("WorkflowHandler", func() {
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/1", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"id": "1", "name": "GenericTask",
+			Expect(body).To(MatchJSON(`{"id": "1", "name": "GenericTask", "groupId": "0", "createTime": "2020-01-01T00:00:00+08:00",
 				"propertyDefinitions":[{"name": "description"}, {"name": "creatorId"}],
 				"stateMachine": {
 					"states": [{"name":"PENDING", "category": 0}, {"name":"DOING", "category": 1}, {"name":"DONE", "category": 2}],

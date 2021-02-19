@@ -22,7 +22,7 @@ type StageRangeOrderUpdating struct {
 
 type WorkDetail struct {
 	Work
-	Type WorkFlowBase `json:"type"`
+	Type Workflow `json:"type"`
 }
 
 type WorkQuery struct {
@@ -54,6 +54,6 @@ func (c *WorkCreation) BuildWorkDetail(id types.ID) *WorkDetail {
 			StateBeginTime: &now,
 			State:          initState,
 		},
-		Type: workFlow.WorkFlowBase,
+		Type: workFlow.Workflow,
 	}
 }

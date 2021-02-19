@@ -5,11 +5,10 @@ import (
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/state"
+	"flywheel/persistence"
 	"flywheel/security"
 	"fmt"
 	"github.com/fundwit/go-commons/types"
-
-	"flywheel/persistence"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
 	"strconv"
@@ -17,8 +16,9 @@ import (
 )
 
 type WorkflowManagerTraits interface {
-	QueryWorkflows(sec *security.Context) (*[]domain.WorkFlow, error)
-	DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkFlow, error)
+	QueryWorkflows(sec *security.Context) (*[]domain.WorkflowDetail, error)
+	CreateWorkflow(c *WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error)
+	DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error)
 
 	CreateWorkStateTransition(*WorkStateTransitionBrief, *security.Context) (*WorkStateTransition, error)
 }
@@ -28,6 +28,12 @@ type WorkflowManager struct {
 	idWorker   *sonyflake.Sonyflake
 }
 
+type WorkflowCreation struct {
+	Name         string             `json:"name"     binding:"required"`
+	GroupID      types.ID           `json:"groupId" binding:"required"`
+	StateMachine state.StateMachine `json:"stateMachine" binding:"required"`
+}
+
 func NewWorkflowManager(ds *persistence.DataSourceManager) WorkflowManagerTraits {
 	return &WorkflowManager{
 		dataSource: ds,
@@ -35,15 +41,60 @@ func NewWorkflowManager(ds *persistence.DataSourceManager) WorkflowManagerTraits
 	}
 }
 
-func (m *WorkflowManager) DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkFlow, error) {
+func (m *WorkflowManager) CreateWorkflow(c *WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error) {
+	if !sec.HasRoleSuffix("_" + c.GroupID.String()) {
+		return nil, common.ErrForbidden
+	}
+
+	workflow := &domain.WorkflowDetail{
+		Workflow: domain.Workflow{
+			ID:         common.NextId(m.idWorker),
+			Name:       c.Name,
+			GroupID:    c.GroupID,
+			CreateTime: time.Now(),
+		},
+		StateMachine: c.StateMachine,
+	}
+
+	db := m.dataSource.GormDB()
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(workflow.Workflow).Error; err != nil {
+			return err
+		}
+		for idx, s := range workflow.StateMachine.States {
+			stateEntity := &domain.WorkflowState{
+				WorkflowID: workflow.ID, Order: idx, Name: s.Name, Category: s.Category, CreateTime: workflow.CreateTime,
+			}
+			if err := tx.Create(stateEntity).Error; err != nil {
+				return err
+			}
+		}
+		for _, t := range workflow.StateMachine.Transitions {
+			transition := &domain.WorkflowStateTransition{
+				WorkflowID: workflow.ID, Name: t.Name, FromState: t.From.Name, ToState: t.To.Name, CreateTime: workflow.CreateTime,
+			}
+			if err := tx.Create(transition).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return workflow, nil
+}
+
+func (m *WorkflowManager) DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
 	if ID == domain.GenericWorkFlow.ID {
 		return &domain.GenericWorkFlow, nil
 	}
 	return nil, domain.ErrNotFound
 }
 
-func (m *WorkflowManager) QueryWorkflows(sec *security.Context) (*[]domain.WorkFlow, error) {
-	return &[]domain.WorkFlow{domain.GenericWorkFlow}, nil
+func (m *WorkflowManager) QueryWorkflows(sec *security.Context) (*[]domain.WorkflowDetail, error) {
+	return &[]domain.WorkflowDetail{domain.GenericWorkFlow}, nil
 }
 
 func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief, sec *security.Context) (*WorkStateTransition, error) {

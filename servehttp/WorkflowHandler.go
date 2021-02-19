@@ -27,6 +27,7 @@ func RegisterWorkflowHandler(r *gin.Engine, flowManager flow.WorkflowManagerTrai
 		workflowManager: flowManager,
 	}
 
+	g.POST("", handler.handleCreateWorkflow)
 	g.GET("", handler.handleQueryWorkflows)
 	g.GET(":flowId", handler.handleDetailWorkflows)
 	g.GET(":flowId/transitions", handler.handleQueryTransitions)
@@ -46,6 +47,25 @@ func (h *workflowHandler) handleQueryWorkflows(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, flows)
+}
+
+func (h *workflowHandler) handleCreateWorkflow(c *gin.Context) {
+	creation := flow.WorkflowCreation{}
+	err := c.ShouldBindBodyWith(&creation, binding.JSON)
+	if err != nil {
+		panic(&common.ErrBadParam{Cause: err})
+	}
+	if err = h.validator.Struct(creation); err != nil {
+		panic(&common.ErrBadParam{Cause: err})
+	}
+
+	workflow, err := h.workflowManager.CreateWorkflow(&creation, security.FindSecurityContext(c))
+	if err != nil {
+		_ = c.Error(err)
+		c.Abort()
+		return
+	}
+	c.JSON(http.StatusCreated, workflow)
 }
 
 func (h *workflowHandler) handleDetailWorkflows(c *gin.Context) {

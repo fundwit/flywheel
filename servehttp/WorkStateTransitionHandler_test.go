@@ -78,17 +78,21 @@ var _ = Describe("WorkStateTransitionHandler", func() {
 
 type workflowManagerMock struct {
 	CreateWorkStateTransitionFunc func(t *flow.WorkStateTransitionBrief, sec *security.Context) (*flow.WorkStateTransition, error)
-	QueryWorkflowsFunc            func(sec *security.Context) (*[]domain.WorkFlow, error)
-	DetailWorkflowFunc            func(ID types.ID, sec *security.Context) (*domain.WorkFlow, error)
+	QueryWorkflowsFunc            func(sec *security.Context) (*[]domain.WorkflowDetail, error)
+	CreateWorkflowFunc            func(c *flow.WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error)
+	DetailWorkflowFunc            func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error)
 }
 
 func (m *workflowManagerMock) CreateWorkStateTransition(
 	c *flow.WorkStateTransitionBrief, sec *security.Context) (*flow.WorkStateTransition, error) {
 	return m.CreateWorkStateTransitionFunc(c, sec)
 }
-func (m *workflowManagerMock) QueryWorkflows(sec *security.Context) (*[]domain.WorkFlow, error) {
+func (m *workflowManagerMock) QueryWorkflows(sec *security.Context) (*[]domain.WorkflowDetail, error) {
 	return m.QueryWorkflowsFunc(sec)
 }
-func (m *workflowManagerMock) DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkFlow, error) {
+func (m *workflowManagerMock) DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
 	return m.DetailWorkflowFunc(ID, sec)
+}
+func (m *workflowManagerMock) CreateWorkflow(c *flow.WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error) {
+	return m.CreateWorkflowFunc(c, sec)
 }

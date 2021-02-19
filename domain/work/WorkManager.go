@@ -76,7 +76,7 @@ func (m *WorkManager) WorkDetail(id types.ID, sec *security.Context) (*domain.Wo
 	}
 
 	// load type and state
-	workDetail.Type = domain.GenericWorkFlow.WorkFlowBase
+	workDetail.Type = domain.GenericWorkFlow.Workflow
 	stateFound, err := findState(workDetail.StateName)
 	if err != nil {
 		return nil, err

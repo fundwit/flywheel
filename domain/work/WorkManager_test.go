@@ -54,7 +54,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(work.CreateTime.Sub(time.Now()) < time.Minute).To(BeTrue())
 			Expect(work.FlowID).To(Equal(types.ID(1)))
 			Expect(work.OrderInState).To(Equal(work.CreateTime.UnixNano() / 1e6))
-			Expect(work.Type).To(Equal(domain.GenericWorkFlow.WorkFlowBase))
+			Expect(work.Type).To(Equal(domain.GenericWorkFlow.Workflow))
 			Expect(work.State).To(Equal(domain.GenericWorkFlow.StateMachine.States[0]))
 			Expect(work.StateBeginTime).To(Equal(&work.CreateTime))
 
@@ -65,7 +65,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(detail.Name).To(Equal(creation.Name))
 			Expect(detail.GroupID).To(Equal(creation.GroupID))
 			Expect(work.CreateTime.Sub(time.Now()) < time.Minute).To(BeTrue())
-			Expect(detail.Type).To(Equal(domain.GenericWorkFlow.WorkFlowBase))
+			Expect(detail.Type).To(Equal(domain.GenericWorkFlow.Workflow))
 			Expect(detail.State).To(Equal(domain.GenericWorkFlow.StateMachine.States[0]))
 			Expect(detail.FlowID).To(Equal(domain.GenericWorkFlow.ID))
 			Expect(work.OrderInState).To(Equal(work.CreateTime.UnixNano() / 1e6))

@@ -1,14 +1,17 @@
 package flow_test
 
 import (
+	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
+	"flywheel/domain/state"
 	"flywheel/domain/work"
 	"flywheel/testinfra"
 	"github.com/fundwit/go-commons/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"log"
+	"time"
 )
 
 var _ = Describe("WorkflowManager", func() {
@@ -19,7 +22,8 @@ var _ = Describe("WorkflowManager", func() {
 	)
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
-		err := testDatabase.DS.GormDB().AutoMigrate(&domain.Work{}, &flow.WorkStateTransition{}, &domain.WorkProcessStep{}).Error
+		err := testDatabase.DS.GormDB().AutoMigrate(&domain.Work{}, &flow.WorkStateTransition{}, &domain.WorkProcessStep{},
+			&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error
 		if err != nil {
 			log.Fatalf("database migration failed %v\n", err)
 		}
@@ -36,6 +40,91 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(err).To(BeNil())
 			Expect(len(*list)).To(Equal(1))
 			Expect((*list)[0]).To(Equal(domain.GenericWorkFlow))
+		})
+	})
+
+	Describe("CreateWorkflow", func() {
+		It("should forbid to create to other group", func() {
+			creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: state.StateMachine{}}
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_2"}))
+			Expect(workflow).To(BeNil())
+			Expect(err).To(Equal(common.ErrForbidden))
+		})
+
+		It("should catch database errors", func() {
+			creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: state.StateMachine{
+				States: []state.State{{Name: "OPEN", Category: state.InProcess}, {Name: "CLOSED", Category: state.Done}},
+				Transitions: []state.Transition{
+					{Name: "done", From: state.State{Name: "OPEN", Category: state.InProcess}, To: state.State{Name: "CLOSED", Category: state.Done}},
+					{Name: "reopen", From: state.State{Name: "CLOSED", Category: state.Done}, To: state.State{Name: "OPEN", Category: state.InProcess}},
+				},
+			}}
+
+			testDatabase.DS.GormDB().DropTable(&domain.WorkflowStateTransition{})
+			_, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflow_state_transitions' doesn't exist"))
+
+			testDatabase.DS.GormDB().DropTable(&domain.WorkflowState{})
+			_, err = manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflow_states' doesn't exist"))
+
+			testDatabase.DS.GormDB().DropTable(&domain.Workflow{})
+			_, err = manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflows' doesn't exist"))
+		})
+
+		It("should return created workflow and all data are persisted", func() {
+			creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: state.StateMachine{
+				States: []state.State{{Name: "OPEN", Category: state.InProcess}, {Name: "CLOSED", Category: state.Done}},
+				Transitions: []state.Transition{
+					{Name: "done", From: state.State{Name: "OPEN", Category: state.InProcess}, To: state.State{Name: "CLOSED", Category: state.Done}},
+					{Name: "reopen", From: state.State{Name: "CLOSED", Category: state.Done}, To: state.State{Name: "OPEN", Category: state.InProcess}},
+				},
+			}}
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+			Expect(workflow.Name).To(Equal(creation.Name))
+			Expect(workflow.GroupID).To(Equal(creation.GroupID))
+			Expect(workflow.StateMachine).To(Equal(creation.StateMachine))
+			Expect(workflow.ID).ToNot(BeNil())
+			Expect(workflow.CreateTime).ToNot(BeNil())
+			workflow.CreateTime = workflow.CreateTime.Round(time.Millisecond)
+
+			var flows []domain.Workflow
+			Expect(testDatabase.DS.GormDB().Model(&domain.Workflow{}).Scan(&flows).Error).To(BeNil())
+			Expect(len(flows)).To(Equal(1))
+			Expect(flows[0]).To(Equal(workflow.Workflow))
+
+			var states []domain.WorkflowState
+			Expect(testDatabase.DS.GormDB().Model(&domain.WorkflowState{}).Order("`order` ASC").Scan(&states).Error).To(BeNil())
+			Expect(len(states)).To(Equal(2))
+			Expect(states[0].WorkflowID).To(Equal(workflow.ID))
+			Expect(states[0].CreateTime).To(Equal(workflow.CreateTime))
+			Expect(states[0].Order).To(Equal(0))
+			Expect(state.State{Name: states[0].Name, Category: states[0].Category}).To(Equal(workflow.StateMachine.States[0]))
+
+			Expect(states[1].WorkflowID).To(Equal(workflow.ID))
+			Expect(states[1].CreateTime).To(Equal(workflow.CreateTime))
+			Expect(states[1].Order).To(Equal(1))
+			Expect(state.State{Name: states[1].Name, Category: states[1].Category}).To(Equal(workflow.StateMachine.States[1]))
+
+			var transitions []domain.WorkflowStateTransition
+			Expect(testDatabase.DS.GormDB().Model(&domain.WorkflowStateTransition{}).Scan(&transitions).Error).To(BeNil())
+			Expect(len(transitions)).To(Equal(2))
+			Expect(transitions[0].WorkflowID).To(Equal(workflow.ID))
+			Expect(transitions[0].CreateTime).To(Equal(workflow.CreateTime))
+			Expect(transitions[0].Name).To(Equal(workflow.StateMachine.Transitions[1].Name))
+			Expect(transitions[0].FromState).To(Equal(workflow.StateMachine.Transitions[1].From.Name))
+			Expect(transitions[0].ToState).To(Equal(workflow.StateMachine.Transitions[1].To.Name))
+
+			Expect(transitions[1].WorkflowID).To(Equal(workflow.ID))
+			Expect(transitions[1].CreateTime).To(Equal(workflow.CreateTime))
+			Expect(transitions[1].Name).To(Equal(workflow.StateMachine.Transitions[0].Name))
+			Expect(transitions[1].FromState).To(Equal(workflow.StateMachine.Transitions[0].From.Name))
+			Expect(transitions[1].ToState).To(Equal(workflow.StateMachine.Transitions[0].To.Name))
 		})
 	})
 

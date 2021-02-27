@@ -5,90 +5,132 @@ import (
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/state"
-	"flywheel/domain/work"
 	"flywheel/testinfra"
 	"github.com/fundwit/go-commons/types"
+	"github.com/jinzhu/gorm"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"log"
 	"time"
 )
 
+var creationDemo = &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: state.StateMachine{
+	States: []state.State{{Name: "OPEN", Category: state.InProcess}, {Name: "CLOSED", Category: state.Done}},
+	Transitions: []state.Transition{
+		{Name: "done", From: state.State{Name: "OPEN", Category: state.InProcess}, To: state.State{Name: "CLOSED", Category: state.Done}},
+		{Name: "reopen", From: state.State{Name: "CLOSED", Category: state.Done}, To: state.State{Name: "OPEN", Category: state.InProcess}},
+	},
+}}
+
 var _ = Describe("WorkflowManager", func() {
 	var (
 		testDatabase *testinfra.TestDatabase
 		manager      flow.WorkflowManagerTraits
-		workManager  work.WorkManagerTraits
 	)
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
-		err := testDatabase.DS.GormDB().AutoMigrate(&domain.Work{}, &flow.WorkStateTransition{}, &domain.WorkProcessStep{},
+		err := testDatabase.DS.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkStateTransition{}, &domain.WorkProcessStep{},
 			&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error
 		if err != nil {
 			log.Fatalf("database migration failed %v\n", err)
 		}
 		manager = flow.NewWorkflowManager(testDatabase.DS)
-		workManager = work.NewWorkManager(testDatabase.DS)
 	})
 	AfterEach(func() {
 		testinfra.StopMysqlTestDatabase(testDatabase)
 	})
 
 	Describe("QueryWorkflows", func() {
-		It("should return generic workflow", func() {
-			list, err := manager.QueryWorkflows(testinfra.BuildSecCtx(123, []string{}))
+		It("should query all workflows successfully", func() {
+			_, err := manager.CreateWorkflow(
+				&flow.WorkflowCreation{Name: "test workflow1", GroupID: types.ID(1), StateMachine: creationDemo.StateMachine},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeZero())
+			_, err = manager.CreateWorkflow(
+				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(2), StateMachine: creationDemo.StateMachine},
+				testinfra.BuildSecCtx(2, []string{"owner_2"}))
+			Expect(err).To(BeZero())
+
+			workflows, err := manager.QueryWorkflows(&domain.WorkflowQuery{}, testinfra.BuildSecCtx(1, []string{"owner_1", "owner_2"}))
 			Expect(err).To(BeNil())
-			Expect(len(*list)).To(Equal(1))
-			Expect((*list)[0]).To(Equal(domain.GenericWorkFlow))
+			Expect(workflows).ToNot(BeNil())
+			Expect(len(*workflows)).To(Equal(2))
+
+			workflows, err = manager.QueryWorkflows(&domain.WorkflowQuery{}, testinfra.BuildSecCtx(1, []string{}))
+			Expect(err).To(BeNil())
+			Expect(workflows).ToNot(BeNil())
+			Expect(len(*workflows)).To(Equal(0))
+
+			workflows, err = manager.QueryWorkflows(&domain.WorkflowQuery{}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+			Expect(workflows).ToNot(BeNil())
+			Expect(len(*workflows)).To(Equal(1))
+
+			workflow1 := (*workflows)[0]
+			Expect(workflow1.ID).ToNot(BeZero())
+			Expect(workflow1.Name).To(Equal("test workflow1"))
+			Expect(workflow1.GroupID).To(Equal(types.ID(1)))
+			Expect(workflow1.CreateTime).ToNot(BeZero())
+		})
+		It("should query by name and group id", func() {
+			_, err := manager.CreateWorkflow(
+				&flow.WorkflowCreation{Name: "test workflow1", GroupID: types.ID(1), StateMachine: creationDemo.StateMachine},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeZero())
+			_, err = manager.CreateWorkflow(
+				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(1), StateMachine: creationDemo.StateMachine},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeZero())
+			_, err = manager.CreateWorkflow(
+				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(2), StateMachine: creationDemo.StateMachine},
+				testinfra.BuildSecCtx(2, []string{"owner_2"}))
+			Expect(err).To(BeZero())
+
+			workflows, err := manager.QueryWorkflows(
+				&domain.WorkflowQuery{Name: "workflow2", GroupID: types.ID(1)}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+			Expect(workflows).ToNot(BeNil())
+			Expect(len(*workflows)).To(Equal(1))
+
+			workflow1 := (*workflows)[0]
+			Expect(workflow1.ID).ToNot(BeZero())
+			Expect(workflow1.Name).To(Equal("test workflow2"))
+			Expect(workflow1.GroupID).To(Equal(types.ID(1)))
+			Expect(workflow1.CreateTime).ToNot(BeZero())
 		})
 	})
 
 	Describe("CreateWorkflow", func() {
 		It("should forbid to create to other group", func() {
-			creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: state.StateMachine{}}
+			creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: creationDemo.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_2"}))
 			Expect(workflow).To(BeNil())
 			Expect(err).To(Equal(common.ErrForbidden))
 		})
 
 		It("should catch database errors", func() {
-			creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: state.StateMachine{
-				States: []state.State{{Name: "OPEN", Category: state.InProcess}, {Name: "CLOSED", Category: state.Done}},
-				Transitions: []state.Transition{
-					{Name: "done", From: state.State{Name: "OPEN", Category: state.InProcess}, To: state.State{Name: "CLOSED", Category: state.Done}},
-					{Name: "reopen", From: state.State{Name: "CLOSED", Category: state.Done}, To: state.State{Name: "OPEN", Category: state.InProcess}},
-				},
-			}}
-
 			testDatabase.DS.GormDB().DropTable(&domain.WorkflowStateTransition{})
-			_, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			_, err := manager.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, []string{"owner_1"}))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflow_state_transitions' doesn't exist"))
 
 			testDatabase.DS.GormDB().DropTable(&domain.WorkflowState{})
-			_, err = manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			_, err = manager.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, []string{"owner_1"}))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflow_states' doesn't exist"))
 
 			testDatabase.DS.GormDB().DropTable(&domain.Workflow{})
-			_, err = manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			_, err = manager.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, []string{"owner_1"}))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflows' doesn't exist"))
 		})
 
 		It("should return created workflow and all data are persisted", func() {
-			creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: state.StateMachine{
-				States: []state.State{{Name: "OPEN", Category: state.InProcess}, {Name: "CLOSED", Category: state.Done}},
-				Transitions: []state.Transition{
-					{Name: "done", From: state.State{Name: "OPEN", Category: state.InProcess}, To: state.State{Name: "CLOSED", Category: state.Done}},
-					{Name: "reopen", From: state.State{Name: "CLOSED", Category: state.Done}, To: state.State{Name: "OPEN", Category: state.InProcess}},
-				},
-			}}
-			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			workflow, err := manager.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, []string{"owner_1"}))
 			Expect(err).To(BeNil())
-			Expect(workflow.Name).To(Equal(creation.Name))
-			Expect(workflow.GroupID).To(Equal(creation.GroupID))
-			Expect(workflow.StateMachine).To(Equal(creation.StateMachine))
+			Expect(workflow.Name).To(Equal(creationDemo.Name))
+			Expect(workflow.GroupID).To(Equal(creationDemo.GroupID))
+			Expect(workflow.StateMachine).To(Equal(creationDemo.StateMachine))
 			Expect(workflow.ID).ToNot(BeNil())
 			Expect(workflow.CreateTime).ToNot(BeNil())
 			workflow.CreateTime = workflow.CreateTime.Round(time.Millisecond)
@@ -129,148 +171,37 @@ var _ = Describe("WorkflowManager", func() {
 	})
 
 	Describe("DetailWorkflow", func() {
-		It("should return generic workflow detail", func() {
-			detail, err := manager.DetailWorkflow(1, testinfra.BuildSecCtx(123, []string{}))
+		It("should forbid to get workflow detail with permissions", func() {
+			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
 			Expect(err).To(BeNil())
-			Expect(*detail).To(Equal(domain.GenericWorkFlow))
-		})
-		It("should return generic workflow detail", func() {
-			detail, err := manager.DetailWorkflow(404, testinfra.BuildSecCtx(123, []string{}))
-			Expect(err).To(Equal(domain.ErrNotFound))
+
+			detail, err := manager.DetailWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{"owner_2"}))
 			Expect(detail).To(BeNil())
-		})
-	})
-
-	Describe("CreateWorkStateTransition", func() {
-		It("should failed if workflow is not exist", func() {
-			id, err := manager.CreateWorkStateTransition(&flow.WorkStateTransitionBrief{FlowID: 2}, testinfra.BuildSecCtx(123, []string{}))
-			Expect(id).To(BeNil())
-			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal("workflow 2 not found"))
-		})
-		It("should failed if transition is not acceptable", func() {
-			id, err := manager.CreateWorkStateTransition(
-				&flow.WorkStateTransitionBrief{FlowID: 1, WorkID: 1, FromState: "DONE", ToState: "DOING"},
-				testinfra.BuildSecCtx(123, []string{}))
-			Expect(id).To(BeNil())
-			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal("transition from DONE to DOING is not invalid"))
-		})
-		It("should failed if update work stateName failed", func() {
-			err := testDatabase.DS.GormDB().DropTable(&domain.Work{}).Error
-			Expect(err).To(BeNil())
-
-			id, err := manager.CreateWorkStateTransition(
-				&flow.WorkStateTransitionBrief{FlowID: 1, WorkID: 1, FromState: "PENDING", ToState: "DOING"},
-				testinfra.BuildSecCtx(123, []string{}))
-			Expect(id).To(BeNil())
-			Expect(err).ToNot(BeNil())
-		})
-		It("should failed when work is not exist", func() {
-			id, err := manager.CreateWorkStateTransition(
-				&flow.WorkStateTransitionBrief{FlowID: 1, WorkID: 1, FromState: "PENDING", ToState: "DOING"},
-				testinfra.BuildSecCtx(123, []string{}))
-			Expect(id).To(BeNil())
-			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal("record not found"))
-		})
-		It("should failed when work is forbidden for current user", func() {
-			detail := testinfra.BuildWorker(workManager, "test work", types.ID(333), testinfra.BuildSecCtx(types.ID(222), []string{"owner_333"}))
-			id, err := manager.CreateWorkStateTransition(
-				&flow.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DOING"},
-				testinfra.BuildSecCtx(types.ID(111), []string{}))
-			Expect(id).To(BeNil())
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 		})
-		It("should failed if stateName is not match fromState", func() {
-			sec := testinfra.BuildSecCtx(types.ID(123), []string{"owner_333"})
-			detail := testinfra.BuildWorker(workManager, "test work", types.ID(333), sec)
 
-			id, err := manager.CreateWorkStateTransition(
-				&flow.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DOING", ToState: "DONE"}, sec)
-			Expect(id).To(BeNil())
-			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal("expected affected row is 1, but actual is 0"))
+		It("should return 404 when workflow not exist", func() {
+			detail, err := manager.DetailWorkflow(404, testinfra.BuildSecCtx(123, []string{}))
+			Expect(err).To(Equal(gorm.ErrRecordNotFound))
+			Expect(detail).To(BeNil())
 		})
 
-		It("should failed if create transition record failed", func() {
-			sec := testinfra.BuildSecCtx(types.ID(123), []string{"owner_333"})
-			detail := testinfra.BuildWorker(workManager, "test work", types.ID(333), sec)
-
-			Expect(testDatabase.DS.GormDB().DropTable(&flow.WorkStateTransition{}).Error).To(BeNil())
-
-			transition := flow.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DOING"}
-			id, err := manager.CreateWorkStateTransition(&transition,
-				testinfra.BuildSecCtx(types.ID(123), []string{"owner_333"}))
-			Expect(id).To(BeZero())
-			Expect(err).ToNot(BeZero())
-		})
-
-		It("should success when all conditions be satisfied", func() {
-			sec := testinfra.BuildSecCtx(types.ID(123), []string{"owner_333"})
-			detail := testinfra.BuildWorker(workManager, "test work", types.ID(333), sec)
-			creation := flow.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DOING"}
-			transition, err := manager.CreateWorkStateTransition(&creation, sec)
+		It("should be able to return workflow detail if everything is ok", func() {
+			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(333), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_333"}))
 			Expect(err).To(BeNil())
-			Expect(transition).ToNot(BeZero())
-			Expect(transition.WorkStateTransitionBrief).To(Equal(creation))
-			Expect(transition.ID).ToNot(BeZero())
-			Expect(transition.CreateTime).ToNot(BeZero())
 
-			// work.stateName is updated
-			detail, err = workManager.WorkDetail(detail.ID, sec)
+			detail, err := manager.DetailWorkflow(workflow.ID, testinfra.BuildSecCtx(123, []string{"owner_333"}))
 			Expect(err).To(BeNil())
-			Expect(detail.StateName).To(Equal("DOING"))
-			Expect(detail.StateBeginTime.UnixNano() >= detail.CreateTime.UnixNano()).To(BeTrue())
-
-			// record is created
-			var records []flow.WorkStateTransition
-			err = testDatabase.DS.GormDB().Model(&flow.WorkStateTransition{}).Find(&records).Error
-			Expect(err).To(BeNil())
-			Expect(len(records)).To(Equal(1))
-			Expect(records[0].ID).To(Equal(transition.ID))
-			Expect(records[0].CreateTime).ToNot(BeZero())
-			Expect(records[0].FlowID).To(Equal(creation.FlowID))
-			Expect(records[0].WorkID).To(Equal(creation.WorkID))
-			Expect(records[0].FromState).To(Equal(creation.FromState))
-			Expect(records[0].ToState).To(Equal(creation.ToState))
-			Expect(records[0].Creator).To(Equal(sec.Identity.ID))
-
-			handleTime := records[0].CreateTime
-			Expect(detail.StateBeginTime).To(Equal(&handleTime))
-			Expect(detail.ProcessBeginTime).To(Equal(&handleTime))
-			Expect(detail.ProcessEndTime).To(BeNil())
-
-			// should handle process step
-			var processSteps []domain.WorkProcessStep
-			Expect(testDatabase.DS.GormDB().Model(&domain.WorkProcessStep{}).Scan(&processSteps).Error).To(BeNil())
-			Expect(processSteps).ToNot(BeNil())
-			Expect(len(processSteps)).To(Equal(2))
-			Expect(processSteps[0]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
-				StateName: creation.FromState, StateCategory: 0, BeginTime: detail.CreateTime, EndTime: &handleTime}))
-			Expect(processSteps[1]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
-				StateName: creation.ToState, StateCategory: 1, BeginTime: handleTime, EndTime: nil}))
-
-			// transit to done state: processEndTime should be set
-			creation = flow.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DOING", ToState: "DONE"}
-			transition, err = manager.CreateWorkStateTransition(&creation, sec)
-			Expect(err).To(BeNil())
-			detail, err = workManager.WorkDetail(detail.ID, sec)
-			Expect(err).To(BeNil())
-			Expect(detail.StateBeginTime).ToNot(BeNil())
-			Expect(detail.ProcessBeginTime).ToNot(BeNil())
-			Expect(detail.ProcessEndTime).ToNot(BeNil())
-
-			// transit back to process state: processEndTime should be reset to nil
-			creation = flow.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DONE", ToState: "PENDING"}
-			transition, err = manager.CreateWorkStateTransition(&creation, sec)
-			Expect(err).To(BeNil())
-			detail, err = workManager.WorkDetail(detail.ID, sec)
-			Expect(err).To(BeNil())
-			Expect(detail.StateBeginTime).ToNot(BeNil())
-			Expect(detail.ProcessBeginTime).ToNot(BeNil())
-			Expect(detail.ProcessEndTime).To(BeNil())
+			Expect(detail.ID).ToNot(BeNil())
+			Expect(detail.Name).To(Equal("test work"))
+			Expect(detail.GroupID).To(Equal(types.ID(333)))
+			Expect(detail.CreateTime).ToNot(BeNil())
+			Expect(detail.StateMachine.States).To(Equal(domain.GenericWorkflowTemplate.StateMachine.States))
+			Expect(state.SortTransitions(detail.StateMachine.Transitions)).To(
+				Equal(state.SortTransitions(domain.GenericWorkflowTemplate.StateMachine.Transitions)))
 		})
 	})
 })

@@ -2,6 +2,7 @@ package servehttp
 
 import (
 	"flywheel/common"
+	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/security"
 	"github.com/gin-gonic/gin"
@@ -23,7 +24,7 @@ type workStateTransitionHandler struct {
 }
 
 func (h *workStateTransitionHandler) handleCreate(c *gin.Context) {
-	creation := flow.WorkStateTransitionBrief{}
+	creation := domain.WorkStateTransitionBrief{}
 	err := c.ShouldBindBodyWith(&creation, binding.JSON)
 	if err != nil {
 		panic(&common.ErrBadParam{Cause: err})

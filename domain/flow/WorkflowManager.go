@@ -16,11 +16,14 @@ import (
 )
 
 type WorkflowManagerTraits interface {
-	QueryWorkflows(sec *security.Context) (*[]domain.WorkflowDetail, error)
+	QueryWorkflows(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error)
 	CreateWorkflow(c *WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error)
 	DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error)
 
-	CreateWorkStateTransition(*WorkStateTransitionBrief, *security.Context) (*WorkStateTransition, error)
+	// update
+	// delete
+
+	CreateWorkStateTransition(*domain.WorkStateTransitionBrief, *security.Context) (*domain.WorkStateTransition, error)
 }
 
 type WorkflowManager struct {
@@ -34,7 +37,7 @@ type WorkflowCreation struct {
 	StateMachine state.StateMachine `json:"stateMachine" binding:"required"`
 }
 
-func NewWorkflowManager(ds *persistence.DataSourceManager) WorkflowManagerTraits {
+func NewWorkflowManager(ds *persistence.DataSourceManager) *WorkflowManager {
 	return &WorkflowManager{
 		dataSource: ds,
 		idWorker:   sonyflake.NewSonyflake(sonyflake.Settings{}),
@@ -86,21 +89,73 @@ func (m *WorkflowManager) CreateWorkflow(c *WorkflowCreation, sec *security.Cont
 	return workflow, nil
 }
 
-func (m *WorkflowManager) DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
-	if ID == domain.GenericWorkFlow.ID {
-		return &domain.GenericWorkFlow, nil
+func (m *WorkflowManager) DetailWorkflow(id types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
+	workflowDetail := domain.WorkflowDetail{}
+	db := m.dataSource.GormDB()
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := db.Where(&domain.Workflow{ID: id}).First(&(workflowDetail.Workflow)).Error; err != nil {
+			return err
+		}
+		if !sec.HasRoleSuffix("_" + workflowDetail.GroupID.String()) {
+			return common.ErrForbidden
+		}
+
+		var stateRecords []domain.WorkflowState
+		if err := db.Where(domain.WorkflowState{WorkflowID: workflowDetail.ID}).Order("`order` ASC").Find(&stateRecords).Error; err != nil {
+			return err
+		}
+		var transitionRecords []domain.WorkflowStateTransition
+		if err := db.Where(domain.WorkflowStateTransition{WorkflowID: workflowDetail.ID}).Find(&transitionRecords).Error; err != nil {
+			return err
+		}
+		stateMachine := state.StateMachine{}
+		for _, record := range stateRecords {
+			stateMachine.States = append(stateMachine.States, state.State{Name: record.Name, Category: record.Category})
+		}
+		for _, record := range transitionRecords {
+			from, fromStateFound := stateMachine.FindState(record.FromState)
+			to, toStateFound := stateMachine.FindState(record.ToState)
+			if !fromStateFound || !toStateFound {
+				return domain.ErrInvalidState
+			}
+			stateMachine.Transitions = append(stateMachine.Transitions, state.Transition{Name: record.Name, From: from, To: to})
+		}
+
+		workflowDetail.StateMachine = stateMachine
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
-	return nil, domain.ErrNotFound
+
+	return &workflowDetail, nil
 }
 
-func (m *WorkflowManager) QueryWorkflows(sec *security.Context) (*[]domain.WorkflowDetail, error) {
-	return &[]domain.WorkflowDetail{domain.GenericWorkFlow}, nil
+func (m *WorkflowManager) QueryWorkflows(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error) {
+	var workflows []domain.Workflow
+	db := m.dataSource.GormDB()
+
+	q := db.Where(domain.Workflow{GroupID: query.GroupID})
+	if query.Name != "" {
+		q = q.Where("name like ?", "%"+query.Name+"%")
+	}
+	visibleGroups := sec.VisibleGroups()
+	if len(visibleGroups) == 0 {
+		return &[]domain.Workflow{}, nil
+	}
+	q = q.Where("group_id in (?)", visibleGroups)
+	if err := q.Find(&workflows).Error; err != nil {
+		return nil, err
+	}
+
+	return &workflows, nil
 }
 
-func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief, sec *security.Context) (*WorkStateTransition, error) {
+func (m *WorkflowManager) CreateWorkStateTransition(c *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error) {
 	flow, err := m.DetailWorkflow(c.FlowID, sec)
-	if flow == nil {
-		return nil, errors.New("workflow " + strconv.FormatUint(uint64(c.FlowID), 10) + " not found")
+	if err != nil {
+		return nil, err
 	}
 	// check whether the transition is acceptable
 	availableTransitions := flow.StateMachine.AvailableTransitions(c.FromState, c.ToState)
@@ -110,7 +165,7 @@ func (m *WorkflowManager) CreateWorkStateTransition(c *WorkStateTransitionBrief,
 
 	now := time.Now()
 	newId := common.NextId(m.idWorker)
-	transition := &WorkStateTransition{ID: newId, CreateTime: now, Creator: sec.Identity.ID, WorkStateTransitionBrief: *c}
+	transition := &domain.WorkStateTransition{ID: newId, CreateTime: now, Creator: sec.Identity.ID, WorkStateTransitionBrief: *c}
 
 	fromState, found := flow.FindState(c.FromState)
 	if !found {

@@ -8,7 +8,7 @@ import (
 func NextId(idWorker *sonyflake.Sonyflake) types.ID {
 	id, err := idWorker.NextID()
 	if err != nil {
-		panic(err)
+		panic(err) // errors.New("over the time limit")
 	}
 	return types.ID(id)
 }

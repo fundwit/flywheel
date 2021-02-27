@@ -34,30 +34,23 @@ var _ = Describe("WorkflowHandler", func() {
 	})
 
 	Describe("handleQueryWorkflows", func() {
-		It("should return workflows", func() {
+		It("should return all workflows", func() {
+			t := time.Date(2020, 1, 1, 1, 0, 0, 0, time.Now().Location())
+			timeBytes, err := t.MarshalJSON()
+			Expect(err).To(BeNil())
+			timeString := strings.Trim(string(timeBytes), `"`)
 			workflowManager.QueryWorkflowsFunc =
-				func(sec *security.Context) (*[]domain.WorkflowDetail, error) {
-					return &[]domain.WorkflowDetail{domain.GenericWorkFlow}, nil
+				func(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error) {
+					return &[]domain.Workflow{{ID: types.ID(10), Name: "test workflow", GroupID: types.ID(100), CreateTime: t}}, nil
 				}
 
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`[{"id": "1", "name": "GenericTask", "groupId": "0", "createTime": "2020-01-01T00:00:00Z",
-				"propertyDefinitions":[{"name": "description"}, {"name": "creatorId"}],
-				"stateMachine": {
-					"states": [{"name":"PENDING", "category": 0}, {"name":"DOING", "category": 1}, {"name":"DONE", "category": 2}],
-					"transitions": [
-						{"name": "begin", "from": {"name":"PENDING", "category": 0}, "to": {"name":"DOING", "category": 1}},
-						{"name": "close", "from": {"name":"PENDING", "category": 0}, "to": {"name":"DONE", "category": 2}},
-						{"name": "cancel", "from": {"name":"DOING", "category": 1}, "to": {"name":"PENDING", "category": 0}},
-						{"name": "finish", "from": {"name":"DOING", "category": 1}, "to": {"name":"DONE", "category": 2}},
-						{"name": "reopen", "from": {"name":"DONE", "category": 2}, "to": {"name":"PENDING", "category": 0}}
-					]
-				}}]`))
+			Expect(body).To(MatchJSON(`[{"id": "10", "name": "test workflow", "groupId": "100", "createTime": "` + timeString + `"}]`))
 		})
 		It("should be able to handle error when query workflows", func() {
-			workflowManager.QueryWorkflowsFunc = func(sec *security.Context) (*[]domain.WorkflowDetail, error) {
+			workflowManager.QueryWorkflowsFunc = func(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error) {
 				return nil, errors.New("a mocked error")
 			}
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows", nil)
@@ -132,14 +125,22 @@ var _ = Describe("WorkflowHandler", func() {
 
 	Describe("handleDetailWorkflow", func() {
 		It("should return specified workflow", func() {
+			t := time.Date(2020, 1, 1, 1, 0, 0, 0, time.Now().Location())
+			timeBytes, err := t.MarshalJSON()
+			Expect(err).To(BeNil())
+			timeString := strings.Trim(string(timeBytes), `"`)
 			workflowManager.DetailWorkflowFunc = func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
-				return &domain.GenericWorkFlow, nil
+				return &domain.WorkflowDetail{
+					Workflow:            domain.Workflow{ID: types.ID(10), Name: "test workflow", GroupID: types.ID(100), CreateTime: t},
+					PropertyDefinitions: []domain.PropertyDefinition{{Name: "description"}, {Name: "creatorId"}},
+					StateMachine:        domain.GenericWorkflowTemplate.StateMachine,
+				}, nil
 			}
 
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/1", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"id": "1", "name": "GenericTask", "groupId": "0", "createTime": "2020-01-01T00:00:00Z",
+			Expect(body).To(MatchJSON(`{"id": "10", "name": "test workflow", "groupId": "100", "createTime": "` + timeString + `",
 				"propertyDefinitions":[{"name": "description"}, {"name": "creatorId"}],
 				"stateMachine": {
 					"states": [{"name":"PENDING", "category": 0}, {"name":"DOING", "category": 1}, {"name":"DONE", "category": 2}],
@@ -184,10 +185,14 @@ var _ = Describe("WorkflowHandler", func() {
 	Describe("handleQueryStates", func() {
 		It("should be able to query states success", func() {
 			workflowManager.DetailWorkflowFunc = func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
-				return &domain.GenericWorkFlow, nil
+				return &domain.WorkflowDetail{
+					Workflow:            domain.Workflow{ID: types.ID(10), Name: "test workflow", GroupID: types.ID(100), CreateTime: time.Now()},
+					PropertyDefinitions: []domain.PropertyDefinition{{Name: "description"}, {Name: "creatorId"}},
+					StateMachine:        domain.GenericWorkflowTemplate.StateMachine,
+				}, nil
 			}
 
-			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/1/states", nil)
+			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/10/states", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`[{"name": "PENDING","category":0},{"name": "DOING","category":1},{"name": "DONE","category":2}]`))
@@ -223,10 +228,14 @@ var _ = Describe("WorkflowHandler", func() {
 	Describe("handleQueryTransitions", func() {
 		It("should be able to query transitions with query: fromState", func() {
 			workflowManager.DetailWorkflowFunc = func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
-				return &domain.GenericWorkFlow, nil
+				return &domain.WorkflowDetail{
+					Workflow:            domain.Workflow{ID: types.ID(10), Name: "test workflow", GroupID: types.ID(100), CreateTime: time.Now()},
+					PropertyDefinitions: []domain.PropertyDefinition{{Name: "description"}, {Name: "creatorId"}},
+					StateMachine:        domain.GenericWorkflowTemplate.StateMachine,
+				}, nil
 			}
 
-			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/1/transitions?fromState=PENDING", nil)
+			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/10/transitions?fromState=PENDING", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`[{"name":"begin","from":{"name": "PENDING", "category": 0},"to":{"name": "DOING", "category": 1}},
@@ -235,10 +244,14 @@ var _ = Describe("WorkflowHandler", func() {
 
 		It("should be able to query transitions with query: fromState and toState", func() {
 			workflowManager.DetailWorkflowFunc = func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
-				return &domain.GenericWorkFlow, nil
+				return &domain.WorkflowDetail{
+					Workflow:            domain.Workflow{ID: types.ID(10), Name: "test workflow", GroupID: types.ID(100), CreateTime: time.Now()},
+					PropertyDefinitions: []domain.PropertyDefinition{{Name: "description"}, {Name: "creatorId"}},
+					StateMachine:        domain.GenericWorkflowTemplate.StateMachine,
+				}, nil
 			}
 
-			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/1/transitions?fromState=PENDING&toState=DONE", nil)
+			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/10/transitions?fromState=PENDING&toState=DONE", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`[{"name":"close","from":{"name": "PENDING", "category": 0},"to":{"name": "DONE", "category": 2}}]`))
@@ -246,10 +259,14 @@ var _ = Describe("WorkflowHandler", func() {
 
 		It("should be able to query transitions with unknown state", func() {
 			workflowManager.DetailWorkflowFunc = func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
-				return &domain.GenericWorkFlow, nil
+				return &domain.WorkflowDetail{
+					Workflow:            domain.Workflow{ID: types.ID(10), Name: "test workflow", GroupID: types.ID(100), CreateTime: time.Now()},
+					PropertyDefinitions: []domain.PropertyDefinition{{Name: "description"}, {Name: "creatorId"}},
+					StateMachine:        domain.GenericWorkflowTemplate.StateMachine,
+				}, nil
 			}
 
-			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/1/transitions?fromState=UNKNOWN", nil)
+			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/10/transitions?fromState=UNKNOWN", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`[]`))

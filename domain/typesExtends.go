@@ -2,12 +2,12 @@ package domain
 
 import (
 	"github.com/fundwit/go-commons/types"
-	"time"
 )
 
 type WorkCreation struct {
 	Name    string   `json:"name" validate:"required"`
 	GroupID types.ID `json:"groupId" validate:"required"`
+	FlowID  types.ID `json:"flowId" validate:"required"`
 }
 
 type WorkUpdating struct {
@@ -30,30 +30,13 @@ type WorkQuery struct {
 	GroupID types.ID `json:"groupId" form:"groupId"`
 }
 
+type WorkflowQuery struct {
+	Name    string   `json:"name" form:"name"`
+	GroupID types.ID `json:"groupId" form:"groupId"`
+}
+
 type GroupRole struct {
 	GroupID   types.ID `json:"groupId"`
 	GroupName string   `json:"groupName"`
 	Role      string   `json:"role"`
-}
-
-func (c *WorkCreation) BuildWorkDetail(id types.ID) *WorkDetail {
-	workFlow := &GenericWorkFlow
-	initState := GenericWorkFlow.StateMachine.States[0]
-
-	now := time.Now()
-	return &WorkDetail{
-		Work: Work{
-			ID:         id,
-			Name:       c.Name,
-			GroupID:    c.GroupID,
-			CreateTime: now,
-
-			FlowID:         workFlow.ID,
-			OrderInState:   now.UnixNano() / 1e6,
-			StateName:      initState.Name,
-			StateBeginTime: &now,
-			State:          initState,
-		},
-		Type: workFlow.Workflow,
-	}
 }

@@ -5,14 +5,13 @@ import (
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
-	"flywheel/domain/state"
 	"flywheel/persistence"
 	"flywheel/security"
-	"fmt"
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
 	"strconv"
+	"time"
 )
 
 type WorkManagerTraits interface {
@@ -25,14 +24,16 @@ type WorkManagerTraits interface {
 }
 
 type WorkManager struct {
-	dataSource *persistence.DataSourceManager
-	idWorker   *sonyflake.Sonyflake
+	workflowManager flow.WorkflowManagerTraits
+	dataSource      *persistence.DataSourceManager
+	idWorker        *sonyflake.Sonyflake
 }
 
-func NewWorkManager(ds *persistence.DataSourceManager) *WorkManager {
+func NewWorkManager(ds *persistence.DataSourceManager, workflowManager flow.WorkflowManagerTraits) *WorkManager {
 	return &WorkManager{
-		dataSource: ds,
-		idWorker:   sonyflake.NewSonyflake(sonyflake.Settings{}),
+		workflowManager: workflowManager,
+		dataSource:      ds,
+		idWorker:        sonyflake.NewSonyflake(sonyflake.Settings{}),
 	}
 }
 
@@ -53,10 +54,23 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 		return nil, err
 	}
 
+	// append Work.state
+	workflowCache := map[types.ID]*domain.WorkflowDetail{}
+	var err error
 	for i := len(works) - 1; i >= 0; i-- {
-		stateFound, err := findState(works[i].StateName)
-		if err != nil {
-			return nil, err
+		work := works[i]
+		workflow := workflowCache[work.FlowID]
+		if workflow == nil {
+			workflow, err = m.workflowManager.DetailWorkflow(work.FlowID, sec)
+			if err != nil {
+				return nil, err
+			}
+			workflowCache[work.FlowID] = workflow
+		}
+
+		stateFound, found := workflow.FindState(work.StateName)
+		if !found {
+			return nil, domain.ErrInvalidState
 		}
 		works[i].State = stateFound
 	}
@@ -75,11 +89,14 @@ func (m *WorkManager) WorkDetail(id types.ID, sec *security.Context) (*domain.Wo
 		return nil, common.ErrForbidden
 	}
 
-	// load type and state
-	workDetail.Type = domain.GenericWorkFlow.Workflow
-	stateFound, err := findState(workDetail.StateName)
+	workflowDetail, err := m.workflowManager.DetailWorkflow(workDetail.FlowID, sec)
 	if err != nil {
 		return nil, err
+	}
+	workDetail.Type = workflowDetail.Workflow
+	stateFound, found := workflowDetail.FindState(workDetail.StateName)
+	if !found {
+		return nil, domain.ErrInvalidState
 	}
 	workDetail.State = stateFound
 
@@ -91,12 +108,18 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 		return nil, common.ErrForbidden
 	}
 
-	workDetail := c.BuildWorkDetail(common.NextId(m.idWorker))
-	initProcessStep := domain.WorkProcessStep{WorkID: workDetail.ID, FlowID: workDetail.FlowID,
-		StateName: workDetail.State.Name, StateCategory: workDetail.State.Category, BeginTime: workDetail.CreateTime}
-
 	db := m.dataSource.GormDB()
+	var workDetail *domain.WorkDetail
 	err := db.Transaction(func(tx *gorm.DB) error {
+		workflowDetail, err := m.workflowManager.DetailWorkflow(c.FlowID, sec)
+		if err != nil {
+			return err
+		}
+
+		workDetail = BuildWorkDetail(common.NextId(m.idWorker), c, workflowDetail)
+		initProcessStep := domain.WorkProcessStep{WorkID: workDetail.ID, FlowID: workDetail.FlowID,
+			StateName: workDetail.State.Name, StateCategory: workDetail.State.Category, BeginTime: workDetail.CreateTime}
+
 		if err := tx.Create(workDetail.Work).Error; err != nil {
 			return err
 		}
@@ -129,17 +152,23 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *secur
 		if err := tx.Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
 			return err
 		}
+
+		workflowDetail, err := m.workflowManager.DetailWorkflow(work.FlowID, sec)
+		if err != nil {
+			return err
+		}
+		stateFound, found := workflowDetail.FindState(work.StateName)
+		if !found {
+			return domain.ErrInvalidState
+		}
+		work.State = stateFound
+
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	stateFound, err := findState(work.StateName)
-	if err != nil {
-		return nil, err
-	}
-	work.State = stateFound
 	return &work, nil
 }
 
@@ -175,7 +204,7 @@ func (m *WorkManager) DeleteWork(id types.ID, sec *security.Context) error {
 		if err := tx.Delete(domain.Work{}, "id = ?", id).Error; err != nil {
 			return err
 		}
-		if err := tx.Delete(flow.WorkStateTransition{}, "work_id = ?", id).Error; err != nil {
+		if err := tx.Delete(domain.WorkStateTransition{}, "work_id = ?", id).Error; err != nil {
 			return err
 		}
 		if err := tx.Delete(domain.WorkProcessStep{}, "work_id = ?", id).Error; err != nil {
@@ -198,10 +227,23 @@ func (m *WorkManager) checkPerms(id types.ID, sec *security.Context) error {
 	return nil
 }
 
-func findState(stateName string) (state.State, error) {
-	stateFound, found := domain.GenericWorkFlow.FindState(stateName)
-	if !found {
-		return state.State{}, fmt.Errorf("invalid state '%s'", stateName)
+func BuildWorkDetail(id types.ID, c *domain.WorkCreation, workflow *domain.WorkflowDetail) *domain.WorkDetail {
+	initState := workflow.StateMachine.States[0]
+
+	now := time.Now()
+	return &domain.WorkDetail{
+		Work: domain.Work{
+			ID:         id,
+			Name:       c.Name,
+			GroupID:    c.GroupID,
+			CreateTime: now,
+
+			FlowID:         workflow.ID,
+			OrderInState:   now.UnixNano() / 1e6,
+			StateName:      initState.Name,
+			StateBeginTime: &now,
+			State:          initState,
+		},
+		Type: workflow.Workflow,
 	}
-	return stateFound, nil
 }

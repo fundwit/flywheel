@@ -18,16 +18,23 @@ var _ = Describe("WorkProcessManager", func() {
 		workProcessManager *work.WorkProcessManager
 		workManager        *work.WorkManager
 		testDatabase       *testinfra.TestDatabase
+		workflowDetail     *domain.WorkflowDetail
 	)
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
 		// migration
-		err := testDatabase.DS.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{}, &flow.WorkStateTransition{}).Error
+		err := testDatabase.DS.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{}, &domain.WorkStateTransition{},
+			&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error
 		if err != nil {
 			log.Fatalf("database migration failed %v\n", err)
 		}
 		workProcessManager = work.NewWorkProcessManager(testDatabase.DS)
-		workManager = work.NewWorkManager(testDatabase.DS)
+		workflowManager := flow.NewWorkflowManager(testDatabase.DS)
+		creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+		workflowDetail, err = workflowManager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+		Expect(err).To(BeNil())
+
+		workManager = work.NewWorkManager(testDatabase.DS, workflowManager)
 	})
 	AfterEach(func() {
 		testinfra.StopMysqlTestDatabase(testDatabase)
@@ -81,7 +88,7 @@ var _ = Describe("WorkProcessManager", func() {
 			// do transition
 			workFlowManager := flow.NewWorkflowManager(testDatabase.DS)
 			_, err = workFlowManager.CreateWorkStateTransition(
-				&flow.WorkStateTransitionBrief{FlowID: 1, WorkID: work1.ID, FromState: work1.StateName, ToState: domain.StateDoing.Name}, secCtx)
+				&domain.WorkStateTransitionBrief{FlowID: workflowDetail.ID, WorkID: work1.ID, FromState: work1.StateName, ToState: domain.StateDoing.Name}, secCtx)
 			Expect(err).To(BeNil())
 
 			// add a record should not be query out
@@ -109,7 +116,7 @@ var _ = Describe("WorkProcessManager", func() {
 			Expect(step2.EndTime).To(BeNil())
 
 			_, err = workFlowManager.CreateWorkStateTransition(
-				&flow.WorkStateTransitionBrief{FlowID: 1, WorkID: work1.ID, FromState: domain.StateDoing.Name, ToState: domain.StateDone.Name}, secCtx)
+				&domain.WorkStateTransitionBrief{FlowID: workflowDetail.ID, WorkID: work1.ID, FromState: domain.StateDoing.Name, ToState: domain.StateDone.Name}, secCtx)
 			Expect(err).To(BeNil())
 			results, err = workProcessManager.QueryProcessSteps(&domain.WorkProcessStepQuery{WorkID: work1.ID}, secCtx)
 			Expect(err).To(BeNil())

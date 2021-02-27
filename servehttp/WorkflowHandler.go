@@ -3,6 +3,7 @@ package servehttp
 import (
 	"errors"
 	"flywheel/common"
+	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/security"
 	"github.com/fundwit/go-commons/types"
@@ -40,11 +41,12 @@ type workflowHandler struct {
 }
 
 func (h *workflowHandler) handleQueryWorkflows(c *gin.Context) {
-	flows, err := h.workflowManager.QueryWorkflows(security.FindSecurityContext(c))
+	query := domain.WorkflowQuery{}
+	_ = c.MustBindWith(&query, binding.Query)
+
+	flows, err := h.workflowManager.QueryWorkflows(&query, security.FindSecurityContext(c))
 	if err != nil {
-		_ = c.Error(err)
-		c.Abort()
-		return
+		panic(err)
 	}
 	c.JSON(http.StatusOK, flows)
 }

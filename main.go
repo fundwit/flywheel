@@ -35,7 +35,7 @@ func main() {
 	defer ds.Stop()
 
 	// database migration (race condition)
-	err = ds.GormDB().AutoMigrate(&domain.Work{}, &flow.WorkStateTransition{}, &domain.WorkProcessStep{},
+	err = ds.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkStateTransition{}, &domain.WorkProcessStep{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{},
 		&security.User{}, &domain.Group{}, &domain.GroupMember{}).Error
 	if err != nil {
@@ -54,8 +54,9 @@ func main() {
 	securityMiddle := security.SimpleAuthFilter()
 	engine.GET("/me", securityMiddle, security.UserInfoQueryHandler)
 
-	servehttp.RegisterWorkHandler(engine, work.NewWorkManager(ds), securityMiddle)
-	servehttp.RegisterWorkflowHandler(engine, flow.NewWorkflowManager(ds), securityMiddle)
+	workflowManager := flow.NewWorkflowManager(ds)
+	servehttp.RegisterWorkflowHandler(engine, workflowManager, securityMiddle)
+	servehttp.RegisterWorkHandler(engine, work.NewWorkManager(ds, workflowManager), securityMiddle)
 	servehttp.RegisterWorkStateTransitionHandler(engine, flow.NewWorkflowManager(ds), securityMiddle)
 	servehttp.RegisterWorkProcessStepHandler(engine, work.NewWorkProcessManager(ds), securityMiddle)
 

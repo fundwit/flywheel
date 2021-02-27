@@ -23,6 +23,11 @@ var _ = Describe("WorkHandler", func() {
 	var (
 		router      *gin.Engine
 		workManager *workManagerMock
+
+		demoTime         time.Time
+		timeString       string
+		demoWorkflow     domain.WorkflowDetail
+		demoWorkflowJson string
 	)
 
 	BeforeEach(func() {
@@ -30,40 +35,48 @@ var _ = Describe("WorkHandler", func() {
 		router.Use(servehttp.ErrorHandling())
 		workManager = &workManagerMock{}
 		servehttp.RegisterWorkHandler(router, workManager)
+
+		demoTime = time.Date(2020, 1, 1, 1, 0, 0, 0, time.Now().Location())
+		timeBytes, err := demoTime.MarshalJSON()
+		Expect(err).To(BeNil())
+		timeString = strings.Trim(string(timeBytes), `"`)
+		demoWorkflow = domain.WorkflowDetail{
+			Workflow:            domain.Workflow{ID: 100, Name: "demo workflow", GroupID: 1000, CreateTime: demoTime},
+			PropertyDefinitions: []domain.PropertyDefinition{{Name: "desc"}},
+			StateMachine:        domain.GenericWorkflowTemplate.StateMachine,
+		}
+		demoWorkflowJson = `{"id": "` + demoWorkflow.ID.String() + `", "name": "` + demoWorkflow.Name + `", "groupId": "` +
+			demoWorkflow.GroupID.String() + `", "createTime": "` + timeString + `"}`
 	})
 
 	Describe("handleCreate", func() {
 		It("should be able to serve create request", func() {
-			t := time.Date(2020, 1, 1, 1, 0, 0, 0, time.Now().Location())
-			timeBytes, err := t.MarshalJSON()
-			timeString := strings.Trim(string(timeBytes), `"`)
-			Expect(err).To(BeNil())
 			workManager.CreateWorkFunc = func(creation *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {
 				detail := domain.WorkDetail{
 					Work: domain.Work{
 						ID:           123,
 						Name:         creation.Name,
 						GroupID:      creation.GroupID,
-						FlowID:       domain.GenericWorkFlow.ID,
-						OrderInState: t.UnixNano() / 1e6,
-						CreateTime:   t,
-						StateName:    domain.GenericWorkFlow.StateMachine.States[0].Name,
-						State:        domain.GenericWorkFlow.StateMachine.States[0],
+						FlowID:       demoWorkflow.ID,
+						OrderInState: demoTime.UnixNano() / 1e6,
+						CreateTime:   demoTime,
+						StateName:    demoWorkflow.StateMachine.States[0].Name,
+						State:        demoWorkflow.StateMachine.States[0],
 					},
-					Type: domain.GenericWorkFlow.Workflow,
+					Type: demoWorkflow.Workflow,
 				}
 				return &detail, nil
 			}
 
-			creation := domain.WorkCreation{Name: "test work", GroupID: types.ID(333)}
+			creation := domain.WorkCreation{Name: "test work", GroupID: types.ID(333), FlowID: demoWorkflow.ID}
 			reqBody, err := json.Marshal(creation)
 			Expect(err).To(BeNil())
 			req := httptest.NewRequest(http.MethodPost, "/v1/works", bytes.NewReader(reqBody))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusCreated))
-			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"333","flowId":"1", "orderInState": ` +
-				strconv.FormatInt(t.UnixNano()/1e6, 10) + `, "createTime":"` + timeString + `",
-				"stateName":"PENDING","type":{"id":"1","name":"GenericTask", "groupId": "0", "createTime": "2020-01-01T00:00:00Z"},"state":{"name":"PENDING","category":0},
+			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"333","flowId":"` + demoWorkflow.ID.String() + `", "orderInState": ` +
+				strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `, "createTime":"` + timeString + `",
+				"stateName":"PENDING","type": ` + demoWorkflowJson + `,"state":{"name":"PENDING","category":0},
 				"stateBeginTime": null,"processBeginTime":null, "processEndTime":null}`))
 		})
 
@@ -79,7 +92,9 @@ var _ = Describe("WorkHandler", func() {
 			Expect(status).To(Equal(http.StatusBadRequest))
 			Expect(body).To(MatchJSON(`{
 			  "code": "common.bad_param",
-			  "message": "Key: 'WorkCreation.Name' Error:Field validation for 'Name' failed on the 'required' tag\nKey: 'WorkCreation.GroupID' Error:Field validation for 'GroupID' failed on the 'required' tag",
+			  "message": "Key: 'WorkCreation.Name' Error:Field validation for 'Name' failed on the 'required' tag\n` +
+				`Key: 'WorkCreation.GroupID' Error:Field validation for 'GroupID' failed on the 'required' tag\n` +
+				`Key: 'WorkCreation.FlowID' Error:Field validation for 'FlowID' failed on the 'required' tag",
 			  "data": null
 			}`))
 		})
@@ -88,7 +103,7 @@ var _ = Describe("WorkHandler", func() {
 			workManager.CreateWorkFunc = func(creation *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {
 				return nil, errors.New("a mocked error")
 			}
-			req := httptest.NewRequest(http.MethodPost, "/v1/works", bytes.NewReader([]byte(`{"name":"test","groupId":"333"}`)))
+			req := httptest.NewRequest(http.MethodPost, "/v1/works", bytes.NewReader([]byte(`{"name":"test","groupId":"333", "flowId": "1000"}`)))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusInternalServerError))
 			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
@@ -97,14 +112,10 @@ var _ = Describe("WorkHandler", func() {
 
 	Describe("handleQuery", func() {
 		It("should be able to serve query request", func() {
-			t := time.Date(2020, 1, 1, 1, 0, 0, 0, time.Now().Location())
-			timeBytes, err := t.MarshalJSON()
-			timeString := strings.Trim(string(timeBytes), `"`)
-			Expect(err).To(BeNil())
 			workManager.QueryWorkFunc = func(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
 				works := []domain.Work{
-					{ID: 1, Name: "work1", GroupID: types.ID(333), FlowID: 1, CreateTime: t, OrderInState: t.UnixNano() / 1e6, StateName: "PENDING", State: domain.StatePending},
-					{ID: 2, Name: "work2", GroupID: types.ID(333), FlowID: 1, CreateTime: t, OrderInState: t.UnixNano() / 1e6, StateName: "PENDING", State: domain.StatePending},
+					{ID: 1, Name: "work1", GroupID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.UnixNano() / 1e6, StateName: "PENDING", State: domain.StatePending},
+					{ID: 2, Name: "work2", GroupID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.UnixNano() / 1e6, StateName: "PENDING", State: domain.StatePending},
 				}
 				return &works, nil
 			}
@@ -113,10 +124,10 @@ var _ = Describe("WorkHandler", func() {
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"data":[{"id":"1","name":"work1","groupId":"333","flowId":"1",
-				"createTime":"` + timeString + `","orderInState": ` + strconv.FormatInt(t.UnixNano()/1e6, 10) + ` ,
+				"createTime":"` + timeString + `","orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + ` ,
 				"stateName":"PENDING","state":{"name":"PENDING", "category":0},
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null}, 
-				{"id":"2","name":"work2","groupId":"333","flowId":"1", "orderInState": ` + strconv.FormatInt(t.UnixNano()/1e6, 10) + `,
+				{"id":"2","name":"work2","groupId":"333","flowId":"1", "orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `,
 				"createTime":"` + timeString + `","stateName":"PENDING","state":{"name":"PENDING", "category":0},
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null
 				}],"total": 2}`))
@@ -154,28 +165,24 @@ var _ = Describe("WorkHandler", func() {
 		})
 
 		It("should return work detail as expected when everything is ok", func() {
-			t := time.Date(2020, 1, 1, 1, 0, 0, 0, time.Now().Location())
-			timeBytes, err := t.MarshalJSON()
-			timeString := strings.Trim(string(timeBytes), `"`)
-			Expect(err).To(BeNil())
 			workManager.WorkDetailFunc = func(id types.ID, sec *security.Context) (*domain.WorkDetail, error) {
 				return &domain.WorkDetail{
 					Work: domain.Work{
-						ID: 123, Name: "test work", GroupID: 100, CreateTime: t, FlowID: 1, OrderInState: 999,
-						StateName: "DOING", State: domain.GenericWorkFlow.StateMachine.States[1],
-						StateBeginTime: &t, ProcessBeginTime: &t, ProcessEndTime: &t,
+						ID: 123, Name: "test work", GroupID: 100, CreateTime: demoTime, FlowID: demoWorkflow.ID, OrderInState: 999,
+						StateName: "DOING", State: demoWorkflow.StateMachine.States[1],
+						StateBeginTime: &demoTime, ProcessBeginTime: &demoTime, ProcessEndTime: &demoTime,
 					},
-					Type: domain.GenericWorkFlow.Workflow,
+					Type: demoWorkflow.Workflow,
 				}, nil
 			}
 			req := httptest.NewRequest(http.MethodGet, "/v1/works/123", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"100","flowId":"1",
+			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"100","flowId":"` + demoWorkflow.ID.String() + `",
 				"createTime":"` + timeString + `","orderInState": 999,
 				"stateName":"DOING","state":{"name":"DOING", "category":1},
 				"stateBeginTime": "` + timeString + `", "processBeginTime": "` + timeString + `", "processEndTime": "` + timeString + `",
-				"type": {"id": "1", "name": "GenericTask", "groupId": "0", "createTime": "2020-01-01T00:00:00Z"}}`))
+				"type": ` + demoWorkflowJson + `}`))
 		})
 	})
 
@@ -203,13 +210,9 @@ var _ = Describe("WorkHandler", func() {
 			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
 		})
 		It("should be able to update work successfully", func() {
-			t := time.Date(2020, 1, 1, 1, 0, 0, 0, time.Now().Location())
-			timeBytes, err := t.MarshalJSON()
-			timeString := strings.Trim(string(timeBytes), `"`)
-			Expect(err).To(BeNil())
 			workManager.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error) {
-				return &domain.Work{ID: 100, Name: "new-name", GroupID: types.ID(333), CreateTime: t,
-					FlowID: 1, OrderInState: t.UnixNano() / 1e6, StateName: "PENDING", State: domain.StatePending}, nil
+				return &domain.Work{ID: 100, Name: "new-name", GroupID: types.ID(333), CreateTime: demoTime,
+					FlowID: 1, OrderInState: demoTime.UnixNano() / 1e6, StateName: "PENDING", State: domain.StatePending}, nil
 			}
 			req := httptest.NewRequest(http.MethodPut, "/v1/works/100", bytes.NewReader([]byte(
 				`{"name": "new-name"}`)))
@@ -218,7 +221,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","stateName":"PENDING",
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null,
 				"state":{"name":"PENDING", "category":0},"groupId":"333","flowId":"1","createTime":"` +
-				timeString + `", "orderInState": ` + strconv.FormatInt(t.UnixNano()/1e6, 10) + `}`))
+				timeString + `", "orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `}`))
 		})
 	})
 

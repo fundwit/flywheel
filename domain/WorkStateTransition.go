@@ -1,4 +1,4 @@
-package flow
+package domain
 
 import (
 	"github.com/fundwit/go-commons/types"

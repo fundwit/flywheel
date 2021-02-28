@@ -136,11 +136,24 @@ var _ = Describe("WorkHandler", func() {
 				}],"total": 2}`))
 		})
 
+		It("should be able to receive parameters", func() {
+			query := &domain.WorkQuery{}
+			workManager.QueryWorkFunc = func(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
+				query = q
+				return &[]domain.Work{}, nil
+			}
+			req := httptest.NewRequest(http.MethodGet, "/v1/works?name=aaa&groupId=3&stateCategory=1&stateCategory=2", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusOK))
+			Expect(body).To(MatchJSON(`{"data": [], "total": 0}`))
+			Expect(query.Name).To(Equal("aaa"))
+			Expect(query.GroupID).To(Equal(types.ID(3)))
+			Expect(query.StateCategories).To(Equal([]state.Category{state.InProcess, state.Done}))
+		})
+
 		It("should return 500 when service failed", func() {
 			workManager.QueryWorkFunc = func(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
-				{
-					return &[]domain.Work{}, errors.New("a mocked error")
-				}
+				return &[]domain.Work{}, errors.New("a mocked error")
 			}
 
 			req := httptest.NewRequest(http.MethodGet, "/v1/works", nil)

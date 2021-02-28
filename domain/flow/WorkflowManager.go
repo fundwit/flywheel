@@ -188,7 +188,7 @@ func (m *WorkflowManager) CreateWorkStateTransition(c *domain.WorkStateTransitio
 		}
 
 		query := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID, StateName: c.FromState}).
-			Update(&domain.Work{StateName: c.ToState, StateBeginTime: &now})
+			Update(&domain.Work{StateName: c.ToState, StateCategory: toState.Category, StateBeginTime: &now})
 		if err := query.Error; err != nil {
 			return err
 		}

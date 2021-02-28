@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"flywheel/domain/state"
 	"github.com/fundwit/go-commons/types"
 )
 
@@ -26,8 +27,9 @@ type WorkDetail struct {
 }
 
 type WorkQuery struct {
-	Name    string   `json:"name" form:"name"`
-	GroupID types.ID `json:"groupId" form:"groupId"`
+	Name            string           `json:"name" form:"name"`
+	GroupID         types.ID         `json:"groupId" form:"groupId"`
+	StateCategories []state.Category `json:"stateCategories" form:"stateCategory"`
 }
 
 type WorkflowQuery struct {

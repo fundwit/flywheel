@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flywheel/domain"
 	"flywheel/domain/flow"
+	"flywheel/domain/state"
 	"flywheel/domain/work"
 	"flywheel/testinfra"
 	"github.com/fundwit/go-commons/types"
@@ -79,6 +80,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(work.Type).To(Equal(flowDetail.Workflow))
 			Expect(work.State).To(Equal(flowDetail.StateMachine.States[0]))
 			Expect(work.StateBeginTime).To(Equal(&work.CreateTime))
+			Expect(work.StateCategory).To(Equal(flowDetail.StateMachine.States[0].Category))
 
 			detail, err := workManager.WorkDetail(work.ID, testinfra.BuildSecCtx(100, []string{"owner_1"}))
 			Expect(err).To(BeNil())
@@ -86,12 +88,13 @@ var _ = Describe("WorkManager", func() {
 			Expect(detail.ID).To(Equal(work.ID))
 			Expect(detail.Name).To(Equal(creation.Name))
 			Expect(detail.GroupID).To(Equal(creation.GroupID))
-			Expect(work.CreateTime.Sub(time.Now()) < time.Minute).To(BeTrue())
+			Expect(detail.CreateTime.Sub(time.Now()) < time.Minute).To(BeTrue())
 			Expect(detail.Type).To(Equal(flowDetail.Workflow))
 			Expect(detail.State).To(Equal(flowDetail.StateMachine.States[0]))
 			Expect(detail.FlowID).To(Equal(flowDetail.ID))
-			Expect(work.OrderInState).To(Equal(work.CreateTime.UnixNano() / 1e6))
+			Expect(detail.OrderInState).To(Equal(work.CreateTime.UnixNano() / 1e6))
 			Expect(detail.StateName).To(Equal(flowDetail.StateMachine.States[0].Name))
+			Expect(work.StateCategory).To(Equal(flowDetail.StateMachine.States[0].Category))
 			//Expect(len(work.Properties)).To(Equal(0))
 
 			// should create init process step
@@ -167,6 +170,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(work1.CreateTime).ToNot(BeZero())
 			Expect(work1.FlowID).To(Equal(flowDetail.ID))
 			Expect(work1.StateName).To(Equal(flowDetail.StateMachine.States[0].Name))
+			Expect(work1.StateCategory).To(Equal(flowDetail.StateMachine.States[0].Category))
 		})
 
 		It("should query by name and group id", func() {
@@ -194,7 +198,34 @@ var _ = Describe("WorkManager", func() {
 			Expect(work1.CreateTime).ToNot(BeZero())
 			Expect(work1.FlowID).To(Equal(flowDetail.ID))
 			Expect(work1.StateName).To(Equal(flowDetail.StateMachine.States[0].Name))
+			Expect(work1.StateCategory).To(Equal(flowDetail.StateMachine.States[0].Category))
 			Expect(work1.State).To(Equal(flowDetail.StateMachine.States[0]))
+		})
+
+		It("should query by stateCategory", func() {
+			work1, err := workManager.CreateWork(
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeZero())
+
+			work2, err := workManager.CreateWork(
+				&domain.WorkCreation{Name: "test work2", GroupID: types.ID(1), FlowID: flowDetail.ID}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeZero())
+			Expect(testDatabase.DS.GormDB().Model(&domain.Work{}).Where(&domain.Work{ID: work2.ID}).
+				Update("state_category", state.InProcess).Error).To(BeNil())
+
+			work3, err := workManager.CreateWork(
+				&domain.WorkCreation{Name: "test work3", GroupID: types.ID(1), FlowID: flowDetail.ID}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeZero())
+			Expect(testDatabase.DS.GormDB().Model(&domain.Work{}).Where(&domain.Work{ID: work3.ID}).
+				Update("state_category", state.Done).Error).To(BeNil())
+
+			works, err := workManager.QueryWork(&domain.WorkQuery{GroupID: types.ID(1), StateCategories: []state.Category{state.InBacklog, state.InProcess}},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+			Expect(works).ToNot(BeNil())
+			Expect(len(*works)).To(Equal(2))
+			Expect((*works)[0].ID).To(Equal(work1.ID))
+			Expect((*works)[1].ID).To(Equal(work2.ID))
 		})
 
 		It("works should be ordered by orderInState asc and id asc", func() {

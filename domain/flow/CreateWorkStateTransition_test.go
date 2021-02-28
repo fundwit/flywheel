@@ -3,6 +3,7 @@ package flow_test
 import (
 	"flywheel/domain"
 	"flywheel/domain/flow"
+	"flywheel/domain/state"
 	"flywheel/domain/work"
 	"flywheel/testinfra"
 	"github.com/fundwit/go-commons/types"
@@ -139,6 +140,7 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			detail, err = workManager.WorkDetail(detail.ID, sec)
 			Expect(err).To(BeNil())
 			Expect(detail.StateName).To(Equal("DOING"))
+			Expect(detail.StateCategory).To(Equal(state.InProcess))
 			Expect(detail.StateBeginTime.UnixNano() >= detail.CreateTime.UnixNano()).To(BeTrue())
 
 			// record is created

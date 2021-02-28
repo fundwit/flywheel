@@ -45,6 +45,9 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 	if query.Name != "" {
 		q = q.Where("name like ?", "%"+query.Name+"%")
 	}
+	if len(query.StateCategories) > 0 {
+		q = q.Where("state_category in (?)", query.StateCategories)
+	}
 	visibleGroups := sec.VisibleGroups()
 	if len(visibleGroups) == 0 {
 		return &[]domain.Work{}, nil
@@ -241,6 +244,7 @@ func BuildWorkDetail(id types.ID, c *domain.WorkCreation, workflow *domain.Workf
 			FlowID:         workflow.ID,
 			OrderInState:   now.UnixNano() / 1e6,
 			StateName:      initState.Name,
+			StateCategory:  initState.Category,
 			StateBeginTime: &now,
 			State:          initState,
 		},

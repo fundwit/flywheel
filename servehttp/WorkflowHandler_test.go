@@ -41,13 +41,13 @@ var _ = Describe("WorkflowHandler", func() {
 			timeString := strings.Trim(string(timeBytes), `"`)
 			workflowManager.QueryWorkflowsFunc =
 				func(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error) {
-					return &[]domain.Workflow{{ID: types.ID(10), Name: "test workflow", GroupID: types.ID(100), CreateTime: t}}, nil
+					return &[]domain.Workflow{{ID: types.ID(10), Name: "test workflow", GroupID: types.ID(100), ThemeColor: "blue", CreateTime: t}}, nil
 				}
 
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`[{"id": "10", "name": "test workflow", "groupId": "100", "createTime": "` + timeString + `"}]`))
+			Expect(body).To(MatchJSON(`[{"id": "10", "name": "test workflow", "themeColor":"blue", "groupId": "100", "createTime": "` + timeString + `"}]`))
 		})
 		It("should be able to handle error when query workflows", func() {
 			workflowManager.QueryWorkflowsFunc = func(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error) {
@@ -74,7 +74,8 @@ var _ = Describe("WorkflowHandler", func() {
 			Expect(body).To(MatchJSON(`{
 			  "code": "common.bad_param",
 			  "message": "Key: 'WorkflowCreation.Name' Error:Field validation for 'Name' failed on the 'required' tag\n` +
-				`Key: 'WorkflowCreation.GroupID' Error:Field validation for 'GroupID' failed on the 'required' tag",
+				`Key: 'WorkflowCreation.GroupID' Error:Field validation for 'GroupID' failed on the 'required' tag\n` +
+				`Key: 'WorkflowCreation.ThemeColor' Error:Field validation for 'ThemeColor' failed on the 'required' tag",
 			  "data": null
 			}`))
 		})
@@ -99,7 +100,7 @@ var _ = Describe("WorkflowHandler", func() {
 			Expect(err).To(BeNil())
 			workflowManager.CreateWorkflowFunc = func(creation *flow.WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error) {
 				detail := domain.WorkflowDetail{
-					Workflow:     domain.Workflow{ID: 123, Name: creation.Name, GroupID: creation.GroupID, CreateTime: t},
+					Workflow:     domain.Workflow{ID: 123, Name: creation.Name, ThemeColor: "blue", GroupID: creation.GroupID, CreateTime: t},
 					StateMachine: creation.StateMachine,
 				}
 				return &detail, nil
@@ -111,7 +112,7 @@ var _ = Describe("WorkflowHandler", func() {
 			req := httptest.NewRequest(http.MethodPost, "/v1/workflows", bytes.NewReader(reqBody))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusCreated))
-			Expect(body).To(MatchJSON(`{"id": "123", "name": "test workflow", "groupId": "333", "createTime": "` + timeString + `",
+			Expect(body).To(MatchJSON(`{"id": "123", "name": "test workflow", "themeColor": "blue", "groupId": "333", "createTime": "` + timeString + `",
 				"propertyDefinitions": null,
 				"stateMachine": {
 					"states": [{"name":"OPEN", "category": 1}, {"name":"CLOSED", "category": 2}],
@@ -131,7 +132,7 @@ var _ = Describe("WorkflowHandler", func() {
 			timeString := strings.Trim(string(timeBytes), `"`)
 			workflowManager.DetailWorkflowFunc = func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
 				return &domain.WorkflowDetail{
-					Workflow:            domain.Workflow{ID: types.ID(10), Name: "test workflow", GroupID: types.ID(100), CreateTime: t},
+					Workflow:            domain.Workflow{ID: types.ID(10), Name: "test workflow", ThemeColor: "blue", GroupID: types.ID(100), CreateTime: t},
 					PropertyDefinitions: []domain.PropertyDefinition{{Name: "description"}, {Name: "creatorId"}},
 					StateMachine:        domain.GenericWorkflowTemplate.StateMachine,
 				}, nil
@@ -140,7 +141,7 @@ var _ = Describe("WorkflowHandler", func() {
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/1", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"id": "10", "name": "test workflow", "groupId": "100", "createTime": "` + timeString + `",
+			Expect(body).To(MatchJSON(`{"id": "10", "name": "test workflow", "themeColor": "blue", "groupId": "100", "createTime": "` + timeString + `",
 				"propertyDefinitions":[{"name": "description"}, {"name": "creatorId"}],
 				"stateMachine": {
 					"states": [{"name":"PENDING", "category": 0}, {"name":"DOING", "category": 1}, {"name":"DONE", "category": 2}],
@@ -304,7 +305,7 @@ var _ = Describe("WorkflowHandler", func() {
 })
 
 func buildDemoWorkflowCreation() *flow.WorkflowCreation {
-	return &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(333), StateMachine: state.StateMachine{
+	return &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(333), ThemeColor: "blue", StateMachine: state.StateMachine{
 		States: []state.State{{Name: "OPEN", Category: state.InProcess}, {Name: "CLOSED", Category: state.Done}},
 		Transitions: []state.Transition{
 			{Name: "done", From: state.State{Name: "OPEN", Category: state.InProcess}, To: state.State{Name: "CLOSED", Category: state.Done}},

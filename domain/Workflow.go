@@ -7,8 +7,9 @@ import (
 )
 
 type Workflow struct {
-	ID   types.ID `json:"id" gorm:"primary_key" sql:"type:BIGINT UNSIGNED NOT NULL"`
-	Name string   `json:"name"`
+	ID         types.ID `json:"id" gorm:"primary_key" sql:"type:BIGINT UNSIGNED NOT NULL"`
+	Name       string   `json:"name"`
+	ThemeColor string   `json:"themeColor"`
 
 	GroupID    types.ID  `json:"groupId"`
 	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`

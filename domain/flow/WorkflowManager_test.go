@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-var creationDemo = &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: state.StateMachine{
+var creationDemo = &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), ThemeColor: "blue", StateMachine: state.StateMachine{
 	States: []state.State{{Name: "OPEN", Category: state.InProcess}, {Name: "CLOSED", Category: state.Done}},
 	Transitions: []state.Transition{
 		{Name: "done", From: state.State{Name: "OPEN", Category: state.InProcess}, To: state.State{Name: "CLOSED", Category: state.Done}},
@@ -43,11 +43,11 @@ var _ = Describe("WorkflowManager", func() {
 	Describe("QueryWorkflows", func() {
 		It("should query all workflows successfully", func() {
 			_, err := manager.CreateWorkflow(
-				&flow.WorkflowCreation{Name: "test workflow1", GroupID: types.ID(1), StateMachine: creationDemo.StateMachine},
+				&flow.WorkflowCreation{Name: "test workflow1", GroupID: types.ID(1), ThemeColor: "blue", StateMachine: creationDemo.StateMachine},
 				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 			_, err = manager.CreateWorkflow(
-				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(2), StateMachine: creationDemo.StateMachine},
+				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(2), ThemeColor: "blue", StateMachine: creationDemo.StateMachine},
 				testinfra.BuildSecCtx(2, []string{"owner_2"}))
 			Expect(err).To(BeZero())
 
@@ -70,19 +70,20 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(workflow1.ID).ToNot(BeZero())
 			Expect(workflow1.Name).To(Equal("test workflow1"))
 			Expect(workflow1.GroupID).To(Equal(types.ID(1)))
+			Expect(workflow1.ThemeColor).To(Equal("blue"))
 			Expect(workflow1.CreateTime).ToNot(BeZero())
 		})
 		It("should query by name and group id", func() {
 			_, err := manager.CreateWorkflow(
-				&flow.WorkflowCreation{Name: "test workflow1", GroupID: types.ID(1), StateMachine: creationDemo.StateMachine},
+				&flow.WorkflowCreation{Name: "test workflow1", GroupID: types.ID(1), ThemeColor: "blue", StateMachine: creationDemo.StateMachine},
 				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 			_, err = manager.CreateWorkflow(
-				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(1), StateMachine: creationDemo.StateMachine},
+				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(1), ThemeColor: "blue", StateMachine: creationDemo.StateMachine},
 				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 			_, err = manager.CreateWorkflow(
-				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(2), StateMachine: creationDemo.StateMachine},
+				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(2), ThemeColor: "blue", StateMachine: creationDemo.StateMachine},
 				testinfra.BuildSecCtx(2, []string{"owner_2"}))
 			Expect(err).To(BeZero())
 
@@ -95,6 +96,7 @@ var _ = Describe("WorkflowManager", func() {
 			workflow1 := (*workflows)[0]
 			Expect(workflow1.ID).ToNot(BeZero())
 			Expect(workflow1.Name).To(Equal("test workflow2"))
+			Expect(workflow1.ThemeColor).To(Equal("blue"))
 			Expect(workflow1.GroupID).To(Equal(types.ID(1)))
 			Expect(workflow1.CreateTime).ToNot(BeZero())
 		})
@@ -129,6 +131,7 @@ var _ = Describe("WorkflowManager", func() {
 			workflow, err := manager.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, []string{"owner_1"}))
 			Expect(err).To(BeNil())
 			Expect(workflow.Name).To(Equal(creationDemo.Name))
+			Expect(workflow.ThemeColor).To(Equal("blue"))
 			Expect(workflow.GroupID).To(Equal(creationDemo.GroupID))
 			Expect(workflow.StateMachine).To(Equal(creationDemo.StateMachine))
 			Expect(workflow.ID).ToNot(BeNil())
@@ -189,7 +192,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to return workflow detail if everything is ok", func() {
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(333), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", GroupID: types.ID(333), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_333"}))
 			Expect(err).To(BeNil())
 
@@ -197,6 +200,7 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(err).To(BeNil())
 			Expect(detail.ID).ToNot(BeNil())
 			Expect(detail.Name).To(Equal("test work"))
+			Expect(detail.ThemeColor).To(Equal("blue"))
 			Expect(detail.GroupID).To(Equal(types.ID(333)))
 			Expect(detail.CreateTime).ToNot(BeNil())
 			Expect(detail.StateMachine.States).To(Equal(domain.GenericWorkflowTemplate.StateMachine.States))

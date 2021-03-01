@@ -34,6 +34,7 @@ type WorkflowManager struct {
 type WorkflowCreation struct {
 	Name         string             `json:"name"     binding:"required"`
 	GroupID      types.ID           `json:"groupId" binding:"required"`
+	ThemeColor   string             `json:"themeColor" binding:"required"`
 	StateMachine state.StateMachine `json:"stateMachine" binding:"required"`
 }
 
@@ -54,6 +55,7 @@ func (m *WorkflowManager) CreateWorkflow(c *WorkflowCreation, sec *security.Cont
 			ID:         common.NextId(m.idWorker),
 			Name:       c.Name,
 			GroupID:    c.GroupID,
+			ThemeColor: c.ThemeColor,
 			CreateTime: time.Now(),
 		},
 		StateMachine: c.StateMachine,

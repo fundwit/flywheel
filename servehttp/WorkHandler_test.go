@@ -42,11 +42,12 @@ var _ = Describe("WorkHandler", func() {
 		Expect(err).To(BeNil())
 		timeString = strings.Trim(string(timeBytes), `"`)
 		demoWorkflow = domain.WorkflowDetail{
-			Workflow:            domain.Workflow{ID: 100, Name: "demo workflow", ThemeColor: "orange", GroupID: 1000, CreateTime: demoTime},
+			Workflow:            domain.Workflow{ID: 100, Name: "demo workflow", ThemeColor: "orange", ThemeIcon: "el-icon-star-on", GroupID: 1000, CreateTime: demoTime},
 			PropertyDefinitions: []domain.PropertyDefinition{{Name: "desc"}},
 			StateMachine:        domain.GenericWorkflowTemplate.StateMachine,
 		}
-		demoWorkflowJson = `{"id": "` + demoWorkflow.ID.String() + `", "name": "` + demoWorkflow.Name + `", "themeColor": "orange", "groupId": "` +
+		demoWorkflowJson = `{"id": "` + demoWorkflow.ID.String() + `", "name": "` + demoWorkflow.Name +
+			`", "themeColor": "orange", "themeIcon": "el-icon-star-on", "groupId": "` +
 			demoWorkflow.GroupID.String() + `", "createTime": "` + timeString + `"}`
 	})
 

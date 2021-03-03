@@ -1,7 +1,6 @@
 package servehttp
 
 import (
-	"errors"
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
@@ -32,7 +31,6 @@ func RegisterWorkflowHandler(r *gin.Engine, flowManager flow.WorkflowManagerTrai
 	g.GET("", handler.handleQueryWorkflows)
 	g.GET(":flowId", handler.handleDetailWorkflows)
 	g.GET(":flowId/transitions", handler.handleQueryTransitions)
-	g.GET(":flowId/states", handler.handleQueryStates)
 }
 
 type workflowHandler struct {
@@ -84,26 +82,6 @@ func (h *workflowHandler) handleDetailWorkflows(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, workflowDetail)
-}
-
-func (h *workflowHandler) handleQueryStates(c *gin.Context) {
-	query := TransitionQuery{}
-	err := c.ShouldBindUri(&query)
-	if err != nil {
-		panic(&common.ErrBadParam{Cause: err})
-	}
-	if query.FlowID <= 0 {
-		panic(&common.ErrBadParam{Cause: errors.New("invalid flowId '" + c.Params.ByName("flowId") + "'")})
-	}
-	workflow, err := h.workflowManager.DetailWorkflow(query.FlowID, security.FindSecurityContext(c))
-	if workflow == nil {
-		c.JSON(http.StatusNotFound, &common.ErrorBody{Code: "common.bad_param",
-			Message: "the flow of id " + strconv.FormatUint(uint64(query.FlowID), 10) + " was not found"})
-		return
-	}
-
-	states := workflow.StateMachine.States
-	c.JSON(http.StatusOK, states)
 }
 
 func (h *workflowHandler) handleQueryTransitions(c *gin.Context) {

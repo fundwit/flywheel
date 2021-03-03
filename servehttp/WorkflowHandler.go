@@ -30,6 +30,8 @@ func RegisterWorkflowHandler(r *gin.Engine, flowManager flow.WorkflowManagerTrai
 	g.POST("", handler.handleCreateWorkflow)
 	g.GET("", handler.handleQueryWorkflows)
 	g.GET(":flowId", handler.handleDetailWorkflows)
+	g.DELETE(":flowId", handler.handleDeleteWorkflow)
+
 	g.GET(":flowId/transitions", handler.handleQueryTransitions)
 }
 
@@ -82,6 +84,22 @@ func (h *workflowHandler) handleDetailWorkflows(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, workflowDetail)
+}
+
+func (h *workflowHandler) handleDeleteWorkflow(c *gin.Context) {
+	id, err := types.ParseID(c.Param("flowId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
+		return
+	}
+
+	err = h.workflowManager.DeleteWorkflow(id, security.FindSecurityContext(c))
+	if err != nil {
+		_ = c.Error(err)
+		c.Abort()
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func (h *workflowHandler) handleQueryTransitions(c *gin.Context) {

@@ -1,17 +1,14 @@
 package flow
 
 import (
-	"errors"
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/state"
 	"flywheel/persistence"
 	"flywheel/security"
-	"fmt"
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
-	"strconv"
 	"time"
 )
 
@@ -19,11 +16,8 @@ type WorkflowManagerTraits interface {
 	QueryWorkflows(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error)
 	CreateWorkflow(c *WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error)
 	DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error)
-
+	DeleteWorkflow(ID types.ID, sec *security.Context) error
 	// update
-	// delete
-
-	CreateWorkStateTransition(*domain.WorkStateTransitionBrief, *security.Context) (*domain.WorkStateTransition, error)
 }
 
 type WorkflowManager struct {
@@ -98,7 +92,7 @@ func (m *WorkflowManager) DetailWorkflow(id types.ID, sec *security.Context) (*d
 	workflowDetail := domain.WorkflowDetail{}
 	db := m.dataSource.GormDB()
 	err := db.Transaction(func(tx *gorm.DB) error {
-		if err := db.Where(&domain.Workflow{ID: id}).First(&(workflowDetail.Workflow)).Error; err != nil {
+		if err := tx.Where(&domain.Workflow{ID: id}).First(&(workflowDetail.Workflow)).Error; err != nil {
 			return err
 		}
 		if !sec.HasRoleSuffix("_" + workflowDetail.GroupID.String()) {
@@ -106,11 +100,11 @@ func (m *WorkflowManager) DetailWorkflow(id types.ID, sec *security.Context) (*d
 		}
 
 		var stateRecords []domain.WorkflowState
-		if err := db.Where(domain.WorkflowState{WorkflowID: workflowDetail.ID}).Order("`order` ASC").Find(&stateRecords).Error; err != nil {
+		if err := tx.Where(domain.WorkflowState{WorkflowID: workflowDetail.ID}).Order("`order` ASC").Find(&stateRecords).Error; err != nil {
 			return err
 		}
 		var transitionRecords []domain.WorkflowStateTransition
-		if err := db.Where(domain.WorkflowStateTransition{WorkflowID: workflowDetail.ID}).Find(&transitionRecords).Error; err != nil {
+		if err := tx.Where(domain.WorkflowStateTransition{WorkflowID: workflowDetail.ID}).Find(&transitionRecords).Error; err != nil {
 			return err
 		}
 		stateMachine := state.StateMachine{}
@@ -157,90 +151,64 @@ func (m *WorkflowManager) QueryWorkflows(query *domain.WorkflowQuery, sec *secur
 	return &workflows, nil
 }
 
-func (m *WorkflowManager) CreateWorkStateTransition(c *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error) {
-	flow, err := m.DetailWorkflow(c.FlowID, sec)
-	if err != nil {
-		return nil, err
-	}
-	// check whether the transition is acceptable
-	availableTransitions := flow.StateMachine.AvailableTransitions(c.FromState, c.ToState)
-	if len(availableTransitions) != 1 {
-		return nil, errors.New("transition from " + c.FromState + " to " + c.ToState + " is not invalid")
-	}
-
-	now := time.Now()
-	newId := common.NextId(m.idWorker)
-	transition := &domain.WorkStateTransition{ID: newId, CreateTime: now, Creator: sec.Identity.ID, WorkStateTransitionBrief: *c}
-
-	fromState, found := flow.FindState(c.FromState)
-	if !found {
-		return nil, errors.New("invalid state " + fromState.Name)
-	}
-	toState, found := flow.FindState(c.ToState)
-	if !found {
-		return nil, errors.New("invalid state " + toState.Name)
-	}
-
+func (m *WorkflowManager) DeleteWorkflow(id types.ID, sec *security.Context) error {
+	wf := domain.Workflow{}
 	db := m.dataSource.GormDB()
-	err = db.Transaction(func(tx *gorm.DB) error {
-		// check perms
-		work := domain.Work{ID: c.WorkID}
-		if err := tx.Where(&work).First(&work).Error; err != nil {
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where(&domain.Workflow{ID: id}).First(&wf).Error; err != nil {
 			return err
 		}
-		if !sec.HasRole(fmt.Sprintf("%s_%d", domain.RoleOwner, work.GroupID)) {
+		if !sec.HasRoleSuffix("owner_" + wf.GroupID.String()) {
 			return common.ErrForbidden
 		}
 
-		query := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID, StateName: c.FromState}).
-			Update(&domain.Work{StateName: c.ToState, StateCategory: toState.Category, StateBeginTime: &now})
-		if err := query.Error; err != nil {
-			return err
-		}
-		if query.RowsAffected != 1 {
-			return errors.New("expected affected row is 1, but actual is " + strconv.FormatInt(query.RowsAffected, 10))
-		}
-
-		// update beginProcessTime and endProcessTime
-		if work.ProcessBeginTime == nil && toState.Category != state.InBacklog {
-			if err := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID}).Update("process_begin_time", &now).Error; err != nil {
-				return err
-			}
-		}
-		if work.ProcessEndTime == nil && toState.Category == state.Done {
-			if err := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID}).Update("process_end_time", &now).Error; err != nil {
-				return err
-			}
-		} else if work.ProcessEndTime != nil && toState.Category != state.Done {
-			if err := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID}).Update("process_end_time", nil).Error; err != nil {
-				return err
-			}
-		}
-
-		// create transition transition
-		if err := tx.Create(transition).Error; err != nil {
+		if err := isWorkflowReferenced(tx, wf.ID); err != nil {
 			return err
 		}
 
-		// update process step
-		if fromState.Category != state.Done {
-			if err := tx.Model(&domain.WorkProcessStep{}).Where(&domain.WorkProcessStep{WorkID: c.WorkID, FlowID: flow.ID, StateName: fromState.Name}).
-				Where("end_time is null").Update(&domain.WorkProcessStep{EndTime: &now}).Error; err != nil {
-				return err
-			}
+		if err := tx.Model(&domain.Workflow{}).Delete(&domain.Workflow{ID: id}).Error; err != nil {
+			return err
 		}
-		if toState.Category != state.Done {
-			nextProcessStep := domain.WorkProcessStep{WorkID: work.ID, FlowID: work.FlowID,
-				StateName: toState.Name, StateCategory: toState.Category, BeginTime: now}
-			if err := tx.Create(nextProcessStep).Error; err != nil {
-				return err
-			}
+		if err := tx.Model(&domain.WorkflowState{}).Where("workflow_id = ?", wf.ID).
+			Delete(&domain.WorkflowState{}).Error; err != nil {
+			return err
 		}
-
+		if err := tx.Model(&domain.WorkflowStateTransition{}).Where("workflow_id = ?", wf.ID).
+			Delete(&domain.WorkflowStateTransition{}).Error; err != nil {
+			return err
+		}
 		return nil
 	})
-	if err != nil {
-		return nil, err
+	return err
+}
+
+func isWorkflowReferenced(db *gorm.DB, workflowID types.ID) error {
+	var work domain.Work
+	err := db.Model(&domain.Work{}).Where(&domain.Work{FlowID: workflowID}).First(&work).Error
+	if err == nil {
+		return common.ErrWorkflowIsReferenced
 	}
-	return transition, nil
+	if err != gorm.ErrRecordNotFound {
+		return err
+	}
+
+	var workProcessStep domain.WorkProcessStep
+	err = db.Model(&domain.WorkProcessStep{}).Where(&domain.WorkProcessStep{FlowID: workflowID}).First(&workProcessStep).Error
+	if err == nil {
+		return common.ErrWorkflowIsReferenced
+	}
+	if err != gorm.ErrRecordNotFound {
+		return err
+	}
+
+	var workStateTransition domain.WorkStateTransition
+	err = db.Model(&domain.WorkStateTransition{}).Where(&domain.WorkStateTransition{WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FlowID: workflowID}}).
+		First(&workStateTransition).Error
+	if err == nil {
+		return common.ErrWorkflowIsReferenced
+	}
+	if err != gorm.ErrRecordNotFound {
+		return err
+	}
+	return nil
 }

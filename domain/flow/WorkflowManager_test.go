@@ -212,5 +212,161 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(state.SortTransitions(detail.StateMachine.Transitions)).To(
 				Equal(state.SortTransitions(domain.GenericWorkflowTemplate.StateMachine.Transitions)))
 		})
+
+		It("should be able to catch database error", func() {
+			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, sec)
+			Expect(err).To(BeNil())
+
+			testDatabase.DS.GormDB().DropTable(&domain.WorkflowStateTransition{})
+			detail, err := manager.DetailWorkflow(workflow.ID, sec)
+			Expect(detail).To(BeNil())
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflow_state_transitions' doesn't exist"))
+
+			testDatabase.DS.GormDB().DropTable(&domain.WorkflowState{})
+			detail, err = manager.DetailWorkflow(workflow.ID, sec)
+			Expect(detail).To(BeNil())
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflow_states' doesn't exist"))
+
+			testDatabase.DS.GormDB().DropTable(&domain.Workflow{})
+			detail, err = manager.DetailWorkflow(workflow.ID, sec)
+			Expect(detail).To(BeNil())
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflows' doesn't exist"))
+		})
+	})
+
+	Describe("DeleteWorkflow", func() {
+		It("should return 404 when workflow not exist", func() {
+			err := manager.DeleteWorkflow(404, testinfra.BuildSecCtx(123, []string{}))
+			Expect(err).To(Equal(gorm.ErrRecordNotFound))
+		})
+
+		It("should forbid to delete workflow without correct permissions", func() {
+			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+
+			// case 1: without any permission
+			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{}))
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("forbidden"))
+
+			// case 1: with other permission
+			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{"owner_2", "reader_1"}))
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("forbidden"))
+		})
+
+		It("should forbid to delete workflow if it still be referenced by work", func() {
+			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+
+			testDatabase.DS.GormDB().Save(&domain.Work{ID: 1, Name: "test", GroupID: 100, CreateTime: time.Now(), FlowID: workflow.ID,
+				OrderInState: 1, StateName: "PENDING", StateCategory: 0, State: domain.StatePending,
+				StateBeginTime: nil, ProcessBeginTime: nil, ProcessEndTime: nil})
+
+			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{"owner_1"}))
+			Expect(err).To(Equal(common.ErrWorkflowIsReferenced))
+		})
+		It("should forbid to delete workflow if it still be referenced by workProcessStep", func() {
+			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+
+			testDatabase.DS.GormDB().Save(&domain.WorkProcessStep{WorkID: 1, FlowID: workflow.ID, StateName: "PENDING", StateCategory: 0, BeginTime: time.Now()})
+
+			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{"owner_1"}))
+			Expect(err).To(Equal(common.ErrWorkflowIsReferenced))
+		})
+		It("should forbid to delete workflow if it still be referenced by workStateTransition", func() {
+			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+
+			testDatabase.DS.GormDB().Save(&domain.WorkStateTransition{
+				ID: 1, CreateTime: time.Now(), Creator: 1,
+				WorkStateTransitionBrief: domain.WorkStateTransitionBrief{
+					FlowID: workflow.ID, WorkID: 1, FromState: "PENDING", ToState: "DOING"},
+			})
+
+			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{"owner_1"}))
+			Expect(err).To(Equal(common.ErrWorkflowIsReferenced))
+		})
+
+		It("should be able to delete workflow if everything is ok", func() {
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_333"}))
+			Expect(err).To(BeNil())
+
+			flowCount := 0
+			Expect(testDatabase.DS.GormDB().Model(&domain.Workflow{}).Where(&domain.Workflow{ID: workflow.ID}).Count(&flowCount).Error).To(BeNil())
+			Expect(flowCount).To(Equal(1))
+
+			flowStateCount := 0
+			Expect(testDatabase.DS.GormDB().Model(&domain.WorkflowState{}).Where(&domain.WorkflowState{WorkflowID: workflow.ID}).Count(&flowStateCount).Error).To(BeNil())
+			Expect(flowStateCount).To(Equal(3))
+
+			flowStateTransitionCount := 0
+			Expect(testDatabase.DS.GormDB().Model(&domain.WorkflowStateTransition{}).
+				Where(&domain.WorkflowStateTransition{WorkflowID: workflow.ID}).Count(&flowStateTransitionCount).Error).To(BeNil())
+			Expect(flowStateTransitionCount).To(Equal(5))
+
+			// do delete
+			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(123, []string{"owner_333"}))
+			Expect(err).To(BeNil())
+
+			// validate: record have be deleted
+			flowCount = 1
+			Expect(testDatabase.DS.GormDB().Model(&domain.Workflow{}).Where(&domain.Workflow{ID: workflow.ID}).Count(&flowCount).Error).To(BeNil())
+			Expect(flowCount).To(Equal(0))
+
+			flowStateCount = 1
+			Expect(testDatabase.DS.GormDB().Model(&domain.WorkflowState{}).Where(&domain.WorkflowState{WorkflowID: workflow.ID}).Count(&flowStateCount).Error).To(BeNil())
+			Expect(flowStateCount).To(Equal(0))
+
+			flowStateTransitionCount = 1
+			Expect(testDatabase.DS.GormDB().Model(&domain.WorkflowStateTransition{}).
+				Where(&domain.WorkflowStateTransition{WorkflowID: workflow.ID}).Count(&flowStateTransitionCount).Error).To(BeNil())
+			Expect(flowStateTransitionCount).To(Equal(0))
+		})
+
+		It("should be able to catch database error", func() {
+			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, sec)
+			Expect(err).To(BeNil())
+
+			testDatabase.DS.GormDB().DropTable(&domain.WorkflowStateTransition{})
+			Expect(manager.DeleteWorkflow(workflow.ID, sec).Error()).
+				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflow_state_transitions' doesn't exist"))
+
+			testDatabase.DS.GormDB().DropTable(&domain.WorkflowState{})
+			Expect(manager.DeleteWorkflow(workflow.ID, sec).Error()).
+				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflow_states' doesn't exist"))
+
+			testDatabase.DS.GormDB().DropTable(&domain.WorkStateTransition{})
+			Expect(manager.DeleteWorkflow(workflow.ID, sec).Error()).
+				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".work_state_transitions' doesn't exist"))
+
+			testDatabase.DS.GormDB().DropTable(&domain.WorkProcessStep{})
+			Expect(manager.DeleteWorkflow(workflow.ID, sec).Error()).
+				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".work_process_steps' doesn't exist"))
+
+			testDatabase.DS.GormDB().DropTable(&domain.Work{})
+			Expect(manager.DeleteWorkflow(workflow.ID, sec).Error()).
+				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
+
+			testDatabase.DS.GormDB().DropTable(&domain.Workflow{})
+			Expect(manager.DeleteWorkflow(workflow.ID, sec).Error()).
+				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflows' doesn't exist"))
+		})
 	})
 })

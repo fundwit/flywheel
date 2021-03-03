@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"flywheel/domain"
-	"flywheel/domain/flow"
 	"flywheel/security"
 	"flywheel/servehttp"
 	"flywheel/testinfra"
@@ -20,15 +19,15 @@ import (
 
 var _ = Describe("WorkStateTransitionHandler", func() {
 	var (
-		router          *gin.Engine
-		workflowManager *workflowManagerMock
+		router             *gin.Engine
+		workProcessManager *workProcessManagerMock
 	)
 
 	BeforeEach(func() {
 		router = gin.Default()
 		router.Use(servehttp.ErrorHandling())
-		workflowManager = &workflowManagerMock{}
-		servehttp.RegisterWorkStateTransitionHandler(router, workflowManager)
+		workProcessManager = &workProcessManagerMock{}
+		servehttp.RegisterWorkStateTransitionHandler(router, workProcessManager)
 	})
 
 	Describe("handleCreate", func() {
@@ -45,7 +44,7 @@ var _ = Describe("WorkStateTransitionHandler", func() {
 			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"Key: 'WorkStateTransitionBrief.FlowID' Error:Field validation for 'FlowID' failed on the 'required' tag\nKey: 'WorkStateTransitionBrief.WorkID' Error:Field validation for 'WorkID' failed on the 'required' tag\nKey: 'WorkStateTransitionBrief.FromState' Error:Field validation for 'FromState' failed on the 'required' tag\nKey: 'WorkStateTransitionBrief.ToState' Error:Field validation for 'ToState' failed on the 'required' tag","data":null}`))
 		})
 		It("should be able to handle service error", func() {
-			workflowManager.CreateWorkStateTransitionFunc =
+			workProcessManager.CreateWorkStateTransitionFunc =
 				func(c *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error) {
 					return nil, errors.New("a mocked error")
 				}
@@ -61,7 +60,7 @@ var _ = Describe("WorkStateTransitionHandler", func() {
 			timeBytes, err := t.MarshalJSON()
 			timeString := strings.Trim(string(timeBytes), `"`)
 			Expect(err).To(BeNil())
-			workflowManager.CreateWorkStateTransitionFunc =
+			workProcessManager.CreateWorkStateTransitionFunc =
 				func(c *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error) {
 					return &domain.WorkStateTransition{ID: 123, Creator: types.ID(123), CreateTime: t, WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FlowID: 1, WorkID: 100, FromState: "PENDING", ToState: "DOING"}}, nil
 				}
@@ -75,24 +74,3 @@ var _ = Describe("WorkStateTransitionHandler", func() {
 		})
 	})
 })
-
-type workflowManagerMock struct {
-	CreateWorkStateTransitionFunc func(t *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error)
-	QueryWorkflowsFunc            func(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error)
-	CreateWorkflowFunc            func(c *flow.WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error)
-	DetailWorkflowFunc            func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error)
-}
-
-func (m *workflowManagerMock) CreateWorkStateTransition(
-	c *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error) {
-	return m.CreateWorkStateTransitionFunc(c, sec)
-}
-func (m *workflowManagerMock) QueryWorkflows(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error) {
-	return m.QueryWorkflowsFunc(query, sec)
-}
-func (m *workflowManagerMock) DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
-	return m.DetailWorkflowFunc(ID, sec)
-}
-func (m *workflowManagerMock) CreateWorkflow(c *flow.WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error) {
-	return m.CreateWorkflowFunc(c, sec)
-}

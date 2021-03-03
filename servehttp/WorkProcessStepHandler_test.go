@@ -79,10 +79,15 @@ var _ = Describe("WorkProcessStepHandler", func() {
 })
 
 type workProcessManagerMock struct {
-	QueryProcessStepsFunc func(query *domain.WorkProcessStepQuery, sec *security.Context) (*[]domain.WorkProcessStep, error)
+	QueryProcessStepsFunc         func(query *domain.WorkProcessStepQuery, sec *security.Context) (*[]domain.WorkProcessStep, error)
+	CreateWorkStateTransitionFunc func(t *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error)
 }
 
 func (m *workProcessManagerMock) QueryProcessSteps(
 	query *domain.WorkProcessStepQuery, sec *security.Context) (*[]domain.WorkProcessStep, error) {
 	return m.QueryProcessStepsFunc(query, sec)
+}
+func (m *workProcessManagerMock) CreateWorkStateTransition(
+	c *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error) {
+	return m.CreateWorkStateTransitionFunc(c, sec)
 }

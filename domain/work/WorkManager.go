@@ -114,6 +114,7 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 	db := m.dataSource.GormDB()
 	var workDetail *domain.WorkDetail
 	err := db.Transaction(func(tx *gorm.DB) error {
+		// TODO transition issues
 		workflowDetail, err := m.workflowManager.DetailWorkflow(c.FlowID, sec)
 		if err != nil {
 			return err
@@ -155,7 +156,7 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *secur
 		if err := tx.Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
 			return err
 		}
-
+		// TODO transition issues
 		workflowDetail, err := m.workflowManager.DetailWorkflow(work.FlowID, sec)
 		if err != nil {
 			return err
@@ -182,6 +183,7 @@ func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.StageRangeOr
 
 	return m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
 		for _, orderUpdating := range *wantedOrders {
+			// TODO transition issues
 			if err := m.checkPerms(orderUpdating.ID, sec); err != nil {
 				return err
 			}

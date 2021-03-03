@@ -186,6 +186,35 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 	})
 
+	Describe("handleDeleteWorkflow", func() {
+		It("should return 204 when workflow delete successfully", func() {
+			workflowManager.DeleteWorkflowFunc = func(ID types.ID, sec *security.Context) error {
+				return nil
+			}
+			req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/1", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusNoContent))
+			Expect(body).To(BeEmpty())
+		})
+
+		It("should return 400 when id is invalid", func() {
+			req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/abc", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid id 'abc'","data":null}`))
+		})
+
+		It("should be able to handle error when delete workflow", func() {
+			workflowManager.DeleteWorkflowFunc = func(ID types.ID, sec *security.Context) error {
+				return errors.New("a mocked error")
+			}
+			req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/1", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusInternalServerError))
+			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
+		})
+	})
+
 	Describe("handleQueryTransitions", func() {
 		It("should be able to query transitions with query: fromState", func() {
 			workflowManager.DetailWorkflowFunc = func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
@@ -272,4 +301,25 @@ func buildDemoWorkflowCreation() *flow.WorkflowCreation {
 			{Name: "reopen", From: state.State{Name: "CLOSED", Category: state.Done}, To: state.State{Name: "OPEN", Category: state.InProcess}},
 		},
 	}}
+}
+
+type workflowManagerMock struct {
+	CreateWorkStateTransitionFunc func(t *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error)
+	QueryWorkflowsFunc            func(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error)
+	CreateWorkflowFunc            func(c *flow.WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error)
+	DetailWorkflowFunc            func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error)
+	DeleteWorkflowFunc            func(ID types.ID, sec *security.Context) error
+}
+
+func (m *workflowManagerMock) QueryWorkflows(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error) {
+	return m.QueryWorkflowsFunc(query, sec)
+}
+func (m *workflowManagerMock) DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
+	return m.DetailWorkflowFunc(ID, sec)
+}
+func (m *workflowManagerMock) CreateWorkflow(c *flow.WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error) {
+	return m.CreateWorkflowFunc(c, sec)
+}
+func (m *workflowManagerMock) DeleteWorkflow(ID types.ID, sec *security.Context) error {
+	return m.DeleteWorkflowFunc(ID, sec)
 }

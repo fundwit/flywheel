@@ -28,8 +28,8 @@ var _ = Describe("WorkProcessManager", func() {
 		if err != nil {
 			log.Fatalf("database migration failed %v\n", err)
 		}
-		workProcessManager = work.NewWorkProcessManager(testDatabase.DS)
 		workflowManager := flow.NewWorkflowManager(testDatabase.DS)
+		workProcessManager = work.NewWorkProcessManager(testDatabase.DS, workflowManager)
 		creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 		workflowDetail, err = workflowManager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
 		Expect(err).To(BeNil())
@@ -87,7 +87,8 @@ var _ = Describe("WorkProcessManager", func() {
 
 			// do transition
 			workFlowManager := flow.NewWorkflowManager(testDatabase.DS)
-			_, err = workFlowManager.CreateWorkStateTransition(
+			workProcessManager := work.NewWorkProcessManager(testDatabase.DS, workFlowManager)
+			_, err = workProcessManager.CreateWorkStateTransition(
 				&domain.WorkStateTransitionBrief{FlowID: workflowDetail.ID, WorkID: work1.ID, FromState: work1.StateName, ToState: domain.StateDoing.Name}, secCtx)
 			Expect(err).To(BeNil())
 
@@ -115,7 +116,7 @@ var _ = Describe("WorkProcessManager", func() {
 			Expect(step2.BeginTime.Unix()).To(Equal(step1.EndTime.Unix()))
 			Expect(step2.EndTime).To(BeNil())
 
-			_, err = workFlowManager.CreateWorkStateTransition(
+			_, err = workProcessManager.CreateWorkStateTransition(
 				&domain.WorkStateTransitionBrief{FlowID: workflowDetail.ID, WorkID: work1.ID, FromState: domain.StateDoing.Name, ToState: domain.StateDone.Name}, secCtx)
 			Expect(err).To(BeNil())
 			results, err = workProcessManager.QueryProcessSteps(&domain.WorkProcessStepQuery{WorkID: work1.ID}, secCtx)

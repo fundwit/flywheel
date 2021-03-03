@@ -55,10 +55,13 @@ func main() {
 	engine.GET("/me", securityMiddle, security.UserInfoQueryHandler)
 
 	workflowManager := flow.NewWorkflowManager(ds)
+	workProcessManager := work.NewWorkProcessManager(ds, workflowManager)
 	servehttp.RegisterWorkflowHandler(engine, workflowManager, securityMiddle)
+
 	servehttp.RegisterWorkHandler(engine, work.NewWorkManager(ds, workflowManager), securityMiddle)
-	servehttp.RegisterWorkStateTransitionHandler(engine, flow.NewWorkflowManager(ds), securityMiddle)
-	servehttp.RegisterWorkProcessStepHandler(engine, work.NewWorkProcessManager(ds), securityMiddle)
+
+	servehttp.RegisterWorkStateTransitionHandler(engine, workProcessManager, securityMiddle)
+	servehttp.RegisterWorkProcessStepHandler(engine, workProcessManager, securityMiddle)
 
 	err = engine.Run(":80")
 	if err != nil {

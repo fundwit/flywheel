@@ -186,6 +186,80 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 	})
 
+	Describe("handleUpdateWorkflowsBase", func() {
+		It("should return 400 when id is invalid", func() {
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/abc", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid id 'abc'","data":null}`))
+		})
+
+		It("should return 400 when failed to bind", func() {
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1", bytes.NewReader([]byte(`bbb`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid character 'b' looking for beginning of value","data":null}`))
+		})
+
+		It("should return 400 when failed to validate", func() {
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1", bytes.NewReader([]byte(`{}`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{
+			  "code": "common.bad_param",
+			  "message": "Key: 'WorkflowBaseUpdation.Name' Error:Field validation for 'Name' failed on the 'required' tag\n` +
+				`Key: 'WorkflowBaseUpdation.ThemeColor' Error:Field validation for 'ThemeColor' failed on the 'required' tag\n` +
+				`Key: 'WorkflowBaseUpdation.ThemeIcon' Error:Field validation for 'ThemeIcon' failed on the 'required' tag",
+			  "data": null
+			}`))
+		})
+
+		It("should return 404 when workflow is not exist", func() {
+			workflowManager.UpdateWorkflowBaseFunc = func(ID types.ID, updating *flow.WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error) {
+				return nil, domain.ErrNotFound
+			}
+
+			reqBody, err := json.Marshal(&flow.WorkflowBaseUpdation{Name: "updated works", ThemeColor: "yellow", ThemeIcon: "arrow"})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusNotFound))
+			Expect(body).To(MatchJSON(`{"code":"common.record_not_found","message":"record not found","data":null}`))
+		})
+
+		It("should be able to handle error when detail workflows", func() {
+			workflowManager.UpdateWorkflowBaseFunc = func(ID types.ID, updating *flow.WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error) {
+				return nil, errors.New("a mocked error")
+			}
+
+			reqBody, err := json.Marshal(&flow.WorkflowBaseUpdation{Name: "updated works", ThemeColor: "yellow", ThemeIcon: "arrow"})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusInternalServerError))
+			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
+		})
+
+		It("should update workflow base info successfully when everything is ok", func() {
+			t := time.Date(2020, 1, 1, 1, 0, 0, 0, time.Now().Location())
+			timeBytes, err := t.MarshalJSON()
+			Expect(err).To(BeNil())
+			timeString := strings.Trim(string(timeBytes), `"`)
+			workflowManager.UpdateWorkflowBaseFunc = func(ID types.ID, updating *flow.WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error) {
+				return &domain.Workflow{ID: types.ID(10), Name: updating.Name, ThemeColor: updating.ThemeColor, ThemeIcon: updating.ThemeIcon,
+					GroupID: types.ID(100), CreateTime: t}, nil
+			}
+
+			reqBody, err := json.Marshal(&flow.WorkflowBaseUpdation{Name: "updated works", ThemeColor: "yellow", ThemeIcon: "arrow"})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusOK))
+			Expect(body).To(MatchJSON(`{"id": "10", "name": "updated works", "themeColor": "yellow", "themeIcon": "arrow",` +
+				`"groupId": "100", "createTime": "` + timeString + `"}`))
+		})
+	})
+
 	Describe("handleDeleteWorkflow", func() {
 		It("should return 204 when workflow delete successfully", func() {
 			workflowManager.DeleteWorkflowFunc = func(ID types.ID, sec *security.Context) error {
@@ -308,6 +382,7 @@ type workflowManagerMock struct {
 	QueryWorkflowsFunc            func(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error)
 	CreateWorkflowFunc            func(c *flow.WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error)
 	DetailWorkflowFunc            func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error)
+	UpdateWorkflowBaseFunc        func(ID types.ID, c *flow.WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error)
 	DeleteWorkflowFunc            func(ID types.ID, sec *security.Context) error
 }
 
@@ -319,6 +394,9 @@ func (m *workflowManagerMock) DetailWorkflow(ID types.ID, sec *security.Context)
 }
 func (m *workflowManagerMock) CreateWorkflow(c *flow.WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error) {
 	return m.CreateWorkflowFunc(c, sec)
+}
+func (m *workflowManagerMock) UpdateWorkflowBase(ID types.ID, c *flow.WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error) {
+	return m.UpdateWorkflowBaseFunc(ID, c, sec)
 }
 func (m *workflowManagerMock) DeleteWorkflow(ID types.ID, sec *security.Context) error {
 	return m.DeleteWorkflowFunc(ID, sec)

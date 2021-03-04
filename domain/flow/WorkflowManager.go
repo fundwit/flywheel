@@ -16,8 +16,9 @@ type WorkflowManagerTraits interface {
 	QueryWorkflows(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error)
 	CreateWorkflow(c *WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error)
 	DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error)
+	UpdateWorkflowBase(ID types.ID, c *WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error)
 	DeleteWorkflow(ID types.ID, sec *security.Context) error
-	// update
+	// updateStateMachine
 }
 
 type WorkflowManager struct {
@@ -32,6 +33,12 @@ type WorkflowCreation struct {
 	ThemeIcon  string   `json:"themeIcon"  binding:"required"`
 
 	StateMachine state.StateMachine `json:"stateMachine" binding:"required"`
+}
+
+type WorkflowBaseUpdation struct {
+	Name       string `json:"name"     binding:"required"`
+	ThemeColor string `json:"themeColor" binding:"required"`
+	ThemeIcon  string `json:"themeIcon"  binding:"required"`
 }
 
 func NewWorkflowManager(ds *persistence.DataSourceManager) *WorkflowManager {
@@ -53,7 +60,7 @@ func (m *WorkflowManager) CreateWorkflow(c *WorkflowCreation, sec *security.Cont
 			GroupID:    c.GroupID,
 			ThemeColor: c.ThemeColor,
 			ThemeIcon:  c.ThemeIcon,
-			CreateTime: time.Now(),
+			CreateTime: time.Now().Round(time.Millisecond),
 		},
 		StateMachine: c.StateMachine,
 	}
@@ -149,6 +156,32 @@ func (m *WorkflowManager) QueryWorkflows(query *domain.WorkflowQuery, sec *secur
 	}
 
 	return &workflows, nil
+}
+
+func (m *WorkflowManager) UpdateWorkflowBase(id types.ID, c *WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error) {
+	wf := domain.Workflow{}
+	db := m.dataSource.GormDB()
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where(&domain.Workflow{ID: id}).First(&wf).Error; err != nil {
+			return err
+		}
+		if !sec.HasRoleSuffix("owner_" + wf.GroupID.String()) {
+			return common.ErrForbidden
+		}
+		if err := tx.Model(&domain.Workflow{}).Where(&domain.Workflow{ID: id}).
+			Update(&domain.Workflow{Name: c.Name, ThemeIcon: c.ThemeIcon, ThemeColor: c.ThemeColor}).Error; err != nil {
+			return err
+		}
+		// query again
+		if err := tx.Where(&domain.Workflow{ID: id}).First(&wf).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &wf, nil
 }
 
 func (m *WorkflowManager) DeleteWorkflow(id types.ID, sec *security.Context) error {

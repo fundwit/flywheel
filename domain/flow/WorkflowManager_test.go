@@ -240,6 +240,85 @@ var _ = Describe("WorkflowManager", func() {
 		})
 	})
 
+	Describe("UpdateWorkflowBase", func() {
+		It("should return 404 when workflow not exist", func() {
+			wf, err := manager.UpdateWorkflowBase(404, &flow.WorkflowBaseUpdation{}, testinfra.BuildSecCtx(123, []string{}))
+			Expect(err).To(Equal(gorm.ErrRecordNotFound))
+			Expect(wf).To(BeNil())
+		})
+
+		It("should forbid to update workflow basic info without correct permissions", func() {
+			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+
+			// case 1: without any permission
+			wf, err := manager.UpdateWorkflowBase(workflow.ID, &flow.WorkflowBaseUpdation{}, testinfra.BuildSecCtx(200, []string{}))
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("forbidden"))
+			Expect(wf).To(BeNil())
+
+			// case 1: with other permission
+			wf, err = manager.UpdateWorkflowBase(workflow.ID, &flow.WorkflowBaseUpdation{}, testinfra.BuildSecCtx(200, []string{"owner_2", "reader_1"}))
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("forbidden"))
+			Expect(wf).To(BeNil())
+		})
+
+		It("should be able to update workflow if everything is ok", func() {
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_333"}))
+			Expect(err).To(BeNil())
+
+			creationCG := &flow.WorkflowCreation{Name: "test work CG", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflowCG, err := manager.CreateWorkflow(creationCG, testinfra.BuildSecCtx(100, []string{"owner_333"}))
+			Expect(err).To(BeNil())
+
+			wf, err := manager.UpdateWorkflowBase(workflow.ID, &flow.WorkflowBaseUpdation{Name: "updated work", ThemeColor: "red", ThemeIcon: "bar"},
+				testinfra.BuildSecCtx(200, []string{"owner_333"}))
+			Expect(err).To(BeNil())
+			Expect(wf).ToNot(BeNil())
+			Expect(wf.Name).To(Equal("updated work"))
+			Expect(wf.ThemeColor).To(Equal("red"))
+			Expect(wf.ThemeIcon).To(Equal("bar"))
+			Expect(wf.CreateTime).To(Equal(workflow.CreateTime))
+			Expect(wf.GroupID).To(Equal(workflow.GroupID))
+			Expect(wf.ID).To(Equal(workflow.ID))
+
+			var workflowInDB domain.Workflow
+			Expect(testDatabase.DS.GormDB().Where(&domain.Workflow{ID: workflow.ID}).First(&workflowInDB).Error).To(BeNil())
+			Expect(workflowInDB.Name).To(Equal("updated work"))
+			Expect(workflowInDB.ThemeColor).To(Equal("red"))
+			Expect(workflowInDB.ThemeIcon).To(Equal("bar"))
+			Expect(workflowInDB.CreateTime).To(Equal(workflow.CreateTime))
+			Expect(workflowInDB.GroupID).To(Equal(workflow.GroupID))
+			Expect(workflowInDB.ID).To(Equal(workflow.ID))
+
+			var workflowInDBCG domain.Workflow
+			Expect(testDatabase.DS.GormDB().Where(&domain.Workflow{ID: workflowCG.ID}).First(&workflowInDBCG).Error).To(BeNil())
+			Expect(workflowInDBCG.Name).To(Equal("test work CG"))
+			Expect(workflowInDBCG.ThemeColor).To(Equal("blue"))
+			Expect(workflowInDBCG.ThemeIcon).To(Equal("foo"))
+			Expect(workflowInDBCG.CreateTime).To(Equal(workflowCG.CreateTime))
+			Expect(workflowInDBCG.GroupID).To(Equal(workflowCG.GroupID))
+			Expect(workflowInDBCG.ID).To(Equal(workflowCG.ID))
+		})
+
+		It("should be able to catch database error", func() {
+			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, sec)
+			Expect(err).To(BeNil())
+
+			testDatabase.DS.GormDB().DropTable(&domain.Workflow{})
+			Expect(manager.DeleteWorkflow(workflow.ID, sec).Error()).
+				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflows' doesn't exist"))
+		})
+	})
+
 	Describe("DeleteWorkflow", func() {
 		It("should return 404 when workflow not exist", func() {
 			err := manager.DeleteWorkflow(404, testinfra.BuildSecCtx(123, []string{}))

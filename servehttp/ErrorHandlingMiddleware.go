@@ -3,9 +3,12 @@ package servehttp
 import (
 	"errors"
 	"flywheel/common"
+	"flywheel/domain"
 	"flywheel/i18n"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/jinzhu/gorm"
+	"net/http"
 	"runtime/debug"
 )
 
@@ -43,6 +46,18 @@ func handleError(err error, c *gin.Context) {
 	if bizErr, ok := genericErr.(common.BizError); ok {
 		respond := bizErr.Respond()
 		c.JSON(respond.Status, &common.ErrorBody{Code: respond.Code, Message: respond.Message, Data: respond.Data})
+		c.Abort()
+		return
+	}
+
+	if errors.Is(genericErr, common.ErrForbidden) {
+		c.JSON(http.StatusForbidden, &common.ErrorBody{Code: "security.forbidden", Message: "access forbidden"})
+		c.Abort()
+		return
+	}
+	if errors.Is(genericErr, gorm.ErrRecordNotFound) || errors.Is(genericErr, domain.ErrNotFound) {
+		c.JSON(http.StatusNotFound, &common.ErrorBody{Code: "common.record_not_found", Message: "record not found"})
+		c.Abort()
 		return
 	}
 

@@ -8,6 +8,7 @@ import (
 	"flywheel/testinfra"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/jinzhu/gorm"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"net/http"
@@ -89,6 +90,27 @@ var _ = Describe("ErrorHandlingMiddleware", func() {
 			status, body, _ := testinfra.ExecuteRequest(req, r)
 			Expect(status).To(Equal(http.StatusInternalServerError))
 			Expect(body).To(MatchJSON(`{"code":"` + i18n.CommonInternalServerError + `", "message":"error1", "data": null}`))
+		})
+	})
+
+	Context("specified errors", func() {
+		It("should handle common.ErrForbidden", func() {
+			r.GET("/", func(c *gin.Context) {
+				_ = c.Error(common.ErrForbidden)
+			})
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, r)
+			Expect(status).To(Equal(http.StatusForbidden))
+			Expect(body).To(MatchJSON(`{"code":"security.forbidden", "message":"access forbidden", "data": null}`))
+		})
+		It("should handle gorm.ErrRecordNotFound", func() {
+			r.GET("/", func(c *gin.Context) {
+				_ = c.Error(gorm.ErrRecordNotFound)
+			})
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, r)
+			Expect(status).To(Equal(http.StatusNotFound))
+			Expect(body).To(MatchJSON(`{"code":"common.record_not_found", "message":"record not found", "data": null}`))
 		})
 	})
 })

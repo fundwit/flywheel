@@ -14,16 +14,18 @@ import (
 )
 
 func RegisterWorkHandler(r *gin.Engine, m work.WorkManagerTraits, middleWares ...gin.HandlerFunc) {
-	// group: "", version: v1, resource: work
-	g := r.Group("/v1/works", middleWares...)
-
 	handler := &workHandler{workManager: m, validator: validator.New()}
 
+	// group: "", version: v1, resource: work
+	g := r.Group("/v1/works", middleWares...)
 	g.GET("", handler.handleQuery)
 	g.POST("", handler.handleCreate)
-	//g.GET(":id", handler.handleDetail)
+	g.GET(":id", handler.handleDetail)
 	g.PUT(":id", handler.handleUpdate)
 	g.DELETE(":id", handler.handleDelete)
+
+	o := r.Group("/v1/work-orders", middleWares...)
+	o.PUT("", handler.handleUpdateOrders)
 }
 
 type workHandler struct {
@@ -49,19 +51,19 @@ func (h *workHandler) handleCreate(c *gin.Context) {
 	c.JSON(http.StatusCreated, detail)
 }
 
-//func (h *workHandler) handleDetail(c *gin.Context) {
-//	id, err := utils.ParseID(c.Param("id"))
-//	if err != nil {
-//		c.JSON(http.StatusBadRequest, &ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("id") + "'"})
-//		return
-//	}
-//	detail, err := h.workManager.WorkDetail(id)
-//	if err != nil {
-//		c.JSON(http.StatusNotFound, &ErrorBody{Code: "common.not_found", Message: ""})
-//		return
-//	}
-//	c.JSON(http.StatusOK, detail)
-//}
+func (h *workHandler) handleDetail(c *gin.Context) {
+	id, err := types.ParseID(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("id") + "'"})
+		return
+	}
+	detail, err := h.workManager.WorkDetail(id, security.FindSecurityContext(c))
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, detail)
+}
 
 func (h *workHandler) handleQuery(c *gin.Context) {
 	query := domain.WorkQuery{}
@@ -93,6 +95,19 @@ func (h *workHandler) handleUpdate(c *gin.Context) {
 	c.JSON(http.StatusOK, updatedWork)
 }
 
+func (h *workHandler) handleUpdateOrders(c *gin.Context) {
+	var updating []domain.StageRangeOrderUpdating
+	err := c.ShouldBindBodyWith(&updating, binding.JSON)
+	if err != nil {
+		panic(&common.ErrBadParam{Cause: err})
+	}
+	err = h.workManager.UpdateStateRangeOrders(&updating, security.FindSecurityContext(c))
+	if err != nil {
+		panic(err)
+	}
+	c.AbortWithStatus(http.StatusOK)
+}
+
 func (h *workHandler) handleDelete(c *gin.Context) {
 	parsedId, err := types.ParseID(c.Param("id"))
 	if err != nil {
@@ -103,5 +118,5 @@ func (h *workHandler) handleDelete(c *gin.Context) {
 	if err != nil {
 		panic(err)
 	}
-	c.JSON(http.StatusNoContent, nil)
+	c.AbortWithStatus(http.StatusNoContent)
 }

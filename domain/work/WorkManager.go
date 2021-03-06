@@ -7,11 +7,11 @@ import (
 	"flywheel/domain/flow"
 	"flywheel/persistence"
 	"flywheel/security"
-	"fmt"
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
 	"strconv"
+	"time"
 )
 
 type WorkManagerTraits interface {
@@ -20,19 +20,23 @@ type WorkManagerTraits interface {
 	CreateWork(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error)
 	UpdateWork(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error)
 	DeleteWork(id types.ID, sec *security.Context) error
+	UpdateStateRangeOrders(wantedOrders *[]domain.StageRangeOrderUpdating, sec *security.Context) error
 }
 
 type WorkManager struct {
-	dataSource *persistence.DataSourceManager
-	idWorker   *sonyflake.Sonyflake
+	workflowManager flow.WorkflowManagerTraits
+	dataSource      *persistence.DataSourceManager
+	idWorker        *sonyflake.Sonyflake
 }
 
-func NewWorkManager(ds *persistence.DataSourceManager) *WorkManager {
+func NewWorkManager(ds *persistence.DataSourceManager, workflowManager flow.WorkflowManagerTraits) *WorkManager {
 	return &WorkManager{
-		dataSource: ds,
-		idWorker:   sonyflake.NewSonyflake(sonyflake.Settings{}),
+		workflowManager: workflowManager,
+		dataSource:      ds,
+		idWorker:        sonyflake.NewSonyflake(sonyflake.Settings{}),
 	}
 }
+
 func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
 	var works []domain.Work
 	db := m.dataSource.GormDB()
@@ -41,14 +45,39 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 	if query.Name != "" {
 		q = q.Where("name like ?", "%"+query.Name+"%")
 	}
+	if len(query.StateCategories) > 0 {
+		q = q.Where("state_category in (?)", query.StateCategories)
+	}
 	visibleGroups := sec.VisibleGroups()
 	if len(visibleGroups) == 0 {
 		return &[]domain.Work{}, nil
 	}
-	q = q.Where("group_id in (?)", visibleGroups)
+	q = q.Where("group_id in (?)", visibleGroups).Order("order_in_state ASC")
 	if err := q.Find(&works).Error; err != nil {
 		return nil, err
 	}
+
+	// append Work.state
+	workflowCache := map[types.ID]*domain.WorkflowDetail{}
+	var err error
+	for i := len(works) - 1; i >= 0; i-- {
+		work := works[i]
+		workflow := workflowCache[work.FlowID]
+		if workflow == nil {
+			workflow, err = m.workflowManager.DetailWorkflow(work.FlowID, sec)
+			if err != nil {
+				return nil, err
+			}
+			workflowCache[work.FlowID] = workflow
+		}
+
+		stateFound, found := workflow.FindState(work.StateName)
+		if !found {
+			return nil, domain.ErrInvalidState
+		}
+		works[i].State = stateFound
+	}
+
 	return &works, nil
 }
 
@@ -60,32 +89,45 @@ func (m *WorkManager) WorkDetail(id types.ID, sec *security.Context) (*domain.Wo
 	}
 
 	if !sec.HasRoleSuffix("_" + workDetail.GroupID.String()) {
-		return nil, errors.New("forbidden")
+		return nil, common.ErrForbidden
 	}
 
-	// load type and state
-	gwt := domain.GenericWorkFlow
-
-	workDetail.Type = gwt.WorkFlowBase
-	state, found := gwt.FindState(workDetail.StateName)
+	workflowDetail, err := m.workflowManager.DetailWorkflow(workDetail.FlowID, sec)
+	if err != nil {
+		return nil, err
+	}
+	workDetail.Type = workflowDetail.Workflow
+	stateFound, found := workflowDetail.FindState(workDetail.StateName)
 	if !found {
-		return nil, fmt.Errorf("invalid state '%s'", workDetail.StateName)
+		return nil, domain.ErrInvalidState
 	}
-	workDetail.State = state
+	workDetail.State = stateFound
 
 	return &workDetail, nil
 }
 
 func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {
 	if !sec.HasRoleSuffix("_" + c.GroupID.String()) {
-		return nil, errors.New("forbidden")
+		return nil, common.ErrForbidden
 	}
 
-	workDetail := c.BuildWorkDetail(common.NextId(m.idWorker))
-
 	db := m.dataSource.GormDB()
+	var workDetail *domain.WorkDetail
 	err := db.Transaction(func(tx *gorm.DB) error {
+		// TODO transition issues
+		workflowDetail, err := m.workflowManager.DetailWorkflow(c.FlowID, sec)
+		if err != nil {
+			return err
+		}
+
+		workDetail = BuildWorkDetail(common.NextId(m.idWorker), c, workflowDetail)
+		initProcessStep := domain.WorkProcessStep{WorkID: workDetail.ID, FlowID: workDetail.FlowID,
+			StateName: workDetail.State.Name, StateCategory: workDetail.State.Category, BeginTime: workDetail.CreateTime}
+
 		if err := tx.Create(workDetail.Work).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(initProcessStep).Error; err != nil {
 			return err
 		}
 		return nil
@@ -114,6 +156,17 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *secur
 		if err := tx.Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
 			return err
 		}
+		// TODO transition issues
+		workflowDetail, err := m.workflowManager.DetailWorkflow(work.FlowID, sec)
+		if err != nil {
+			return err
+		}
+		stateFound, found := workflowDetail.FindState(work.StateName)
+		if !found {
+			return domain.ErrInvalidState
+		}
+		work.State = stateFound
+
 		return nil
 	})
 	if err != nil {
@@ -121,6 +174,30 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *secur
 	}
 
 	return &work, nil
+}
+
+func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.StageRangeOrderUpdating, sec *security.Context) error {
+	if wantedOrders == nil || len(*wantedOrders) == 0 {
+		return nil
+	}
+
+	return m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
+		for _, orderUpdating := range *wantedOrders {
+			// TODO transition issues
+			if err := m.checkPerms(orderUpdating.ID, sec); err != nil {
+				return err
+			}
+			db := tx.Model(&domain.Work{}).Where(&domain.Work{ID: orderUpdating.ID, OrderInState: orderUpdating.OldOlder}).
+				Update(&domain.Work{OrderInState: orderUpdating.NewOlder})
+			if err := db.Error; err != nil {
+				return err
+			}
+			if db.RowsAffected != 1 {
+				return errors.New("expected affected row is 1, but actual is " + strconv.FormatInt(db.RowsAffected, 10))
+			}
+		}
+		return nil
+	})
 }
 
 func (m *WorkManager) DeleteWork(id types.ID, sec *security.Context) error {
@@ -132,7 +209,10 @@ func (m *WorkManager) DeleteWork(id types.ID, sec *security.Context) error {
 		if err := tx.Delete(domain.Work{}, "id = ?", id).Error; err != nil {
 			return err
 		}
-		if err := tx.Delete(flow.WorkStateTransition{}, "work_id = ?", id).Error; err != nil {
+		if err := tx.Delete(domain.WorkStateTransition{}, "work_id = ?", id).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(domain.WorkProcessStep{}, "work_id = ?", id).Error; err != nil {
 			return err
 		}
 		return nil
@@ -146,8 +226,30 @@ func (m *WorkManager) checkPerms(id types.ID, sec *security.Context) error {
 	if err := m.dataSource.GormDB().Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
 		return err
 	}
-	if !sec.HasRoleSuffix("_" + work.GroupID.String()) {
-		return errors.New("forbidden")
+	if sec == nil || !sec.HasRoleSuffix("_"+work.GroupID.String()) {
+		return common.ErrForbidden
 	}
 	return nil
+}
+
+func BuildWorkDetail(id types.ID, c *domain.WorkCreation, workflow *domain.WorkflowDetail) *domain.WorkDetail {
+	initState := workflow.StateMachine.States[0]
+
+	now := time.Now()
+	return &domain.WorkDetail{
+		Work: domain.Work{
+			ID:         id,
+			Name:       c.Name,
+			GroupID:    c.GroupID,
+			CreateTime: now,
+
+			FlowID:         workflow.ID,
+			OrderInState:   now.UnixNano() / 1e6,
+			StateName:      initState.Name,
+			StateCategory:  initState.Category,
+			StateBeginTime: &now,
+			State:          initState,
+		},
+		Type: workflow.Workflow,
+	}
 }

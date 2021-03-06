@@ -1,4 +1,4 @@
-package flow
+package domain
 
 import (
 	"github.com/fundwit/go-commons/types"
@@ -7,7 +7,7 @@ import (
 
 type WorkStateTransition struct {
 	ID         types.ID  `json:"id"`
-	CreateTime time.Time `json:"createTime"`
+	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
 	Creator    types.ID  `json:"creator"`
 
 	WorkStateTransitionBrief

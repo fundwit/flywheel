@@ -2,7 +2,8 @@ package servehttp
 
 import (
 	"flywheel/common"
-	"flywheel/domain/flow"
+	"flywheel/domain"
+	"flywheel/domain/work"
 	"flywheel/security"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -10,7 +11,7 @@ import (
 	"net/http"
 )
 
-func RegisterWorkStateTransitionHandler(r *gin.Engine, m flow.WorkflowManagerTraits, middleWares ...gin.HandlerFunc) {
+func RegisterWorkStateTransitionHandler(r *gin.Engine, m work.WorkProcessManagerTraits, middleWares ...gin.HandlerFunc) {
 	g := r.Group("/v1/transitions", middleWares...)
 
 	handler := &workStateTransitionHandler{manager: m, validator: validator.New()}
@@ -18,12 +19,12 @@ func RegisterWorkStateTransitionHandler(r *gin.Engine, m flow.WorkflowManagerTra
 }
 
 type workStateTransitionHandler struct {
-	manager   flow.WorkflowManagerTraits
+	manager   work.WorkProcessManagerTraits
 	validator *validator.Validate
 }
 
 func (h *workStateTransitionHandler) handleCreate(c *gin.Context) {
-	creation := flow.WorkStateTransitionBrief{}
+	creation := domain.WorkStateTransitionBrief{}
 	err := c.ShouldBindBodyWith(&creation, binding.JSON)
 	if err != nil {
 		panic(&common.ErrBadParam{Cause: err})

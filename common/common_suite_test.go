@@ -1,4 +1,4 @@
-package work_test
+package common_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestDomainWork(t *testing.T) {
+func TestCommon(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "domain Suite")
+	RunSpecs(t, "Common Suite")
 }

@@ -1,6 +1,12 @@
 package common
 
-import "net/http"
+import (
+	"errors"
+	"net/http"
+)
+
+var ErrForbidden = errors.New("forbidden")
+var ErrWorkflowIsReferenced = errors.New("workflow is referenced")
 
 type BizError interface {
 	Respond() *BizErrorDetail

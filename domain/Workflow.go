@@ -3,53 +3,44 @@ package domain
 import (
 	"flywheel/domain/state"
 	"github.com/fundwit/go-commons/types"
+	"time"
 )
 
-type WorkFlowFace interface {
-	FindState(string) *state.State
+type Workflow struct {
+	ID         types.ID `json:"id" gorm:"primary_key" sql:"type:BIGINT UNSIGNED NOT NULL"`
+	Name       string   `json:"name"`
+	ThemeColor string   `json:"themeColor"`
+	ThemeIcon  string   `json:"themeIcon"`
+
+	GroupID    types.ID  `json:"groupId"`
+	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
 }
 
-type WorkFlowBase struct {
-	ID   types.ID `json:"id"`
-	Name string   `json:"name"`
-}
-
-type WorkFlow struct {
-	WorkFlowBase
+type WorkflowDetail struct {
+	Workflow
 
 	PropertyDefinitions []PropertyDefinition `json:"propertyDefinitions"`
 	StateMachine        state.StateMachine   `json:"stateMachine"`
 }
 
-func (wt *WorkFlow) FindState(stateName string) (state.State, bool) {
-	for _, s := range wt.StateMachine.States {
-		if stateName == s.Name {
-			return s, true
-		}
-	}
-	return state.State{}, false
+type WorkflowState struct {
+	WorkflowID types.ID `json:"workflowId" gorm:"primary_key" sql:"type:BIGINT UNSIGNED NOT NULL"`
+	Name       string   `json:"name" gorm:"primary_key"`
+	Order      int      `json:"order"`
+
+	Category   state.Category `json:"category"`
+	CreateTime time.Time      `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
 }
 
-func FindWorkflow(ID types.ID) *WorkFlow {
-	if ID == GenericWorkFlow.ID {
-		return &GenericWorkFlow
-	}
-	return nil
+type WorkflowStateTransition struct {
+	WorkflowID types.ID `json:"workflowId" gorm:"primary_key" sql:"type:BIGINT UNSIGNED NOT NULL"`
+	FromState  string   `json:"fromState" gorm:"primary_key"`
+	ToState    string   `json:"toState"     gorm:"primary_key"`
+
+	Name       string    `json:"name"`
+	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
 }
 
-var GenericWorkFlow = WorkFlow{
-	WorkFlowBase: WorkFlowBase{
-		ID:   1,
-		Name: "GenericTask",
-	},
-	StateMachine: *state.NewStateMachine([]state.State{{Name: "PENDING"}, {Name: "DOING"}, {Name: "DONE"}}, []state.Transition{
-		{Name: "begin", From: state.State{Name: "PENDING"}, To: state.State{Name: "DOING"}},
-		{Name: "close", From: state.State{Name: "PENDING"}, To: state.State{Name: "DONE"}},
-		{Name: "cancel", From: state.State{Name: "DOING"}, To: state.State{Name: "PENDING"}},
-		{Name: "finish", From: state.State{Name: "DOING"}, To: state.State{Name: "DONE"}},
-		{Name: "reopen", From: state.State{Name: "DONE"}, To: state.State{Name: "PENDING"}},
-	}),
-	PropertyDefinitions: []PropertyDefinition{
-		{Name: "description"}, {Name: "creatorId"},
-	},
+func (f *WorkflowDetail) FindState(stateName string) (state.State, bool) {
+	return f.StateMachine.FindState(stateName)
 }

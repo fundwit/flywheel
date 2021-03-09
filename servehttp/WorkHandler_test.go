@@ -56,14 +56,15 @@ var _ = Describe("WorkHandler", func() {
 			workManager.CreateWorkFunc = func(creation *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {
 				detail := domain.WorkDetail{
 					Work: domain.Work{
-						ID:           123,
-						Name:         creation.Name,
-						GroupID:      creation.GroupID,
-						FlowID:       demoWorkflow.ID,
-						OrderInState: demoTime.UnixNano() / 1e6,
-						CreateTime:   demoTime,
-						StateName:    demoWorkflow.StateMachine.States[0].Name,
-						State:        demoWorkflow.StateMachine.States[0],
+						ID:            123,
+						Name:          creation.Name,
+						GroupID:       creation.GroupID,
+						FlowID:        demoWorkflow.ID,
+						OrderInState:  demoTime.UnixNano() / 1e6,
+						CreateTime:    demoTime,
+						StateName:     demoWorkflow.StateMachine.States[0].Name,
+						StateCategory: demoWorkflow.StateMachine.States[0].Category,
+						State:         demoWorkflow.StateMachine.States[0],
 					},
 					Type: demoWorkflow.Workflow,
 				}
@@ -78,7 +79,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(status).To(Equal(http.StatusCreated))
 			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"333","flowId":"` + demoWorkflow.ID.String() + `", "orderInState": ` +
 				strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `, "createTime":"` + timeString + `",
-				"stateName":"PENDING", "stateCategory": 0, "type": ` + demoWorkflowJson + `,"state":{"name":"PENDING","category":0},
+				"stateName":"PENDING", "stateCategory": 1, "type": ` + demoWorkflowJson + `,"state":{"name":"PENDING","category":1},
 				"stateBeginTime": null,"processBeginTime":null, "processEndTime":null}`))
 		})
 
@@ -129,10 +130,10 @@ var _ = Describe("WorkHandler", func() {
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"data":[{"id":"1","name":"work1","groupId":"333","flowId":"1",
 				"createTime":"` + timeString + `","orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + ` ,
-				"stateName":"PENDING", "stateCategory": 0, "state":{"name":"PENDING", "category":0},
+				"stateName":"PENDING", "stateCategory": 1, "state":{"name":"PENDING", "category":1},
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null}, 
 				{"id":"2","name":"work2","groupId":"333","flowId":"1", "orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `,
-				"createTime":"` + timeString + `","stateName":"DONE", "stateCategory": 2, "state":{"name":"DONE", "category":2},
+				"createTime":"` + timeString + `","stateName":"DONE", "stateCategory": 3, "state":{"name":"DONE", "category":3},
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null
 				}],"total": 2}`))
 		})
@@ -143,7 +144,7 @@ var _ = Describe("WorkHandler", func() {
 				query = q
 				return &[]domain.Work{}, nil
 			}
-			req := httptest.NewRequest(http.MethodGet, "/v1/works?name=aaa&groupId=3&stateCategory=1&stateCategory=2", nil)
+			req := httptest.NewRequest(http.MethodGet, "/v1/works?name=aaa&groupId=3&stateCategory=2&stateCategory=3", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"data": [], "total": 0}`))
@@ -186,7 +187,7 @@ var _ = Describe("WorkHandler", func() {
 				return &domain.WorkDetail{
 					Work: domain.Work{
 						ID: 123, Name: "test work", GroupID: 100, CreateTime: demoTime, FlowID: demoWorkflow.ID, OrderInState: 999,
-						StateName: "DOING", StateCategory: 1, State: demoWorkflow.StateMachine.States[1],
+						StateName: "DOING", StateCategory: demoWorkflow.StateMachine.States[1].Category, State: demoWorkflow.StateMachine.States[1],
 						StateBeginTime: &demoTime, ProcessBeginTime: &demoTime, ProcessEndTime: &demoTime,
 					},
 					Type: demoWorkflow.Workflow,
@@ -197,7 +198,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"100","flowId":"` + demoWorkflow.ID.String() + `",
 				"createTime":"` + timeString + `","orderInState": 999,
-				"stateName":"DOING", "stateCategory": 1, "state":{"name":"DOING", "category":1},
+				"stateName":"DOING", "stateCategory": 2, "state":{"name":"DOING", "category":2},
 				"stateBeginTime": "` + timeString + `", "processBeginTime": "` + timeString + `", "processEndTime": "` + timeString + `",
 				"type": ` + demoWorkflowJson + `}`))
 		})
@@ -229,15 +230,16 @@ var _ = Describe("WorkHandler", func() {
 		It("should be able to update work successfully", func() {
 			workManager.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error) {
 				return &domain.Work{ID: 100, Name: "new-name", GroupID: types.ID(333), CreateTime: demoTime,
-					FlowID: 1, OrderInState: demoTime.UnixNano() / 1e6, StateName: "PENDING", StateCategory: 0, State: domain.StatePending}, nil
+					FlowID: 1, OrderInState: demoTime.UnixNano() / 1e6,
+					StateName: "PENDING", StateCategory: domain.StatePending.Category, State: domain.StatePending}, nil
 			}
 			req := httptest.NewRequest(http.MethodPut, "/v1/works/100", bytes.NewReader([]byte(
 				`{"name": "new-name"}`)))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","stateName":"PENDING", "stateCategory": 0,
+			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","stateName":"PENDING", "stateCategory": 1,
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null,
-				"state":{"name":"PENDING", "category":0},"groupId":"333","flowId":"1","createTime":"` +
+				"state":{"name":"PENDING", "category":1},"groupId":"333","flowId":"1","createTime":"` +
 				timeString + `", "orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `}`))
 		})
 	})

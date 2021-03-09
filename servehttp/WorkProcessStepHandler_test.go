@@ -71,8 +71,8 @@ var _ = Describe("WorkProcessStepHandler", func() {
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"total": 2, "data": [
-				{"workId": "100", "flowId": "1", "stateName": "PENDING", "stateCategory": 0, "beginTime": "` + timeString + `", "endTime":"` + timeString + `"},
-				{"workId": "100", "flowId": "1", "stateName": "DOING", "stateCategory": 1, "beginTime": "` + timeString + `", "endTime": null}
+				{"workId": "100", "flowId": "1", "stateName": "PENDING", "stateCategory": 1, "beginTime": "` + timeString + `", "endTime":"` + timeString + `"},
+				{"workId": "100", "flowId": "1", "stateName": "DOING", "stateCategory": 2, "beginTime": "` + timeString + `", "endTime": null}
 			]}`))
 		})
 	})

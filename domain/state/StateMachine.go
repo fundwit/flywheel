@@ -17,9 +17,9 @@ type StateMachine struct {
 type Category uint
 
 const (
-	InBacklog Category = iota
-	InProcess
-	Done
+	InBacklog Category = 1
+	InProcess Category = 2
+	Done      Category = 3
 )
 
 type State struct {

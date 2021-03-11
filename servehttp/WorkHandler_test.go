@@ -79,7 +79,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(status).To(Equal(http.StatusCreated))
 			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"333","flowId":"` + demoWorkflow.ID.String() + `", "orderInState": ` +
 				strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `, "createTime":"` + timeString + `",
-				"stateName":"PENDING", "stateCategory": 1, "type": ` + demoWorkflowJson + `,"state":{"name":"PENDING","category":1},
+				"stateName":"PENDING", "stateCategory": 1, "type": ` + demoWorkflowJson + `,"state":{"name": "PENDING", "category": 1, "order": 1},
 				"stateBeginTime": null,"processBeginTime":null, "processEndTime":null}`))
 		})
 
@@ -130,10 +130,10 @@ var _ = Describe("WorkHandler", func() {
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"data":[{"id":"1","name":"work1","groupId":"333","flowId":"1",
 				"createTime":"` + timeString + `","orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + ` ,
-				"stateName":"PENDING", "stateCategory": 1, "state":{"name":"PENDING", "category":1},
+				"stateName":"PENDING", "stateCategory": 1, "state":{"name":"PENDING", "category":1, "order": 1},
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null}, 
 				{"id":"2","name":"work2","groupId":"333","flowId":"1", "orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `,
-				"createTime":"` + timeString + `","stateName":"DONE", "stateCategory": 3, "state":{"name":"DONE", "category":3},
+				"createTime":"` + timeString + `","stateName":"DONE", "stateCategory": 3, "state":{"name":"DONE", "category":3, "order": 3},
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null
 				}],"total": 2}`))
 		})
@@ -198,7 +198,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"100","flowId":"` + demoWorkflow.ID.String() + `",
 				"createTime":"` + timeString + `","orderInState": 999,
-				"stateName":"DOING", "stateCategory": 2, "state":{"name":"DOING", "category":2},
+				"stateName":"DOING", "stateCategory": 2, "state":{"name":"DOING", "category":2, "order": 2},
 				"stateBeginTime": "` + timeString + `", "processBeginTime": "` + timeString + `", "processEndTime": "` + timeString + `",
 				"type": ` + demoWorkflowJson + `}`))
 		})
@@ -239,7 +239,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","stateName":"PENDING", "stateCategory": 1,
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null,
-				"state":{"name":"PENDING", "category":1},"groupId":"333","flowId":"1","createTime":"` +
+				"state":{"name":"PENDING", "category":1, "order": 1},"groupId":"333","flowId":"1","createTime":"` +
 				timeString + `", "orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `}`))
 		})
 	})

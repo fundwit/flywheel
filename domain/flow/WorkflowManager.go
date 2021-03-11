@@ -65,14 +65,19 @@ func (m *WorkflowManager) CreateWorkflow(c *WorkflowCreation, sec *security.Cont
 		StateMachine: c.StateMachine,
 	}
 
+	stateNum := len(workflow.StateMachine.States)
+	for idx := 0; idx < stateNum; idx++ {
+		workflow.StateMachine.States[idx].Order = idx + 1
+	}
+
 	db := m.dataSource.GormDB()
 	err := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(workflow.Workflow).Error; err != nil {
 			return err
 		}
-		for idx, s := range workflow.StateMachine.States {
+		for _, s := range workflow.StateMachine.States {
 			stateEntity := &domain.WorkflowState{
-				WorkflowID: workflow.ID, Order: idx, Name: s.Name, Category: s.Category, CreateTime: workflow.CreateTime,
+				WorkflowID: workflow.ID, Order: s.Order, Name: s.Name, Category: s.Category, CreateTime: workflow.CreateTime,
 			}
 			if err := tx.Create(stateEntity).Error; err != nil {
 				return err
@@ -80,7 +85,7 @@ func (m *WorkflowManager) CreateWorkflow(c *WorkflowCreation, sec *security.Cont
 		}
 		for _, t := range workflow.StateMachine.Transitions {
 			transition := &domain.WorkflowStateTransition{
-				WorkflowID: workflow.ID, Name: t.Name, FromState: t.From.Name, ToState: t.To.Name, CreateTime: workflow.CreateTime,
+				WorkflowID: workflow.ID, Name: t.Name, FromState: t.From, ToState: t.To, CreateTime: workflow.CreateTime,
 			}
 			if err := tx.Create(transition).Error; err != nil {
 				return err
@@ -116,7 +121,7 @@ func (m *WorkflowManager) DetailWorkflow(id types.ID, sec *security.Context) (*d
 		}
 		stateMachine := state.StateMachine{}
 		for _, record := range stateRecords {
-			stateMachine.States = append(stateMachine.States, state.State{Name: record.Name, Category: record.Category})
+			stateMachine.States = append(stateMachine.States, state.State{Name: record.Name, Category: record.Category, Order: record.Order})
 		}
 		for _, record := range transitionRecords {
 			from, fromStateFound := stateMachine.FindState(record.FromState)
@@ -124,7 +129,7 @@ func (m *WorkflowManager) DetailWorkflow(id types.ID, sec *security.Context) (*d
 			if !fromStateFound || !toStateFound {
 				return domain.ErrInvalidState
 			}
-			stateMachine.Transitions = append(stateMachine.Transitions, state.Transition{Name: record.Name, From: from, To: to})
+			stateMachine.Transitions = append(stateMachine.Transitions, state.Transition{Name: record.Name, From: from.Name, To: to.Name})
 		}
 
 		workflowDetail.StateMachine = stateMachine

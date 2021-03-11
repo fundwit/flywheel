@@ -25,12 +25,13 @@ const (
 type State struct {
 	Name     string   `json:"name"`
 	Category Category `json:"category"`
+	Order    int      `json:"order"`
 }
 
 type Transition struct {
 	Name string `json:"name"`
-	From State  `json:"from"`
-	To   State  `json:"to"`
+	From string `json:"from"`
+	To   string `json:"to"`
 }
 
 func NewStateMachine(states []State, transitions []Transition) *StateMachine {
@@ -49,7 +50,7 @@ func (sm *StateMachine) FindState(stateName string) (State, bool) {
 func (sm *StateMachine) AvailableTransitions(fromState string, toState string) []Transition {
 	r := []Transition{}
 	for _, transition := range sm.Transitions {
-		if (fromState == "" || fromState == transition.From.Name) && (toState == "" || toState == transition.To.Name) {
+		if (fromState == "" || fromState == transition.From) && (toState == "" || toState == transition.To) {
 			r = append(r, transition)
 		}
 	}
@@ -62,10 +63,10 @@ func (I transitionList) Len() int {
 	return len(I)
 }
 func (I transitionList) Less(i, j int) bool {
-	if I[i].From.Category == I[j].From.Category {
-		return I[i].To.Category < I[j].To.Category
+	if I[i].From == I[j].From {
+		return I[i].To < I[j].To
 	} else {
-		return I[i].From.Category < I[j].From.Category
+		return I[i].From < I[j].From
 	}
 }
 func (I transitionList) Swap(i, j int) {

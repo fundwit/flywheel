@@ -17,8 +17,8 @@ import (
 var creationDemo = &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), ThemeColor: "blue", ThemeIcon: "some-icon", StateMachine: state.StateMachine{
 	States: []state.State{{Name: "OPEN", Category: state.InProcess}, {Name: "CLOSED", Category: state.Done}},
 	Transitions: []state.Transition{
-		{Name: "done", From: state.State{Name: "OPEN", Category: state.InProcess}, To: state.State{Name: "CLOSED", Category: state.Done}},
-		{Name: "reopen", From: state.State{Name: "CLOSED", Category: state.Done}, To: state.State{Name: "OPEN", Category: state.InProcess}},
+		{Name: "done", From: "OPEN", To: "CLOSED"},
+		{Name: "reopen", From: "CLOSED", To: "OPEN"},
 	},
 }}
 
@@ -151,13 +151,13 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(len(states)).To(Equal(2))
 			Expect(states[0].WorkflowID).To(Equal(workflow.ID))
 			Expect(states[0].CreateTime).To(Equal(workflow.CreateTime))
-			Expect(states[0].Order).To(Equal(0))
-			Expect(state.State{Name: states[0].Name, Category: states[0].Category}).To(Equal(workflow.StateMachine.States[0]))
+			Expect(states[0].Order).To(Equal(1))
+			Expect(state.State{Name: states[0].Name, Category: states[0].Category, Order: states[0].Order}).To(Equal(workflow.StateMachine.States[0]))
 
 			Expect(states[1].WorkflowID).To(Equal(workflow.ID))
 			Expect(states[1].CreateTime).To(Equal(workflow.CreateTime))
-			Expect(states[1].Order).To(Equal(1))
-			Expect(state.State{Name: states[1].Name, Category: states[1].Category}).To(Equal(workflow.StateMachine.States[1]))
+			Expect(states[1].Order).To(Equal(2))
+			Expect(state.State{Name: states[1].Name, Category: states[1].Category, Order: states[1].Order}).To(Equal(workflow.StateMachine.States[1]))
 
 			var transitions []domain.WorkflowStateTransition
 			Expect(testDatabase.DS.GormDB().Model(&domain.WorkflowStateTransition{}).Scan(&transitions).Error).To(BeNil())
@@ -165,14 +165,14 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(transitions[0].WorkflowID).To(Equal(workflow.ID))
 			Expect(transitions[0].CreateTime).To(Equal(workflow.CreateTime))
 			Expect(transitions[0].Name).To(Equal(workflow.StateMachine.Transitions[1].Name))
-			Expect(transitions[0].FromState).To(Equal(workflow.StateMachine.Transitions[1].From.Name))
-			Expect(transitions[0].ToState).To(Equal(workflow.StateMachine.Transitions[1].To.Name))
+			Expect(transitions[0].FromState).To(Equal(workflow.StateMachine.Transitions[1].From))
+			Expect(transitions[0].ToState).To(Equal(workflow.StateMachine.Transitions[1].To))
 
 			Expect(transitions[1].WorkflowID).To(Equal(workflow.ID))
 			Expect(transitions[1].CreateTime).To(Equal(workflow.CreateTime))
 			Expect(transitions[1].Name).To(Equal(workflow.StateMachine.Transitions[0].Name))
-			Expect(transitions[1].FromState).To(Equal(workflow.StateMachine.Transitions[0].From.Name))
-			Expect(transitions[1].ToState).To(Equal(workflow.StateMachine.Transitions[0].To.Name))
+			Expect(transitions[1].FromState).To(Equal(workflow.StateMachine.Transitions[0].From))
+			Expect(transitions[1].ToState).To(Equal(workflow.StateMachine.Transitions[0].To))
 		})
 	})
 

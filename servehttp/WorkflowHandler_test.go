@@ -118,10 +118,10 @@ var _ = Describe("WorkflowHandler", func() {
 			Expect(body).To(MatchJSON(`{"id": "123", "name": "test workflow", "themeColor": "blue", "themeIcon": "some-icon", "groupId": "333", "createTime": "` + timeString + `",
 				"propertyDefinitions": null,
 				"stateMachine": {
-					"states": [{"name":"OPEN", "category": 2}, {"name":"CLOSED", "category": 3}],
+					"states": [{"name":"OPEN", "category": 2, "order": 10}, {"name":"CLOSED", "category": 3, "order": 20}],
 					"transitions": [
-						{"name": "done", "from": {"name":"OPEN", "category": 2}, "to": {"name":"CLOSED", "category": 3}},
-						{"name": "reopen", "from": {"name":"CLOSED", "category": 3}, "to": {"name":"OPEN", "category": 2}}
+						{"name": "done", "from": "OPEN", "to": "CLOSED"},
+						{"name": "reopen", "from": "CLOSED", "to": "OPEN"}
 					]
 				}}`))
 		})
@@ -147,13 +147,14 @@ var _ = Describe("WorkflowHandler", func() {
 			Expect(body).To(MatchJSON(`{"id": "10", "name": "test workflow", "themeColor": "blue", "themeIcon": "some-icon", "groupId": "100", "createTime": "` + timeString + `",
 				"propertyDefinitions":[{"name": "description"}, {"name": "creatorId"}],
 				"stateMachine": {
-					"states": [{"name":"PENDING", "category": 1}, {"name":"DOING", "category": 2}, {"name":"DONE", "category": 3}],
+					"states": [{"name":"PENDING", "category": 1, "order": 1}, {"name":"DOING", "category": 2, "order": 2},
+								{"name":"DONE", "category": 3, "order": 3}],
 					"transitions": [
-						{"name": "begin", "from": {"name":"PENDING", "category": 1}, "to": {"name":"DOING", "category": 2}},
-						{"name": "close", "from": {"name":"PENDING", "category": 1}, "to": {"name":"DONE", "category": 3}},
-						{"name": "cancel", "from": {"name":"DOING", "category": 2}, "to": {"name":"PENDING", "category": 1}},
-						{"name": "finish", "from": {"name":"DOING", "category": 2}, "to": {"name":"DONE", "category": 3}},
-						{"name": "reopen", "from": {"name":"DONE", "category": 3}, "to": {"name":"PENDING", "category": 1}}
+						{"name": "begin", "from": "PENDING", "to": "DOING"},
+						{"name": "close", "from": "PENDING", "to": "DONE"},
+						{"name": "cancel", "from": "DOING", "to": "PENDING"},
+						{"name": "finish", "from": "DOING", "to": "DONE"},
+						{"name": "reopen", "from": "DONE", "to": "PENDING"}
 					]
 				}}`))
 		})
@@ -302,8 +303,8 @@ var _ = Describe("WorkflowHandler", func() {
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/10/transitions?fromState=PENDING", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`[{"name":"begin","from":{"name": "PENDING", "category": 1},"to":{"name": "DOING", "category": 2}},
-				{"name":"close","from":{"name": "PENDING", "category": 1},"to":{"name": "DONE", "category":3}}]`))
+			Expect(body).To(MatchJSON(`[{"name":"begin","from":"PENDING","to":"DOING"},
+				{"name":"close","from":"PENDING","to":"DONE"}]`))
 		})
 
 		It("should be able to query transitions with query: fromState and toState", func() {
@@ -318,7 +319,7 @@ var _ = Describe("WorkflowHandler", func() {
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/10/transitions?fromState=PENDING&toState=DONE", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`[{"name":"close","from":{"name": "PENDING", "category": 1},"to":{"name": "DONE", "category": 3}}]`))
+			Expect(body).To(MatchJSON(`[{"name":"close","from":"PENDING","to":"DONE"}]`))
 		})
 
 		It("should be able to query transitions with unknown state", func() {
@@ -369,10 +370,10 @@ var _ = Describe("WorkflowHandler", func() {
 
 func buildDemoWorkflowCreation() *flow.WorkflowCreation {
 	return &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(333), ThemeColor: "blue", ThemeIcon: "some-icon", StateMachine: state.StateMachine{
-		States: []state.State{{Name: "OPEN", Category: state.InProcess}, {Name: "CLOSED", Category: state.Done}},
+		States: []state.State{{Name: "OPEN", Category: state.InProcess, Order: 10}, {Name: "CLOSED", Category: state.Done, Order: 20}},
 		Transitions: []state.Transition{
-			{Name: "done", From: state.State{Name: "OPEN", Category: state.InProcess}, To: state.State{Name: "CLOSED", Category: state.Done}},
-			{Name: "reopen", From: state.State{Name: "CLOSED", Category: state.Done}, To: state.State{Name: "OPEN", Category: state.InProcess}},
+			{Name: "done", From: "OPEN", To: "CLOSED"},
+			{Name: "reopen", From: "CLOSED", To: "OPEN"},
 		},
 	}}
 }

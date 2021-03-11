@@ -19,11 +19,11 @@ var _ = Describe("StateMachine", func() {
 		stateMachine = state.NewStateMachine(
 			[]state.State{{Name: "PENDING"}, {Name: "DOING"}, {Name: "DONE"}},
 			[]state.Transition{
-				{Name: "begin", From: state.State{Name: "PENDING"}, To: state.State{Name: "DOING"}},
-				{Name: "close", From: state.State{Name: "PENDING"}, To: state.State{Name: "DONE"}},
-				{Name: "cancel", From: state.State{Name: "DOING"}, To: state.State{Name: "PENDING"}},
-				{Name: "finish", From: state.State{Name: "DOING"}, To: state.State{Name: "DONE"}},
-				{Name: "reopen", From: state.State{Name: "DONE"}, To: state.State{Name: "PENDING"}},
+				{Name: "begin", From: "PENDING", To: "DOING"},
+				{Name: "close", From: "PENDING", To: "DONE"},
+				{Name: "cancel", From: "DOING", To: "PENDING"},
+				{Name: "finish", From: "DOING", To: "DONE"},
+				{Name: "reopen", From: "DONE", To: "PENDING"},
 			})
 	})
 
@@ -34,11 +34,11 @@ var _ = Describe("StateMachine", func() {
 				Expect(stateMachine.States).Should(Equal([]state.State{{Name: "PENDING"}, {Name: "DOING"}, {Name: "DONE"}}))
 				Expect(stateMachine.Transitions).Should(Equal(
 					[]state.Transition{
-						{Name: "begin", From: state.State{Name: "PENDING"}, To: state.State{Name: "DOING"}},
-						{Name: "close", From: state.State{Name: "PENDING"}, To: state.State{Name: "DONE"}},
-						{Name: "cancel", From: state.State{Name: "DOING"}, To: state.State{Name: "PENDING"}},
-						{Name: "finish", From: state.State{Name: "DOING"}, To: state.State{Name: "DONE"}},
-						{Name: "reopen", From: state.State{Name: "DONE"}, To: state.State{Name: "PENDING"}},
+						{Name: "begin", From: "PENDING", To: "DOING"},
+						{Name: "close", From: "PENDING", To: "DONE"},
+						{Name: "cancel", From: "DOING", To: "PENDING"},
+						{Name: "finish", From: "DOING", To: "DONE"},
+						{Name: "reopen", From: "DONE", To: "PENDING"},
 					},
 				))
 			})
@@ -51,34 +51,34 @@ var _ = Describe("StateMachine", func() {
 				Expect(stateMachine).NotTo(BeZero())
 
 				Ω(stateMachine.AvailableTransitions("", "")).Should(Equal([]state.Transition{
-					{Name: "begin", From: state.State{Name: "PENDING"}, To: state.State{Name: "DOING"}},
-					{Name: "close", From: state.State{Name: "PENDING"}, To: state.State{Name: "DONE"}},
-					{Name: "cancel", From: state.State{Name: "DOING"}, To: state.State{Name: "PENDING"}},
-					{Name: "finish", From: state.State{Name: "DOING"}, To: state.State{Name: "DONE"}},
-					{Name: "reopen", From: state.State{Name: "DONE"}, To: state.State{Name: "PENDING"}},
+					{Name: "begin", From: "PENDING", To: "DOING"},
+					{Name: "close", From: "PENDING", To: "DONE"},
+					{Name: "cancel", From: "DOING", To: "PENDING"},
+					{Name: "finish", From: "DOING", To: "DONE"},
+					{Name: "reopen", From: "DONE", To: "PENDING"},
 				}))
 
 				Ω(stateMachine.AvailableTransitions("PENDING", "")).Should(Equal([]state.Transition{
-					{Name: "begin", From: state.State{Name: "PENDING"}, To: state.State{Name: "DOING"}},
-					{Name: "close", From: state.State{Name: "PENDING"}, To: state.State{Name: "DONE"}},
+					{Name: "begin", From: "PENDING", To: "DOING"},
+					{Name: "close", From: "PENDING", To: "DONE"},
 				}))
 
 				Ω(stateMachine.AvailableTransitions("", "PENDING")).Should(Equal([]state.Transition{
-					{Name: "cancel", From: state.State{Name: "DOING"}, To: state.State{Name: "PENDING"}},
-					{Name: "reopen", From: state.State{Name: "DONE"}, To: state.State{Name: "PENDING"}},
+					{Name: "cancel", From: "DOING", To: "PENDING"},
+					{Name: "reopen", From: "DONE", To: "PENDING"},
 				}))
 
 				Ω(stateMachine.AvailableTransitions("PENDING", "DOING")).Should(Equal([]state.Transition{
-					{Name: "begin", From: state.State{Name: "PENDING"}, To: state.State{Name: "DOING"}},
+					{Name: "begin", From: "PENDING", To: "DOING"},
 				}))
 
 				Ω(stateMachine.AvailableTransitions("DOING", "")).Should(Equal([]state.Transition{
-					{Name: "cancel", From: state.State{Name: "DOING"}, To: state.State{Name: "PENDING"}},
-					{Name: "finish", From: state.State{Name: "DOING"}, To: state.State{Name: "DONE"}},
+					{Name: "cancel", From: "DOING", To: "PENDING"},
+					{Name: "finish", From: "DOING", To: "DONE"},
 				}))
 
 				Ω(stateMachine.AvailableTransitions("DONE", "")).Should(Equal([]state.Transition{
-					{Name: "reopen", From: state.State{Name: "DONE"}, To: state.State{Name: "PENDING"}},
+					{Name: "reopen", From: "DONE", To: "PENDING"},
 				}))
 
 				Ω(len(stateMachine.AvailableTransitions("UNKNOWN", ""))).Should(Equal(0))

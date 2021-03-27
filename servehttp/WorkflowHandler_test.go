@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/state"
@@ -366,6 +367,173 @@ var _ = Describe("WorkflowHandler", func() {
 				"message":"Key: 'TransitionQuery.FlowID' Error:Field validation for 'FlowID' failed on the 'required' tag", "data": null}`))
 		})
 	})
+
+	Describe("handleCreateStateMachineTransitions", func() {
+		It("should return 400 when id is invalid", func() {
+			req := httptest.NewRequest(http.MethodPost, "/v1/workflows/abc/transitions", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid id 'abc'","data":null}`))
+		})
+
+		It("should return 400 when request body is not json", func() {
+			req := httptest.NewRequest(http.MethodPost, "/v1/workflows/1/transitions", bytes.NewReader([]byte(`bbb`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid character 'b' looking for beginning of value","data":null}`))
+		})
+
+		It("should return 400 when request body is json object", func() {
+			req := httptest.NewRequest(http.MethodPost, "/v1/workflows/1/transitions", bytes.NewReader([]byte(`{}`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{
+			  "code": "common.bad_param",
+			  "message": "json: cannot unmarshal object into Go value of type []state.Transition",
+			  "data": null
+			}`))
+		})
+
+		It("should return 400 when failed to validate", func() {
+			req := httptest.NewRequest(http.MethodPost, "/v1/workflows/1/transitions", bytes.NewReader([]byte(`[{"name": "test"}]`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{
+			  "code": "common.bad_param",
+			  "message": "Key: 'Transition.From' Error:Field validation for 'From' failed on the 'required' tag\n` +
+				`Key: 'Transition.To' Error:Field validation for 'To' failed on the 'required' tag",
+			  "data": null
+			}`))
+		})
+
+		It("should return 404 when workflow is not exist", func() {
+			workflowManager.CreateWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *security.Context) error {
+				return domain.ErrNotFound
+			}
+
+			reqBody, err := json.Marshal(&[]state.Transition{{Name: "test", From: "PENDING", To: "DOING"}})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodPost, "/v1/workflows/1/transitions", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusNotFound))
+			Expect(body).To(MatchJSON(`{"code":"common.record_not_found","message":"record not found","data":null}`))
+		})
+
+		It("should return 400 state is unknown", func() {
+			workflowManager.CreateWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *security.Context) error {
+				return common.ErrUnknownState
+			}
+
+			reqBody, err := json.Marshal(&[]state.Transition{{Name: "test", From: "PENDING", To: "DOING"}})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodPost, "/v1/workflows/1/transitions", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"workflow.unknown_state","message":"unknown state","data":null}`))
+		})
+
+		It("should be able to handle unexpected error", func() {
+			workflowManager.CreateWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *security.Context) error {
+				return errors.New("a mocked error")
+			}
+			reqBody, err := json.Marshal(&[]state.Transition{{Name: "test", From: "PENDING", To: "DOING"}})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodPost, "/v1/workflows/1/transitions", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusInternalServerError))
+			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
+		})
+
+		It("should return 200 when everything is ok", func() {
+			workflowManager.CreateWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *security.Context) error {
+				return nil
+			}
+
+			reqBody, err := json.Marshal(&[]state.Transition{{Name: "test", From: "PENDING", To: "DOING"}})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodPost, "/v1/workflows/1/transitions", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusNoContent))
+			Expect(body).To(BeEmpty())
+		})
+	})
+
+	Describe("handleDeleteStateMachineTransitions", func() {
+		It("should return 400 when id is invalid", func() {
+			req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/abc/transitions", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid id 'abc'","data":null}`))
+		})
+
+		It("should return 400 when request body is not json", func() {
+			req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/1/transitions", bytes.NewReader([]byte(`bbb`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid character 'b' looking for beginning of value","data":null}`))
+		})
+
+		It("should return 400 when request body is json object", func() {
+			req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/1/transitions", bytes.NewReader([]byte(`{}`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{
+			  "code": "common.bad_param",
+			  "message": "json: cannot unmarshal object into Go value of type []state.Transition",
+			  "data": null
+			}`))
+		})
+
+		It("should return 400 when failed to validate", func() {
+			req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/1/transitions", bytes.NewReader([]byte(`[{"name": "test"}]`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{
+			  "code": "common.bad_param",
+			  "message": "Key: 'Transition.From' Error:Field validation for 'From' failed on the 'required' tag\n` +
+				`Key: 'Transition.To' Error:Field validation for 'To' failed on the 'required' tag",
+			  "data": null
+			}`))
+		})
+
+		It("should return 404 when workflow is not exist", func() {
+			workflowManager.DeleteWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *security.Context) error {
+				return domain.ErrNotFound
+			}
+
+			reqBody, err := json.Marshal(&[]state.Transition{{Name: "test", From: "PENDING", To: "DOING"}})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/1/transitions", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusNotFound))
+			Expect(body).To(MatchJSON(`{"code":"common.record_not_found","message":"record not found","data":null}`))
+		})
+
+		It("should be able to handle unexpected error", func() {
+			workflowManager.DeleteWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *security.Context) error {
+				return errors.New("a mocked error")
+			}
+			reqBody, err := json.Marshal(&[]state.Transition{{Name: "test", From: "PENDING", To: "DOING"}})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/1/transitions", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusInternalServerError))
+			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
+		})
+
+		It("should return 200 when everything is ok", func() {
+			workflowManager.DeleteWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *security.Context) error {
+				return nil
+			}
+
+			reqBody, err := json.Marshal(&[]state.Transition{{Name: "test", From: "PENDING", To: "DOING"}})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/1/transitions", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusNoContent))
+			Expect(body).To(BeEmpty())
+		})
+	})
 })
 
 func buildDemoWorkflowCreation() *flow.WorkflowCreation {
@@ -379,12 +547,14 @@ func buildDemoWorkflowCreation() *flow.WorkflowCreation {
 }
 
 type workflowManagerMock struct {
-	CreateWorkStateTransitionFunc func(t *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error)
-	QueryWorkflowsFunc            func(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error)
-	CreateWorkflowFunc            func(c *flow.WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error)
-	DetailWorkflowFunc            func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error)
-	UpdateWorkflowBaseFunc        func(ID types.ID, c *flow.WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error)
-	DeleteWorkflowFunc            func(ID types.ID, sec *security.Context) error
+	CreateWorkStateTransitionFunc      func(t *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error)
+	QueryWorkflowsFunc                 func(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error)
+	CreateWorkflowFunc                 func(c *flow.WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error)
+	DetailWorkflowFunc                 func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error)
+	UpdateWorkflowBaseFunc             func(ID types.ID, c *flow.WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error)
+	DeleteWorkflowFunc                 func(ID types.ID, sec *security.Context) error
+	CreateWorkflowStateTransitionsFunc func(id types.ID, transitions []state.Transition, sec *security.Context) error
+	DeleteWorkflowStateTransitionsFunc func(id types.ID, transitions []state.Transition, sec *security.Context) error
 }
 
 func (m *workflowManagerMock) QueryWorkflows(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error) {
@@ -401,4 +571,10 @@ func (m *workflowManagerMock) UpdateWorkflowBase(ID types.ID, c *flow.WorkflowBa
 }
 func (m *workflowManagerMock) DeleteWorkflow(ID types.ID, sec *security.Context) error {
 	return m.DeleteWorkflowFunc(ID, sec)
+}
+func (m *workflowManagerMock) CreateWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error {
+	return m.CreateWorkflowStateTransitionsFunc(id, transitions, sec)
+}
+func (m *workflowManagerMock) DeleteWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error {
+	return m.DeleteWorkflowStateTransitionsFunc(id, transitions, sec)
 }

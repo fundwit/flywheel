@@ -55,6 +55,11 @@ func handleError(err error, c *gin.Context) {
 		c.Abort()
 		return
 	}
+	if errors.Is(genericErr, common.ErrUnknownState) {
+		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "workflow.unknown_state", Message: "unknown state"})
+		c.Abort()
+		return
+	}
 	if errors.Is(genericErr, gorm.ErrRecordNotFound) || errors.Is(genericErr, domain.ErrNotFound) {
 		c.JSON(http.StatusNotFound, &common.ErrorBody{Code: "common.record_not_found", Message: "record not found"})
 		c.Abort()

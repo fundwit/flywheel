@@ -18,7 +18,10 @@ type WorkflowManagerTraits interface {
 	DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error)
 	UpdateWorkflowBase(ID types.ID, c *WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error)
 	DeleteWorkflow(ID types.ID, sec *security.Context) error
+
 	// updateStateMachine
+	CreateWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error
+	DeleteWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error
 }
 
 type WorkflowManager struct {
@@ -218,6 +221,68 @@ func (m *WorkflowManager) DeleteWorkflow(id types.ID, sec *security.Context) err
 		return nil
 	})
 	return err
+}
+
+func (m *WorkflowManager) CreateWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error {
+	workflow := domain.Workflow{}
+	db := m.dataSource.GormDB()
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where(&domain.Workflow{ID: id}).First(&workflow).Error; err != nil {
+			return err
+		}
+		if !sec.HasRoleSuffix("owner_" + workflow.GroupID.String()) {
+			return common.ErrForbidden
+		}
+
+		var states []domain.WorkflowState
+		if err := tx.Where(domain.WorkflowState{WorkflowID: workflow.ID}).Find(&states).Error; err != nil {
+			return err
+		}
+		stateIndex := map[string]domain.WorkflowState{}
+		for _, t := range states {
+			stateIndex[t.Name] = t
+		}
+
+		for _, t := range transitions {
+			if _, found := stateIndex[t.From]; !found {
+				return common.ErrUnknownState
+			}
+			if _, found := stateIndex[t.To]; !found {
+				return common.ErrUnknownState
+			}
+			transition := &domain.WorkflowStateTransition{
+				WorkflowID: workflow.ID, Name: t.Name, FromState: t.From, ToState: t.To, CreateTime: time.Now(),
+			}
+			if err := tx.Save(transition).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (m *WorkflowManager) DeleteWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error {
+	wf := domain.Workflow{}
+	db := m.dataSource.GormDB()
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where(&domain.Workflow{ID: id}).First(&wf).Error; err != nil {
+			return err
+		}
+		if !sec.HasRoleSuffix("owner_" + wf.GroupID.String()) {
+			return common.ErrForbidden
+		}
+
+		for _, t := range transitions {
+			q := tx.Model(&domain.WorkflowStateTransition{}).
+				Where("workflow_id = ?", wf.ID).
+				Where("from_state LIKE ?", t.From).
+				Where("to_state LIKE ?", t.To)
+			if err := q.Delete(&domain.WorkflowStateTransition{}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func isWorkflowReferenced(db *gorm.DB, workflowID types.ID) error {

@@ -4,6 +4,7 @@ import (
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
+	"flywheel/domain/state"
 	"flywheel/security"
 	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
@@ -34,6 +35,8 @@ func RegisterWorkflowHandler(r *gin.Engine, flowManager flow.WorkflowManagerTrai
 	g.DELETE(":flowId", handler.handleDeleteWorkflow)
 
 	g.GET(":flowId/transitions", handler.handleQueryTransitions)
+	g.POST(":flowId/transitions", handler.handleCreateStateMachineTransitions)
+	g.DELETE(":flowId/transitions", handler.handleDeleteStateMachineTransitions)
 }
 
 type workflowHandler struct {
@@ -149,4 +152,58 @@ func (h *workflowHandler) handleQueryTransitions(c *gin.Context) {
 
 	availableTransitions := workflow.StateMachine.AvailableTransitions(query.FromState, query.ToState)
 	c.JSON(http.StatusOK, availableTransitions)
+}
+
+func (h *workflowHandler) handleCreateStateMachineTransitions(c *gin.Context) {
+	id, err := types.ParseID(c.Param("flowId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
+		return
+	}
+
+	var transitions []state.Transition
+	err = c.ShouldBindBodyWith(&transitions, binding.JSON)
+	if err != nil {
+		panic(&common.ErrBadParam{Cause: err})
+	}
+	for _, t := range transitions {
+		if err = h.validator.Struct(t); err != nil {
+			panic(&common.ErrBadParam{Cause: err})
+		}
+	}
+
+	err = h.workflowManager.CreateWorkflowStateTransitions(id, transitions, security.FindSecurityContext(c))
+	if err != nil {
+		_ = c.Error(err)
+		c.Abort()
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *workflowHandler) handleDeleteStateMachineTransitions(c *gin.Context) {
+	id, err := types.ParseID(c.Param("flowId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
+		return
+	}
+
+	var transitions []state.Transition
+	err = c.ShouldBindBodyWith(&transitions, binding.JSON)
+	if err != nil {
+		panic(&common.ErrBadParam{Cause: err})
+	}
+	for _, t := range transitions {
+		if err = h.validator.Struct(t); err != nil {
+			panic(&common.ErrBadParam{Cause: err})
+		}
+	}
+
+	err = h.workflowManager.DeleteWorkflowStateTransitions(id, transitions, security.FindSecurityContext(c))
+	if err != nil {
+		_ = c.Error(err)
+		c.Abort()
+		return
+	}
+	c.Status(http.StatusNoContent)
 }

@@ -7,6 +7,7 @@ import (
 
 var ErrForbidden = errors.New("forbidden")
 var ErrWorkflowIsReferenced = errors.New("workflow is referenced")
+var ErrUnknownState = errors.New("unknown workflow state")
 
 type BizError interface {
 	Respond() *BizErrorDetail

@@ -29,9 +29,9 @@ type State struct {
 }
 
 type Transition struct {
-	Name string `json:"name"`
-	From string `json:"from"`
-	To   string `json:"to"`
+	Name string `json:"name" validate:"required"`
+	From string `json:"from" validate:"required"`
+	To   string `json:"to"   validate:"required"`
 }
 
 func NewStateMachine(states []State, transitions []Transition) *StateMachine {

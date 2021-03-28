@@ -22,6 +22,8 @@ type WorkflowManagerTraits interface {
 	// updateStateMachine
 	CreateWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error
 	DeleteWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error
+
+	UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, sec *security.Context) error
 }
 
 type WorkflowManager struct {
@@ -42,6 +44,13 @@ type WorkflowBaseUpdation struct {
 	Name       string `json:"name"     binding:"required"`
 	ThemeColor string `json:"themeColor" binding:"required"`
 	ThemeIcon  string `json:"themeIcon"  binding:"required"`
+}
+
+type WorkflowStateUpdating struct {
+	OriginName string `json:"originName"  binding:"required"`
+
+	Name  string `json:"name"        binding:"required"`
+	Order int    `json:"order"`
 }
 
 func NewWorkflowManager(ds *persistence.DataSourceManager) *WorkflowManager {
@@ -281,6 +290,98 @@ func (m *WorkflowManager) DeleteWorkflowStateTransitions(id types.ID, transition
 				return err
 			}
 		}
+		return nil
+	})
+}
+
+func (m *WorkflowManager) UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, sec *security.Context) error {
+	workflow := domain.Workflow{}
+	db := m.dataSource.GormDB()
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where(&domain.Workflow{ID: id}).First(&workflow).Error; err != nil {
+			return err
+		}
+		if !sec.HasRoleSuffix("owner_" + workflow.GroupID.String()) {
+			return common.ErrForbidden
+		}
+
+		// origin state must exist
+		var originState domain.WorkflowState
+		if err := tx.Where(domain.WorkflowState{WorkflowID: workflow.ID, Name: updating.OriginName}).First(&originState).Error; err != nil {
+			return err
+		}
+
+		if updating.OriginName != updating.Name {
+			// new state name must not exist
+			var existState []domain.WorkflowState
+			if err := tx.Where(domain.WorkflowState{WorkflowID: workflow.ID, Name: updating.Name}).First(&existState).Error; err != nil {
+				return err
+			}
+			if len(existState) > 0 {
+				return common.ErrStateExisted
+			}
+		}
+
+		// delete origin state
+		if err := tx.Model(originState).Delete(originState).Error; err != nil {
+			return err
+		}
+		// insert new state
+		stateEntity := &domain.WorkflowState{
+			WorkflowID: workflow.ID, Order: updating.Order, Name: updating.Name, Category: originState.Category, CreateTime: workflow.CreateTime,
+		}
+		if err := tx.Create(stateEntity).Error; err != nil {
+			return err
+		}
+
+		// update referrers
+		if originState.Name != updating.Name {
+			// workflow_state_transitions:    workflow_id, from_state, to_state
+			if err := tx.Model(&domain.WorkflowStateTransition{}).
+				Where("workflow_id = ?", originState.WorkflowID).
+				Where("from_state LIKE ?", originState.Name).
+				Update(domain.WorkflowStateTransition{FromState: updating.Name}).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&domain.WorkflowStateTransition{}).
+				Where("workflow_id = ?", originState.WorkflowID).
+				Where("to_state LIKE ?", originState.Name).
+				Update(domain.WorkflowStateTransition{ToState: updating.Name}).Error; err != nil {
+				return err
+			}
+
+			// work_state_transitions:  flow_id, from_state, to_state
+			if err := tx.Model(&domain.WorkStateTransition{}).
+				Where("flow_id = ?", originState.WorkflowID).
+				Where("from_state LIKE ?", originState.Name).
+				Update(domain.WorkStateTransition{WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FromState: updating.Name}}).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&domain.WorkStateTransition{}).
+				Where("flow_id = ?", originState.WorkflowID).
+				Where("to_state LIKE ?", originState.Name).
+				Update(domain.WorkStateTransition{WorkStateTransitionBrief: domain.WorkStateTransitionBrief{ToState: updating.Name}}).Error; err != nil {
+				return err
+			}
+		}
+		if originState.Name != updating.Name {
+			// work:  flow_id, state_name  state_category
+			if err := tx.Model(&domain.Work{}).
+				Where("flow_id = ?", originState.WorkflowID).
+				Where("state_name LIKE ?", originState.Name).
+				Update(domain.Work{StateName: updating.Name, StateCategory: originState.Category}).Error; err != nil {
+				return err
+			}
+
+			// work_process_steps: flow_id, state_name, state_category
+			if err := tx.Model(&domain.WorkProcessStep{}).
+				Where("flow_id = ?", originState.WorkflowID).
+				Where("state_name LIKE ?", originState.Name).
+				Update(domain.WorkProcessStep{StateName: updating.Name, StateCategory: originState.Category}).Error; err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 }

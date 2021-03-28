@@ -20,11 +20,12 @@ const (
 	InBacklog Category = 1
 	InProcess Category = 2
 	Done      Category = 3
+	Rejected  Category = 4
 )
 
 type State struct {
-	Name     string   `json:"name"`
-	Category Category `json:"category"`
+	Name     string   `json:"name"     validate:"required"`
+	Category Category `json:"category" validate:"required"`
 	Order    int      `json:"order"`
 }
 
@@ -48,11 +49,14 @@ func (sm *StateMachine) FindState(stateName string) (State, bool) {
 }
 
 func (sm *StateMachine) AvailableTransitions(fromState string, toState string) []Transition {
-	r := []Transition{}
+	var r []Transition
 	for _, transition := range sm.Transitions {
 		if (fromState == "" || fromState == transition.From) && (toState == "" || toState == transition.To) {
 			r = append(r, transition)
 		}
+	}
+	if r == nil {
+		r = []Transition{}
 	}
 	return r
 }

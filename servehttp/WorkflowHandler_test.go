@@ -534,6 +534,84 @@ var _ = Describe("WorkflowHandler", func() {
 			Expect(body).To(BeEmpty())
 		})
 	})
+
+	Describe("handleUpdateStateMachineState", func() {
+		It("should return 400 when id is invalid", func() {
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/abc/states", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid id 'abc'","data":null}`))
+		})
+
+		It("should return 400 when request body is not json", func() {
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1/states", bytes.NewReader([]byte(`bbb`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid character 'b' looking for beginning of value","data":null}`))
+		})
+
+		It("should return 400 when failed to validate", func() {
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1/states", bytes.NewReader([]byte(`{"name": "test"}`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{
+			  "code": "common.bad_param",
+			  "message": "Key: 'WorkflowStateUpdating.OriginName' Error:Field validation for 'OriginName' failed on the 'required' tag",
+			  "data": null
+			}`))
+		})
+
+		It("should return 404 when workflow is not exist", func() {
+			workflowManager.UpdateWorkflowStateFunc = func(id types.ID, updating flow.WorkflowStateUpdating, sec *security.Context) error {
+				return domain.ErrNotFound
+			}
+
+			reqBody, err := json.Marshal(&flow.WorkflowStateUpdating{OriginName: "PENDING", Name: "QUEUED", Order: 2000})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1/states", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusNotFound))
+			Expect(body).To(MatchJSON(`{"code":"common.record_not_found","message":"record not found","data":null}`))
+		})
+
+		It("should return 400 when new state is exist", func() {
+			workflowManager.UpdateWorkflowStateFunc = func(id types.ID, updating flow.WorkflowStateUpdating, sec *security.Context) error {
+				return common.ErrStateExisted
+			}
+
+			reqBody, err := json.Marshal(&flow.WorkflowStateUpdating{OriginName: "PENDING", Name: "QUEUED", Order: 2000})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1/states", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"workflow.state_existed","message":"state existed","data":null}`))
+		})
+
+		It("should be able to handle unexpected error", func() {
+			workflowManager.UpdateWorkflowStateFunc = func(id types.ID, updating flow.WorkflowStateUpdating, sec *security.Context) error {
+				return errors.New("a mocked error")
+			}
+			reqBody, err := json.Marshal(&flow.WorkflowStateUpdating{OriginName: "PENDING", Name: "QUEUED", Order: 2000})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1/states", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusInternalServerError))
+			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
+		})
+
+		It("should return 2xx when everything is ok", func() {
+			workflowManager.UpdateWorkflowStateFunc = func(id types.ID, updating flow.WorkflowStateUpdating, sec *security.Context) error {
+				return nil
+			}
+
+			reqBody, err := json.Marshal(&flow.WorkflowStateUpdating{OriginName: "PENDING", Name: "QUEUED", Order: 2000})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1/states", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusNoContent))
+			Expect(body).To(BeEmpty())
+		})
+	})
 })
 
 func buildDemoWorkflowCreation() *flow.WorkflowCreation {
@@ -547,14 +625,16 @@ func buildDemoWorkflowCreation() *flow.WorkflowCreation {
 }
 
 type workflowManagerMock struct {
-	CreateWorkStateTransitionFunc      func(t *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error)
-	QueryWorkflowsFunc                 func(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error)
-	CreateWorkflowFunc                 func(c *flow.WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error)
-	DetailWorkflowFunc                 func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error)
-	UpdateWorkflowBaseFunc             func(ID types.ID, c *flow.WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error)
-	DeleteWorkflowFunc                 func(ID types.ID, sec *security.Context) error
+	CreateWorkStateTransitionFunc func(t *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error)
+	QueryWorkflowsFunc            func(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error)
+	CreateWorkflowFunc            func(c *flow.WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error)
+	DetailWorkflowFunc            func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error)
+	UpdateWorkflowBaseFunc        func(ID types.ID, c *flow.WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error)
+	DeleteWorkflowFunc            func(ID types.ID, sec *security.Context) error
+
 	CreateWorkflowStateTransitionsFunc func(id types.ID, transitions []state.Transition, sec *security.Context) error
 	DeleteWorkflowStateTransitionsFunc func(id types.ID, transitions []state.Transition, sec *security.Context) error
+	UpdateWorkflowStateFunc            func(id types.ID, updating flow.WorkflowStateUpdating, sec *security.Context) error
 }
 
 func (m *workflowManagerMock) QueryWorkflows(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error) {
@@ -577,4 +657,7 @@ func (m *workflowManagerMock) CreateWorkflowStateTransitions(id types.ID, transi
 }
 func (m *workflowManagerMock) DeleteWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error {
 	return m.DeleteWorkflowStateTransitionsFunc(id, transitions, sec)
+}
+func (m *workflowManagerMock) UpdateWorkflowState(id types.ID, updating flow.WorkflowStateUpdating, sec *security.Context) error {
+	return m.UpdateWorkflowStateFunc(id, updating, sec)
 }

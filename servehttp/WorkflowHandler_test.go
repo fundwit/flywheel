@@ -612,6 +612,81 @@ var _ = Describe("WorkflowHandler", func() {
 			Expect(body).To(BeEmpty())
 		})
 	})
+
+	Describe("handleUpdateStateMachineStateOrders", func() {
+		It("should return 400 when id is invalid", func() {
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/abc/state-orders", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid id 'abc'","data":null}`))
+		})
+
+		It("should return 400 when request body is not json", func() {
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1/state-orders", bytes.NewReader([]byte(`bbb`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid character 'b' looking for beginning of value","data":null}`))
+		})
+
+		It("should return 400 when request body is json object", func() {
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1/state-orders", bytes.NewReader([]byte(`{}`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{
+			  "code": "common.bad_param",
+			  "message": "json: cannot unmarshal object into Go value of type []flow.StateOrderRangeUpdating",
+			  "data": null
+			}`))
+		})
+
+		It("should return 400 when failed to validate", func() {
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1/state-orders", bytes.NewReader([]byte(`[{}]`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{
+			  "code": "common.bad_param",
+			  "message": "Key: 'StateOrderRangeUpdating.State' Error:Field validation for 'State' failed on the 'required' tag",
+			  "data": null
+			}`))
+		})
+
+		It("should return 404 when workflow is not exist", func() {
+			workflowManager.UpdateStateRangeOrdersFunc = func(workflowID types.ID, wantedOrders *[]flow.StateOrderRangeUpdating, sec *security.Context) error {
+				return domain.ErrNotFound
+			}
+
+			reqBody, err := json.Marshal(&[]flow.StateOrderRangeUpdating{})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1/state-orders", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusNotFound))
+			Expect(body).To(MatchJSON(`{"code":"common.record_not_found","message":"record not found","data":null}`))
+		})
+
+		It("should be able to handle unexpected error", func() {
+			workflowManager.UpdateStateRangeOrdersFunc = func(workflowID types.ID, wantedOrders *[]flow.StateOrderRangeUpdating, sec *security.Context) error {
+				return errors.New("a mocked error")
+			}
+			reqBody, err := json.Marshal(&[]flow.StateOrderRangeUpdating{})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1/state-orders", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusInternalServerError))
+			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
+		})
+
+		It("should return 2xx when everything is ok", func() {
+			workflowManager.UpdateStateRangeOrdersFunc = func(workflowID types.ID, wantedOrders *[]flow.StateOrderRangeUpdating, sec *security.Context) error {
+				return nil
+			}
+			reqBody, err := json.Marshal(&[]flow.StateOrderRangeUpdating{})
+			Expect(err).To(BeNil())
+			req := httptest.NewRequest(http.MethodPut, "/v1/workflows/1/state-orders", bytes.NewReader(reqBody))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusNoContent))
+			Expect(body).To(BeEmpty())
+		})
+	})
 })
 
 func buildDemoWorkflowCreation() *flow.WorkflowCreation {
@@ -635,6 +710,7 @@ type workflowManagerMock struct {
 	CreateWorkflowStateTransitionsFunc func(id types.ID, transitions []state.Transition, sec *security.Context) error
 	DeleteWorkflowStateTransitionsFunc func(id types.ID, transitions []state.Transition, sec *security.Context) error
 	UpdateWorkflowStateFunc            func(id types.ID, updating flow.WorkflowStateUpdating, sec *security.Context) error
+	UpdateStateRangeOrdersFunc         func(workflowID types.ID, wantedOrders *[]flow.StateOrderRangeUpdating, sec *security.Context) error
 }
 
 func (m *workflowManagerMock) QueryWorkflows(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error) {
@@ -660,4 +736,7 @@ func (m *workflowManagerMock) DeleteWorkflowStateTransitions(id types.ID, transi
 }
 func (m *workflowManagerMock) UpdateWorkflowState(id types.ID, updating flow.WorkflowStateUpdating, sec *security.Context) error {
 	return m.UpdateWorkflowStateFunc(id, updating, sec)
+}
+func (m *workflowManagerMock) UpdateStateRangeOrders(workflowID types.ID, wantedOrders *[]flow.StateOrderRangeUpdating, sec *security.Context) error {
+	return m.UpdateStateRangeOrdersFunc(workflowID, wantedOrders, sec)
 }

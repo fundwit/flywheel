@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"errors"
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/state"
@@ -9,6 +10,7 @@ import (
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
+	"strconv"
 	"time"
 )
 
@@ -24,6 +26,7 @@ type WorkflowManagerTraits interface {
 	DeleteWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error
 
 	UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, sec *security.Context) error
+	UpdateStateRangeOrders(workflowID types.ID, wantedOrders *[]StateOrderRangeUpdating, sec *security.Context) error
 }
 
 type WorkflowManager struct {
@@ -53,6 +56,12 @@ type WorkflowStateUpdating struct {
 	Order int    `json:"order"`
 }
 
+type StateOrderRangeUpdating struct {
+	State    string `json:"state" validate:"required"`
+	NewOlder int    `json:"newOrder"`
+	OldOlder int    `json:"oldOrder"`
+}
+
 func NewWorkflowManager(ds *persistence.DataSourceManager) *WorkflowManager {
 	return &WorkflowManager{
 		dataSource: ds,
@@ -79,7 +88,7 @@ func (m *WorkflowManager) CreateWorkflow(c *WorkflowCreation, sec *security.Cont
 
 	stateNum := len(workflow.StateMachine.States)
 	for idx := 0; idx < stateNum; idx++ {
-		workflow.StateMachine.States[idx].Order = idx + 1
+		workflow.StateMachine.States[idx].Order = 10000 + idx + 1
 	}
 
 	db := m.dataSource.GormDB()
@@ -384,6 +393,42 @@ func (m *WorkflowManager) UpdateWorkflowState(id types.ID, updating WorkflowStat
 
 		return nil
 	})
+}
+
+func (m *WorkflowManager) UpdateStateRangeOrders(workflowID types.ID, wantedOrders *[]StateOrderRangeUpdating, sec *security.Context) error {
+	if wantedOrders == nil || len(*wantedOrders) == 0 {
+		return nil
+	}
+
+	return m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
+		if err := m.checkPerms(workflowID, sec); err != nil {
+			return err
+		}
+
+		for _, orderUpdating := range *wantedOrders {
+			db := tx.Model(&domain.WorkflowState{}).
+				Where(&domain.WorkflowState{WorkflowID: workflowID, Name: orderUpdating.State}).
+				Update("order", orderUpdating.NewOlder)
+			if err := db.Error; err != nil {
+				return err
+			}
+			if db.RowsAffected != 1 {
+				return errors.New("expected affected row is 1, but actual is " + strconv.FormatInt(db.RowsAffected, 10))
+			}
+		}
+		return nil
+	})
+}
+
+func (m *WorkflowManager) checkPerms(id types.ID, sec *security.Context) error {
+	var workflow domain.Workflow
+	if err := m.dataSource.GormDB().Where(&domain.Workflow{ID: id}).First(&workflow).Error; err != nil {
+		return err
+	}
+	if sec == nil || !sec.HasRoleSuffix("_"+workflow.GroupID.String()) {
+		return common.ErrForbidden
+	}
+	return nil
 }
 
 func isWorkflowReferenced(db *gorm.DB, workflowID types.ID) error {

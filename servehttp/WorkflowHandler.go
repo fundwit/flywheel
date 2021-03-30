@@ -35,6 +35,7 @@ func RegisterWorkflowHandler(r *gin.Engine, flowManager flow.WorkflowManagerTrai
 	g.DELETE(":flowId", handler.handleDeleteWorkflow)
 
 	g.PUT(":flowId/states", handler.handleUpdateStateMachineState)
+	g.PUT(":flowId/state-orders", handler.handleUpdateStateMachineStateOrders)
 
 	g.GET(":flowId/transitions", handler.handleQueryTransitions)
 	g.POST(":flowId/transitions", handler.handleCreateStateMachineTransitions)
@@ -227,6 +228,33 @@ func (h *workflowHandler) handleUpdateStateMachineState(c *gin.Context) {
 	}
 
 	err = h.workflowManager.UpdateWorkflowState(id, updating, security.FindSecurityContext(c))
+	if err != nil {
+		_ = c.Error(err)
+		c.Abort()
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *workflowHandler) handleUpdateStateMachineStateOrders(c *gin.Context) {
+	id, err := types.ParseID(c.Param("flowId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
+		return
+	}
+
+	var orderUpdating []flow.StateOrderRangeUpdating
+	err = c.ShouldBindBodyWith(&orderUpdating, binding.JSON)
+	if err != nil {
+		panic(&common.ErrBadParam{Cause: err})
+	}
+
+	for _, updating := range orderUpdating {
+		if err = h.validator.Struct(updating); err != nil {
+			panic(&common.ErrBadParam{Cause: err})
+		}
+	}
+	err = h.workflowManager.UpdateStateRangeOrders(id, &orderUpdating, security.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()

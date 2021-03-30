@@ -420,13 +420,13 @@ var _ = Describe("WorkManager", func() {
 	Describe("UpdateStateRangeOrders", func() {
 		It("should do nothing when input is empty", func() {
 			Expect(workManager.UpdateStateRangeOrders(nil, nil)).To(BeNil())
-			Expect(workManager.UpdateStateRangeOrders(&[]domain.StageRangeOrderUpdating{}, nil)).To(BeNil())
+			Expect(workManager.UpdateStateRangeOrders(&[]domain.WorkOrderRangeUpdating{}, nil)).To(BeNil())
 		})
 
 		It("should be able to handle forbidden access", func() {
-			Expect(workManager.UpdateStateRangeOrders(&[]domain.StageRangeOrderUpdating{
+			Expect(workManager.UpdateStateRangeOrders(&[]domain.WorkOrderRangeUpdating{
 				{ID: 1, NewOlder: 3, OldOlder: 2}}, nil)).To(Equal(errors.New("record not found")))
-			Expect(workManager.UpdateStateRangeOrders(&[]domain.StageRangeOrderUpdating{
+			Expect(workManager.UpdateStateRangeOrders(&[]domain.WorkOrderRangeUpdating{
 				{ID: 1, NewOlder: 3, OldOlder: 2}}, testinfra.BuildSecCtx(1, []string{"owner_404"}))).To(Equal(errors.New("record not found")))
 		})
 
@@ -448,7 +448,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(list[0].OrderInState < list[1].OrderInState && list[1].OrderInState < list[2].OrderInState).To(BeTrue())
 
 			// invalid data
-			Expect(workManager.UpdateStateRangeOrders(&[]domain.StageRangeOrderUpdating{{ID: list[0].ID, NewOlder: 3, OldOlder: 2}}, secCtx)).
+			Expect(workManager.UpdateStateRangeOrders(&[]domain.WorkOrderRangeUpdating{{ID: list[0].ID, NewOlder: 3, OldOlder: 2}}, secCtx)).
 				To(Equal(errors.New("expected affected row is 1, but actual is 0")))
 
 			listPtr, err = workManager.QueryWork(&domain.WorkQuery{}, secCtx)
@@ -459,7 +459,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(list[0].OrderInState < list[1].OrderInState && list[1].OrderInState < list[2].OrderInState).To(BeTrue())
 
 			// valid data: w3 > w2 > w1
-			Expect(workManager.UpdateStateRangeOrders(&[]domain.StageRangeOrderUpdating{
+			Expect(workManager.UpdateStateRangeOrders(&[]domain.WorkOrderRangeUpdating{
 				{ID: list[0].ID, NewOlder: list[2].OrderInState + 2, OldOlder: list[0].OrderInState},
 				{ID: list[1].ID, NewOlder: list[2].OrderInState + 1, OldOlder: list[1].OrderInState}}, secCtx)).To(BeNil())
 

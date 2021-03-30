@@ -278,10 +278,10 @@ var _ = Describe("WorkHandler", func() {
 			req := httptest.NewRequest(http.MethodPut, "/v1/work-orders", bytes.NewReader([]byte(`{}`)))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusBadRequest))
-			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"json: cannot unmarshal object into Go value of type []domain.StageRangeOrderUpdating","data":null}`))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"json: cannot unmarshal object into Go value of type []domain.WorkOrderRangeUpdating","data":null}`))
 		})
 		It("should be able to handle process error", func() {
-			workManager.UpdateStateRangeOrdersFunc = func(wantedOrders *[]domain.StageRangeOrderUpdating, sec *security.Context) error {
+			workManager.UpdateStateRangeOrdersFunc = func(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *security.Context) error {
 				return errors.New("unexpected exception")
 			}
 			req := httptest.NewRequest(http.MethodPut, "/v1/work-orders", bytes.NewReader([]byte(`[]`)))
@@ -290,7 +290,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"unexpected exception","data":null}`))
 		})
 		It("should be able to handle update", func() {
-			workManager.UpdateStateRangeOrdersFunc = func(wantedOrders *[]domain.StageRangeOrderUpdating, sec *security.Context) error {
+			workManager.UpdateStateRangeOrdersFunc = func(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *security.Context) error {
 				return nil
 			}
 			req := httptest.NewRequest(http.MethodPut, "/v1/work-orders", bytes.NewReader([]byte(`[]`)))
@@ -307,7 +307,7 @@ type workManagerMock struct {
 	CreateWorkFunc             func(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error)
 	DeleteWorkFunc             func(id types.ID, sec *security.Context) error
 	UpdateWorkFunc             func(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error)
-	UpdateStateRangeOrdersFunc func(wantedOrders *[]domain.StageRangeOrderUpdating, sec *security.Context) error
+	UpdateStateRangeOrdersFunc func(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *security.Context) error
 }
 
 func (m *workManagerMock) QueryWork(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
@@ -325,6 +325,6 @@ func (m *workManagerMock) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *s
 func (m *workManagerMock) DeleteWork(id types.ID, sec *security.Context) error {
 	return m.DeleteWorkFunc(id, sec)
 }
-func (m *workManagerMock) UpdateStateRangeOrders(wantedOrders *[]domain.StageRangeOrderUpdating, sec *security.Context) error {
+func (m *workManagerMock) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *security.Context) error {
 	return m.UpdateStateRangeOrdersFunc(wantedOrders, sec)
 }

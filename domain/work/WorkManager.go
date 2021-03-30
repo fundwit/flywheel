@@ -20,7 +20,7 @@ type WorkManagerTraits interface {
 	CreateWork(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error)
 	UpdateWork(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error)
 	DeleteWork(id types.ID, sec *security.Context) error
-	UpdateStateRangeOrders(wantedOrders *[]domain.StageRangeOrderUpdating, sec *security.Context) error
+	UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *security.Context) error
 }
 
 type WorkManager struct {
@@ -176,7 +176,7 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *secur
 	return &work, nil
 }
 
-func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.StageRangeOrderUpdating, sec *security.Context) error {
+func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *security.Context) error {
 	if wantedOrders == nil || len(*wantedOrders) == 0 {
 		return nil
 	}

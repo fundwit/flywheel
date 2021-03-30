@@ -151,12 +151,12 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(len(states)).To(Equal(2))
 			Expect(states[0].WorkflowID).To(Equal(workflow.ID))
 			Expect(states[0].CreateTime).To(Equal(workflow.CreateTime))
-			Expect(states[0].Order).To(Equal(1))
+			Expect(states[0].Order).To(Equal(10001))
 			Expect(state.State{Name: states[0].Name, Category: states[0].Category, Order: states[0].Order}).To(Equal(workflow.StateMachine.States[0]))
 
 			Expect(states[1].WorkflowID).To(Equal(workflow.ID))
 			Expect(states[1].CreateTime).To(Equal(workflow.CreateTime))
-			Expect(states[1].Order).To(Equal(2))
+			Expect(states[1].Order).To(Equal(10002))
 			Expect(state.State{Name: states[1].Name, Category: states[1].Category, Order: states[1].Order}).To(Equal(workflow.StateMachine.States[1]))
 
 			var transitions []domain.WorkflowStateTransition
@@ -781,6 +781,105 @@ var _ = Describe("WorkflowManager", func() {
 
 			testDatabase.DS.GormDB().DropTable(&domain.Workflow{})
 			Expect(manager.UpdateWorkflowState(workflow.ID, updating, sec).Error()).
+				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflows' doesn't exist"))
+		})
+	})
+
+	Describe("UpdateStateRangeOrders", func() {
+		It("should return 404 when workflow not exist", func() {
+			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			err := manager.UpdateStateRangeOrders(404, &[]flow.StateOrderRangeUpdating{{State: "UNKNOWN", OldOlder: 100, NewOlder: 101}}, sec)
+			Expect(err).To(Equal(gorm.ErrRecordNotFound))
+		})
+
+		It("should be forbidden without correct permissions", func() {
+			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(333), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, sec)
+			Expect(err).To(BeNil())
+
+			// case 1: without any permission
+			err = manager.UpdateStateRangeOrders(workflow.ID, &[]flow.StateOrderRangeUpdating{{State: "UNKNOWN", OldOlder: 100, NewOlder: 101}},
+				testinfra.BuildSecCtx(200, []string{}))
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("forbidden"))
+
+			// case 1: with other permission
+			err = manager.UpdateStateRangeOrders(workflow.ID, &[]flow.StateOrderRangeUpdating{{State: "UNKNOWN", OldOlder: 100, NewOlder: 101}},
+				testinfra.BuildSecCtx(200, []string{"owner_2", "reader_1"}))
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("forbidden"))
+		})
+
+		It("should failed when origin state not exist", func() {
+			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, sec)
+			Expect(err).To(BeNil())
+
+			err = manager.UpdateStateRangeOrders(workflow.ID, &[]flow.StateOrderRangeUpdating{{State: "UNKNOWN", OldOlder: 100, NewOlder: 101}}, sec)
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("expected affected row is 1, but actual is 0"))
+		})
+
+		It("should success if changes is empty or nil", func() {
+			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, sec)
+			Expect(err).To(BeNil())
+
+			err = manager.UpdateStateRangeOrders(workflow.ID, &[]flow.StateOrderRangeUpdating{}, sec)
+			Expect(err).To(BeNil())
+
+			err = manager.UpdateStateRangeOrders(workflow.ID, nil, sec)
+			Expect(err).To(BeNil())
+		})
+
+		It("should be able to update state orders if everything is ok", func() {
+			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sm := state.NewStateMachine([]state.State{
+				{Name: "QUEUED", Category: state.InBacklog},
+				{Name: "PENDING", Category: state.InBacklog},
+				{Name: "DONE", Category: state.Done},
+			}, []state.Transition{})
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333), StateMachine: *sm}
+			workflow, err := manager.CreateWorkflow(creation, sec)
+			Expect(err).To(BeNil())
+
+			// do action
+			err = manager.UpdateStateRangeOrders(workflow.ID, &[]flow.StateOrderRangeUpdating{
+				{State: "QUEUED", OldOlder: 1, NewOlder: 103},
+				{State: "PENDING", OldOlder: 20, NewOlder: 102},
+			}, sec)
+			Expect(err).To(BeNil())
+
+			var affectedStates []domain.WorkflowState
+			Expect(testDatabase.DS.GormDB().Where(domain.WorkflowState{WorkflowID: workflow.ID}).Order("`order` ASC").Find(&affectedStates).Error).To(BeNil())
+			Expect(len(affectedStates)).To(Equal(3))
+			Expect(affectedStates[0].Name).To(Equal("PENDING"))
+			Expect(affectedStates[0].Category).To(Equal(state.InBacklog))
+			Expect(affectedStates[0].Order).To(Equal(102))
+			Expect(affectedStates[1].Name).To(Equal("QUEUED"))
+			Expect(affectedStates[1].Category).To(Equal(state.InBacklog))
+			Expect(affectedStates[1].Order).To(Equal(103))
+			Expect(affectedStates[2].Name).To(Equal("DONE"))
+			Expect(affectedStates[2].Category).To(Equal(state.Done))
+			Expect(affectedStates[2].Order).To(Equal(10003))
+		})
+
+		It("should be able to catch database error", func() {
+			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := manager.CreateWorkflow(creation, sec)
+			Expect(err).To(BeNil())
+
+			testDatabase.DS.GormDB().DropTable(&domain.WorkflowState{})
+			Expect(manager.UpdateStateRangeOrders(workflow.ID, &[]flow.StateOrderRangeUpdating{{State: "UNKNOWN", OldOlder: 100, NewOlder: 101}}, sec).Error()).
+				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflow_states' doesn't exist"))
+
+			testDatabase.DS.GormDB().DropTable(&domain.Workflow{})
+			Expect(manager.UpdateStateRangeOrders(workflow.ID, &[]flow.StateOrderRangeUpdating{{State: "UNKNOWN", OldOlder: 100, NewOlder: 101}}, sec).Error()).
 				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflows' doesn't exist"))
 		})
 	})

@@ -15,7 +15,7 @@ type WorkUpdating struct {
 	Name string `json:"name"`
 }
 
-type StageRangeOrderUpdating struct {
+type WorkOrderRangeUpdating struct {
 	ID       types.ID `json:"id" validate:"required"`
 	NewOlder int64    `json:"newOrder"`
 	OldOlder int64    `json:"oldOrder"`

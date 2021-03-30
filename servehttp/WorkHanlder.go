@@ -96,7 +96,7 @@ func (h *workHandler) handleUpdate(c *gin.Context) {
 }
 
 func (h *workHandler) handleUpdateOrders(c *gin.Context) {
-	var updating []domain.StageRangeOrderUpdating
+	var updating []domain.WorkOrderRangeUpdating
 	err := c.ShouldBindBodyWith(&updating, binding.JSON)
 	if err != nil {
 		panic(&common.ErrBadParam{Cause: err})

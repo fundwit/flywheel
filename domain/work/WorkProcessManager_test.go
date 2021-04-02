@@ -44,7 +44,7 @@ var _ = Describe("WorkProcessManager", func() {
 		It("should be able to catch db errors", func() {
 			secCtx := testinfra.BuildSecCtx(1, []string{"owner_1"})
 			work, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1)}, secCtx)
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), InitialStateName: domain.StatePending.Name}, secCtx)
 			Expect(err).To(BeZero())
 
 			testDatabase.DS.GormDB().DropTable(&domain.WorkProcessStep{})
@@ -69,7 +69,7 @@ var _ = Describe("WorkProcessManager", func() {
 
 		It("should return empty when access without permissions", func() {
 			detail, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1)},
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), InitialStateName: domain.StatePending.Name},
 				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 
@@ -82,7 +82,7 @@ var _ = Describe("WorkProcessManager", func() {
 		It("should return correct result", func() {
 			secCtx := testinfra.BuildSecCtx(1, []string{"owner_1"})
 			// will create init process step
-			work1, err := workManager.CreateWork(&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1)}, secCtx)
+			work1, err := workManager.CreateWork(&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), InitialStateName: domain.StatePending.Name}, secCtx)
 			Expect(err).To(BeZero())
 
 			// do transition

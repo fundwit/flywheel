@@ -9,6 +9,9 @@ type WorkCreation struct {
 	Name    string   `json:"name" validate:"required"`
 	GroupID types.ID `json:"groupId" validate:"required"`
 	FlowID  types.ID `json:"flowId" validate:"required"`
+
+	InitialStateName string `json:"initialStateName" validate:"required"`
+	PriorityLevel    int    `json:"priorityLevel"`
 }
 
 type WorkUpdating struct {

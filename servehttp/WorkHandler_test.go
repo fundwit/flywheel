@@ -71,7 +71,7 @@ var _ = Describe("WorkHandler", func() {
 				return &detail, nil
 			}
 
-			creation := domain.WorkCreation{Name: "test work", GroupID: types.ID(333), FlowID: demoWorkflow.ID}
+			creation := domain.WorkCreation{Name: "test work", GroupID: types.ID(333), FlowID: demoWorkflow.ID, InitialStateName: domain.StatePending.Name}
 			reqBody, err := json.Marshal(creation)
 			Expect(err).To(BeNil())
 			req := httptest.NewRequest(http.MethodPost, "/v1/works", bytes.NewReader(reqBody))
@@ -97,7 +97,8 @@ var _ = Describe("WorkHandler", func() {
 			  "code": "common.bad_param",
 			  "message": "Key: 'WorkCreation.Name' Error:Field validation for 'Name' failed on the 'required' tag\n` +
 				`Key: 'WorkCreation.GroupID' Error:Field validation for 'GroupID' failed on the 'required' tag\n` +
-				`Key: 'WorkCreation.FlowID' Error:Field validation for 'FlowID' failed on the 'required' tag",
+				`Key: 'WorkCreation.FlowID' Error:Field validation for 'FlowID' failed on the 'required' tag\n` +
+				`Key: 'WorkCreation.InitialStateName' Error:Field validation for 'InitialStateName' failed on the 'required' tag",
 			  "data": null
 			}`))
 		})
@@ -106,7 +107,8 @@ var _ = Describe("WorkHandler", func() {
 			workManager.CreateWorkFunc = func(creation *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {
 				return nil, errors.New("a mocked error")
 			}
-			req := httptest.NewRequest(http.MethodPost, "/v1/works", bytes.NewReader([]byte(`{"name":"test","groupId":"333", "flowId": "1000"}`)))
+			req := httptest.NewRequest(http.MethodPost, "/v1/works",
+				bytes.NewReader([]byte(`{"name":"test","groupId":"333", "flowId": "1000", "initialStateName": "PENDING"}`)))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusInternalServerError))
 			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))

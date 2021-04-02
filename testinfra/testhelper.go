@@ -14,9 +14,10 @@ func BuildSecCtx(uid types.ID, perms []string) *security.Context {
 
 func BuildWorker(m work.WorkManagerTraits, workName string, flowId, gid types.ID, secCtx *security.Context) *domain.WorkDetail {
 	workCreation := &domain.WorkCreation{
-		Name:    workName,
-		GroupID: gid,
-		FlowID:  flowId,
+		Name:             workName,
+		GroupID:          gid,
+		FlowID:           flowId,
+		InitialStateName: domain.StatePending.Name,
 	}
 	detail, err := m.CreateWork(workCreation, secCtx)
 	Expect(err).To(BeNil())

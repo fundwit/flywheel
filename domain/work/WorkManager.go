@@ -5,6 +5,7 @@ import (
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
+	"flywheel/domain/state"
 	"flywheel/persistence"
 	"flywheel/security"
 	"github.com/fundwit/go-commons/types"
@@ -120,13 +121,29 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 			return err
 		}
 
-		workDetail = BuildWorkDetail(common.NextId(m.idWorker), c, workflowDetail)
-		initProcessStep := domain.WorkProcessStep{WorkID: workDetail.ID, FlowID: workDetail.FlowID,
-			StateName: workDetail.State.Name, StateCategory: workDetail.State.Category, BeginTime: workDetail.CreateTime}
+		initialState, found := workflowDetail.StateMachine.FindState(c.InitialStateName)
+		if !found {
+			return common.ErrUnknownState
+		}
 
+		workDetail = BuildWorkDetail(common.NextId(m.idWorker), c, workflowDetail, initialState)
+		if c.PriorityLevel < 0 {
+			var highestPriorityWork domain.Work
+			err := tx.Model(&domain.Work{}).Where(&domain.Work{GroupID: c.GroupID, StateName: initialState.Name}).
+				Select("order_in_state").
+				Order("order_in_state ASC").Limit(1).First(&highestPriorityWork).Error
+			if err == nil {
+				workDetail.OrderInState = highestPriorityWork.OrderInState - 1
+			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+		}
 		if err := tx.Create(workDetail.Work).Error; err != nil {
 			return err
 		}
+
+		initProcessStep := domain.WorkProcessStep{WorkID: workDetail.ID, FlowID: workDetail.FlowID,
+			StateName: workDetail.State.Name, StateCategory: workDetail.State.Category, BeginTime: workDetail.CreateTime}
 		if err := tx.Create(initProcessStep).Error; err != nil {
 			return err
 		}
@@ -232,9 +249,7 @@ func (m *WorkManager) checkPerms(id types.ID, sec *security.Context) error {
 	return nil
 }
 
-func BuildWorkDetail(id types.ID, c *domain.WorkCreation, workflow *domain.WorkflowDetail) *domain.WorkDetail {
-	initState := workflow.StateMachine.States[0]
-
+func BuildWorkDetail(id types.ID, c *domain.WorkCreation, workflow *domain.WorkflowDetail, initState state.State) *domain.WorkDetail {
 	now := time.Now()
 	return &domain.WorkDetail{
 		Work: domain.Work{

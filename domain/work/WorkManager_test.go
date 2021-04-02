@@ -2,6 +2,7 @@ package work_test
 
 import (
 	"errors"
+	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/state"
@@ -42,8 +43,8 @@ var _ = Describe("WorkManager", func() {
 		flowDetail.CreateTime = flowDetail.CreateTime.Round(time.Millisecond)
 		creation = &flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(2), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 		flowDetail2, err = flowManager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_2"}))
-		flowDetail2.CreateTime = flowDetail2.CreateTime.Round(time.Millisecond)
 		Expect(err).To(BeNil())
+		flowDetail2.CreateTime = flowDetail2.CreateTime.Round(time.Millisecond)
 
 		workManager = work.NewWorkManager(testDatabase.DS, flowManager)
 	})
@@ -59,14 +60,25 @@ var _ = Describe("WorkManager", func() {
 		It("should be able to catch db errors", func() {
 			testDatabase.DS.GormDB().DropTable(&domain.Work{})
 
-			creation := &domain.WorkCreation{Name: "test work", GroupID: types.ID(1), FlowID: flowDetail.ID}
+			creation := &domain.WorkCreation{Name: "test work", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name}
 			work, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
 			Expect(work).To(BeNil())
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
 		})
+
+		It("should failed when initial state is unknown", func() {
+			testDatabase.DS.GormDB().DropTable(&domain.Work{})
+
+			creation := &domain.WorkCreation{Name: "test work", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: "UNKNOWN"}
+			work, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(work).To(BeNil())
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal(common.ErrUnknownState.Error()))
+		})
+
 		It("should create new work successfully", func() {
-			creation := &domain.WorkCreation{Name: "test work", GroupID: types.ID(1), FlowID: flowDetail.ID}
+			creation := &domain.WorkCreation{Name: "test work", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name}
 			work, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
 
 			Expect(err).To(BeZero())
@@ -105,8 +117,48 @@ var _ = Describe("WorkManager", func() {
 			Expect(initProcessStep[0]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
 				StateName: detail.StateName, StateCategory: detail.State.Category, BeginTime: detail.CreateTime, EndTime: nil}))
 		})
+
+		It("should create new work with highest priority successfully", func() {
+			creation := &domain.WorkCreation{Name: "test work", GroupID: types.ID(2), FlowID: flowDetail2.ID,
+				InitialStateName: domain.StatePending.Name, PriorityLevel: -2}
+			ignoreWork1, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, []string{"owner_2"}))
+			Expect(err).To(BeZero())
+			Expect(ignoreWork1).ToNot(BeZero())
+
+			creation = &domain.WorkCreation{Name: "test work", GroupID: types.ID(1), FlowID: flowDetail.ID,
+				InitialStateName: domain.StateDoing.Name}
+			ignoreWork2, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(err).To(BeZero())
+			Expect(ignoreWork2).ToNot(BeZero())
+			Expect(ignoreWork2.OrderInState > ignoreWork1.OrderInState).To(BeTrue())
+
+			creation = &domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID,
+				InitialStateName: domain.StatePending.Name}
+			work, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(err).To(BeZero())
+			Expect(work).ToNot(BeZero())
+			detail, err := workManager.WorkDetail(work.ID, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+			Expect(detail).ToNot(BeNil())
+			Expect(work.OrderInState > ignoreWork2.OrderInState).To(BeTrue())
+
+			creation = &domain.WorkCreation{Name: "test work2", GroupID: types.ID(1), FlowID: flowDetail.ID,
+				InitialStateName: domain.StatePending.Name, PriorityLevel: -1}
+			work1, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(err).To(BeZero())
+			Expect(work).ToNot(BeZero())
+			detail1, err := workManager.WorkDetail(work1.ID, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+			Expect(detail1).ToNot(BeNil())
+
+			Expect(detail1.StateName).To(Equal(domain.StatePending.Name))
+			Expect(detail1.StateCategory).To(Equal(domain.StatePending.Category))
+			Expect(detail1.OrderInState).To(Equal(detail.OrderInState - 1))
+			Expect(detail1.OrderInState > ignoreWork2.OrderInState).To(BeTrue())
+		})
+
 		It("should forbid to create to other group", func() {
-			creation := &domain.WorkCreation{Name: "test work", GroupID: types.ID(1), FlowID: flowDetail.ID}
+			creation := &domain.WorkCreation{Name: "test work", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name}
 			work, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, []string{"owner_2"}))
 			Expect(work).To(BeNil())
 			Expect(err).ToNot(BeNil())
@@ -116,7 +168,7 @@ var _ = Describe("WorkManager", func() {
 
 	Describe("DetailWork", func() {
 		It("should forbid to get work detail with permissions", func() {
-			creation := &domain.WorkCreation{Name: "test work", GroupID: types.ID(1), FlowID: flowDetail.ID}
+			creation := &domain.WorkCreation{Name: "test work", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name}
 			work, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
 			Expect(err).To(BeNil())
 
@@ -142,10 +194,12 @@ var _ = Describe("WorkManager", func() {
 	Describe("Query All", func() {
 		It("should query all works successfully", func() {
 			_, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 			_, err = workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work2", GroupID: types.ID(2), FlowID: flowDetail2.ID}, testinfra.BuildSecCtx(2, []string{"owner_2"}))
+				&domain.WorkCreation{Name: "test work2", GroupID: types.ID(2), FlowID: flowDetail2.ID, InitialStateName: domain.StatePending.Name},
+				testinfra.BuildSecCtx(2, []string{"owner_2"}))
 			Expect(err).To(BeZero())
 
 			works, err := workManager.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, []string{"owner_1", "owner_2"}))
@@ -175,13 +229,16 @@ var _ = Describe("WorkManager", func() {
 
 		It("should query by name and group id", func() {
 			_, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 			_, err = workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work2", GroupID: types.ID(1), FlowID: flowDetail.ID}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+				&domain.WorkCreation{Name: "test work2", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 			_, err = workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work2", GroupID: types.ID(2), FlowID: flowDetail2.ID}, testinfra.BuildSecCtx(2, []string{"owner_2"}))
+				&domain.WorkCreation{Name: "test work2", GroupID: types.ID(2), FlowID: flowDetail2.ID, InitialStateName: domain.StatePending.Name},
+				testinfra.BuildSecCtx(2, []string{"owner_2"}))
 			Expect(err).To(BeZero())
 
 			works, err := workManager.QueryWork(
@@ -204,17 +261,20 @@ var _ = Describe("WorkManager", func() {
 
 		It("should query by stateCategory", func() {
 			work1, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 
 			work2, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work2", GroupID: types.ID(1), FlowID: flowDetail.ID}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+				&domain.WorkCreation{Name: "test work2", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 			Expect(testDatabase.DS.GormDB().Model(&domain.Work{}).Where(&domain.Work{ID: work2.ID}).
 				Update("state_category", state.InProcess).Error).To(BeNil())
 
 			work3, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work3", GroupID: types.ID(1), FlowID: flowDetail.ID}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+				&domain.WorkCreation{Name: "test work3", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 			Expect(testDatabase.DS.GormDB().Model(&domain.Work{}).Where(&domain.Work{ID: work3.ID}).
 				Update("state_category", state.Done).Error).To(BeNil())
@@ -263,7 +323,7 @@ var _ = Describe("WorkManager", func() {
 	Describe("UpdateWork", func() {
 		It("should be able to update work", func() {
 			detail, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID},
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
 				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 
@@ -286,7 +346,7 @@ var _ = Describe("WorkManager", func() {
 		})
 		It("should be able to catch error when work not found", func() {
 			_, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID},
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
 				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 
@@ -299,7 +359,7 @@ var _ = Describe("WorkManager", func() {
 		})
 
 		It("should forbid to update work without permission", func() {
-			detail, err := workManager.CreateWork(&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID},
+			detail, err := workManager.CreateWork(&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
 				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 
@@ -337,11 +397,11 @@ var _ = Describe("WorkManager", func() {
 	Describe("DeleteWork", func() {
 		It("should be able to delete work by id", func() {
 			_, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID},
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
 				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 			_, err = workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work2", GroupID: types.ID(1), FlowID: flowDetail.ID},
+				&domain.WorkCreation{Name: "test work2", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
 				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 
@@ -390,7 +450,7 @@ var _ = Describe("WorkManager", func() {
 
 		It("should forbid to delete without permissions", func() {
 			detail, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID},
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
 				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 
@@ -401,7 +461,7 @@ var _ = Describe("WorkManager", func() {
 
 		It("should be able to catch db errors", func() {
 			detail, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID},
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
 				testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeZero())
 
@@ -432,11 +492,11 @@ var _ = Describe("WorkManager", func() {
 
 		It("should update order", func() {
 			secCtx := testinfra.BuildSecCtx(1, []string{"owner_1"})
-			_, err := workManager.CreateWork(&domain.WorkCreation{Name: "w1", GroupID: types.ID(1), FlowID: flowDetail.ID}, secCtx)
+			_, err := workManager.CreateWork(&domain.WorkCreation{Name: "w1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name}, secCtx)
 			Expect(err).To(BeZero())
-			_, err = workManager.CreateWork(&domain.WorkCreation{Name: "w2", GroupID: types.ID(1), FlowID: flowDetail.ID}, secCtx)
+			_, err = workManager.CreateWork(&domain.WorkCreation{Name: "w2", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name}, secCtx)
 			Expect(err).To(BeZero())
-			_, err = workManager.CreateWork(&domain.WorkCreation{Name: "w3", GroupID: types.ID(1), FlowID: flowDetail.ID}, secCtx)
+			_, err = workManager.CreateWork(&domain.WorkCreation{Name: "w3", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name}, secCtx)
 			Expect(err).To(BeZero())
 
 			// default w1 > w2 > w3

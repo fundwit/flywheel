@@ -25,6 +25,7 @@ type WorkflowManagerTraits interface {
 	CreateWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error
 	DeleteWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error
 
+	CreateState(workflowID types.ID, creating *StateCreating, sec *security.Context) error
 	UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, sec *security.Context) error
 	UpdateStateRangeOrders(workflowID types.ID, wantedOrders *[]StateOrderRangeUpdating, sec *security.Context) error
 }
@@ -35,12 +36,12 @@ type WorkflowManager struct {
 }
 
 type WorkflowCreation struct {
-	Name       string   `json:"name"     binding:"required"`
-	GroupID    types.ID `json:"groupId" binding:"required"`
+	Name       string   `json:"name"       binding:"required"`
+	GroupID    types.ID `json:"groupId"    binding:"required"`
 	ThemeColor string   `json:"themeColor" binding:"required"`
 	ThemeIcon  string   `json:"themeIcon"  binding:"required"`
 
-	StateMachine state.StateMachine `json:"stateMachine" binding:"required"`
+	StateMachine state.StateMachine `json:"stateMachine" binding:"dive"`
 }
 
 type WorkflowBaseUpdation struct {
@@ -60,6 +61,12 @@ type StateOrderRangeUpdating struct {
 	State    string `json:"state" validate:"required"`
 	NewOlder int    `json:"newOrder"`
 	OldOlder int    `json:"oldOrder"`
+}
+type StateCreating struct {
+	Name        string             `json:"name"         binding:"required"`
+	Category    state.Category     `json:"category"     binding:"required"`
+	Order       int                `json:"order"        binding:"required"`
+	Transitions []state.Transition `json:"transitions"  binding:"dive"`
 }
 
 func NewWorkflowManager(ds *persistence.DataSourceManager) *WorkflowManager {
@@ -391,6 +398,45 @@ func (m *WorkflowManager) UpdateWorkflowState(id types.ID, updating WorkflowStat
 			}
 		}
 
+		return nil
+	})
+}
+
+func (m *WorkflowManager) CreateState(workflowID types.ID, creating *StateCreating, sec *security.Context) error {
+	now := time.Now()
+	return m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
+		if err := m.checkPerms(workflowID, sec); err != nil {
+			return err
+		}
+
+		stateEntity := &domain.WorkflowState{
+			WorkflowID: workflowID, Order: creating.Order, Name: creating.Name, Category: creating.Category, CreateTime: now,
+		}
+		if err := tx.Create(stateEntity).Error; err != nil {
+			return err
+		}
+
+		var stateRecords []domain.WorkflowState
+		if err := tx.Where(domain.WorkflowState{WorkflowID: workflowID}).Order("`order` ASC").Find(&stateRecords).Error; err != nil {
+			return err
+		}
+		stateMap := map[string]string{}
+		for _, stateRecord := range stateRecords {
+			stateMap[stateRecord.Name] = stateRecord.Name
+		}
+
+		for _, t := range creating.Transitions {
+			if stateMap[t.From] == "" || stateMap[t.To] == "" {
+				return common.ErrUnknownState
+			}
+
+			transition := &domain.WorkflowStateTransition{
+				WorkflowID: workflowID, Name: t.Name, FromState: t.From, ToState: t.To, CreateTime: now,
+			}
+			if err := tx.Create(transition).Error; err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 }

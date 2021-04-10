@@ -883,4 +883,99 @@ var _ = Describe("WorkflowManager", func() {
 				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflows' doesn't exist"))
 		})
 	})
+
+	Describe("CreateState", func() {
+		It("should return 404 when workflow not exist when creating state", func() {
+			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			err := manager.CreateState(404, &flow.StateCreating{Name: "NEW", Category: 1, Order: 101, Transitions: []state.Transition{}}, sec)
+			Expect(err).To(Equal(gorm.ErrRecordNotFound))
+		})
+
+		It("should be forbidden without correct permissions when creating state", func() {
+			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", GroupID: types.ID(333),
+				StateMachine: domain.GenericWorkflowTemplate.StateMachine}, sec)
+			Expect(err).To(BeNil())
+
+			creation := &flow.StateCreating{Name: "NEW", Category: 1, Order: 101, Transitions: []state.Transition{}}
+			// case 1: without any permission
+			err = manager.CreateState(workflow.ID, creation, testinfra.BuildSecCtx(200, []string{}))
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("forbidden"))
+
+			// case 1: with other permission
+			err = manager.CreateState(workflow.ID, creation, testinfra.BuildSecCtx(200, []string{"owner_2", "reader_1"}))
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("forbidden"))
+		})
+
+		It("should failed when state in transitions not exist", func() {
+			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1),
+				StateMachine: domain.GenericWorkflowTemplate.StateMachine}, sec)
+			Expect(err).To(BeNil())
+
+			err = manager.CreateState(workflow.ID, &flow.StateCreating{Name: "NEW", Category: 1, Order: 101,
+				Transitions: []state.Transition{{Name: "test", From: "NotExist", To: domain.StatePending.Name}}}, sec)
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal(common.ErrUnknownState.Error()))
+
+			err = manager.CreateState(workflow.ID, &flow.StateCreating{Name: "NEW", Category: 1, Order: 101,
+				Transitions: []state.Transition{{Name: "test", From: domain.StatePending.Name, To: "NotExist"}}}, sec)
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal(common.ErrUnknownState.Error()))
+		})
+
+		It("should success if everything is ok when creating state", func() {
+			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1),
+				StateMachine: domain.GenericWorkflowTemplate.StateMachine}, sec)
+			Expect(err).To(BeNil())
+
+			// do action
+			err = manager.CreateState(workflow.ID, &flow.StateCreating{Name: "NEW", Category: 2, Order: 20002,
+				Transitions: []state.Transition{{Name: "test", From: domain.StatePending.Name, To: "NEW"}}}, sec)
+			Expect(err).To(BeNil())
+
+			err = manager.CreateState(workflow.ID, &flow.StateCreating{Name: "NEW1", Category: 1, Order: 20001,
+				Transitions: []state.Transition{}}, sec)
+			Expect(err).To(BeNil())
+
+			var affectedStates []domain.WorkflowState
+			Expect(testDatabase.DS.GormDB().Where(domain.WorkflowState{WorkflowID: workflow.ID}).Order("`order` ASC").Find(&affectedStates).Error).To(BeNil())
+			Expect(len(affectedStates)).To(Equal(5))
+			Expect(affectedStates[3].Name).To(Equal("NEW1"))
+			Expect(affectedStates[3].Category).To(Equal(state.InBacklog))
+			Expect(affectedStates[4].Name).To(Equal("NEW"))
+			Expect(affectedStates[4].Category).To(Equal(state.InProcess))
+
+			var affectedTransitions []domain.WorkflowStateTransition
+			Expect(testDatabase.DS.GormDB().Where(domain.WorkflowStateTransition{WorkflowID: workflow.ID}).
+				Order("`create_time` ASC").Find(&affectedTransitions).Error).To(BeNil())
+			Expect(len(affectedTransitions)).To(Equal(6))
+			Expect(affectedTransitions[5].Name).To(Equal("test"))
+			Expect(affectedTransitions[5].FromState).To(Equal(domain.StatePending.Name))
+			Expect(affectedTransitions[5].ToState).To(Equal("NEW"))
+		})
+
+		It("should be able to catch database error when creating state", func() {
+			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+				StateMachine: domain.GenericWorkflowTemplate.StateMachine}, sec)
+			Expect(err).To(BeNil())
+
+			testDatabase.DS.GormDB().DropTable(&domain.WorkflowStateTransition{})
+			Expect(manager.CreateState(workflow.ID, &flow.StateCreating{Name: "NEW", Category: 1, Order: 20001,
+				Transitions: []state.Transition{{Name: "test", From: domain.StatePending.Name, To: "NEW"}}}, sec).Error()).
+				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflow_state_transitions' doesn't exist"))
+
+			testDatabase.DS.GormDB().DropTable(&domain.WorkflowState{})
+			Expect(manager.CreateState(workflow.ID, &flow.StateCreating{Name: "NEW", Category: 1, Order: 20001, Transitions: []state.Transition{}}, sec).Error()).
+				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflow_states' doesn't exist"))
+
+			testDatabase.DS.GormDB().DropTable(&domain.Workflow{})
+			Expect(manager.CreateState(workflow.ID, &flow.StateCreating{Name: "NEW", Category: 1, Order: 20001, Transitions: []state.Transition{}}, sec).Error()).
+				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflows' doesn't exist"))
+		})
+	})
 })

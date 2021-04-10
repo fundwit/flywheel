@@ -30,9 +30,9 @@ type State struct {
 }
 
 type Transition struct {
-	Name string `json:"name" validate:"required"`
-	From string `json:"from" validate:"required"`
-	To   string `json:"to"   validate:"required"`
+	Name string `json:"name" validate:"required" binding:"required"`
+	From string `json:"from" validate:"required" binding:"required"`
+	To   string `json:"to"   validate:"required" binding:"required"`
 }
 
 func NewStateMachine(states []State, transitions []Transition) *StateMachine {

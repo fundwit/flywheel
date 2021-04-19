@@ -1,6 +1,7 @@
 package servehttp
 
 import (
+	"flywheel/bizerror"
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/work"
@@ -25,7 +26,7 @@ type workProcessStepHandler struct {
 func (h *workProcessStepHandler) handleQuery(c *gin.Context) {
 	query := domain.WorkProcessStepQuery{}
 	if err := c.ShouldBindWith(&query, binding.Query); err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
 	works, err := h.manager.QueryProcessSteps(&query, security.FindSecurityContext(c))

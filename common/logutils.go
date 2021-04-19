@@ -5,13 +5,11 @@ import (
 	"os"
 )
 
-var Log *logrus.Logger
-
 func init() {
-	Log = logrus.New()
-	Log.Out = os.Stdout
-	Log.Formatter = &logrus.JSONFormatter{}
-	Log.AddHook(&DefaultFieldsHook{})
+	logger := logrus.StandardLogger()
+	logger.Out = os.Stdout
+	logger.Formatter = &logrus.JSONFormatter{}
+	logger.AddHook(&DefaultFieldsHook{})
 }
 
 type DefaultFieldsHook struct {

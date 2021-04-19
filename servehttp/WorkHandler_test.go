@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/state"
 	"flywheel/security"
@@ -33,7 +34,7 @@ var _ = Describe("WorkHandler", func() {
 
 	BeforeEach(func() {
 		router = gin.Default()
-		router.Use(servehttp.ErrorHandling())
+		router.Use(bizerror.ErrorHandling())
 		workManager = &workManagerMock{}
 		servehttp.RegisterWorkHandler(router, workManager)
 
@@ -80,7 +81,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"333","flowId":"` + demoWorkflow.ID.String() + `", "orderInState": ` +
 				strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `, "createTime":"` + timeString + `",
 				"stateName":"PENDING", "stateCategory": 1, "type": ` + demoWorkflowJson + `,"state":{"name": "PENDING", "category": 1, "order": 1},
-				"stateBeginTime": null,"processBeginTime":null, "processEndTime":null}`))
+				"stateBeginTime": null,"processBeginTime":null, "processEndTime":null, "archivedTime": null}`))
 		})
 
 		It("should return 400 when bind failed", func() {
@@ -133,10 +134,10 @@ var _ = Describe("WorkHandler", func() {
 			Expect(body).To(MatchJSON(`{"data":[{"id":"1","name":"work1","groupId":"333","flowId":"1",
 				"createTime":"` + timeString + `","orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + ` ,
 				"stateName":"PENDING", "stateCategory": 1, "state":{"name":"PENDING", "category":1, "order": 1},
-				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null}, 
+				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null}, 
 				{"id":"2","name":"work2","groupId":"333","flowId":"1", "orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `,
 				"createTime":"` + timeString + `","stateName":"DONE", "stateCategory": 3, "state":{"name":"DONE", "category":3, "order": 3},
-				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null
+				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null
 				}],"total": 2}`))
 		})
 
@@ -202,7 +203,7 @@ var _ = Describe("WorkHandler", func() {
 				"createTime":"` + timeString + `","orderInState": 999,
 				"stateName":"DOING", "stateCategory": 2, "state":{"name":"DOING", "category":2, "order": 2},
 				"stateBeginTime": "` + timeString + `", "processBeginTime": "` + timeString + `", "processEndTime": "` + timeString + `",
-				"type": ` + demoWorkflowJson + `}`))
+				"type": ` + demoWorkflowJson + `, "archivedTime": null}`))
 		})
 	})
 
@@ -240,7 +241,7 @@ var _ = Describe("WorkHandler", func() {
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","stateName":"PENDING", "stateCategory": 1,
-				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null,
+				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null,
 				"state":{"name":"PENDING", "category":1, "order": 1},"groupId":"333","flowId":"1","createTime":"` +
 				timeString + `", "orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `}`))
 		})
@@ -269,6 +270,52 @@ var _ = Describe("WorkHandler", func() {
 				return errors.New("unexpected exception")
 			}
 			req := httptest.NewRequest(http.MethodDelete, "/v1/works/123", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusInternalServerError))
+			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"unexpected exception","data":null}`))
+		})
+	})
+
+	Describe("handleCreateArchivedWorks", func() {
+		It("should be able to handle archive work", func() {
+			workManager.ArchiveWorksFunc = func(id []types.ID, sec *security.Context) error {
+				return nil
+			}
+
+			req := httptest.NewRequest(http.MethodPost, "/v1/archived-works", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"bad_request.body_not_found","message":"body not found","data":null}`))
+
+			req = httptest.NewRequest(http.MethodPost, "/v1/archived-works", bytes.NewReader([]byte(`abc`)))
+			status, body, _ = testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"bad_request.invalid_body_format","message":"invalid body format",
+					"data":"invalid character 'a' looking for beginning of value"}`))
+
+			req = httptest.NewRequest(http.MethodPost, "/v1/archived-works", bytes.NewReader([]byte(`{"workIdList": null}`)))
+			status, body, _ = testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"bad_request.validation_failed","message":"validation failed",
+				"data":"Key: 'WorkSelection.WorkIdList' Error:Field validation for 'WorkIdList' failed on the 'required' tag"}`))
+
+			req = httptest.NewRequest(http.MethodPost, "/v1/archived-works", bytes.NewReader([]byte(`{"workIdList": []}`)))
+			status, body, _ = testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"bad_request.validation_failed","message":"validation failed",
+				"data":"Key: 'WorkSelection.WorkIdList' Error:Field validation for 'WorkIdList' failed on the 'gt' tag"}`))
+
+			req = httptest.NewRequest(http.MethodPost, "/v1/archived-works", bytes.NewReader([]byte(`{"workIdList": ["111", 222]}`)))
+			status, body, _ = testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusNoContent))
+			Expect(len(body)).To(Equal(0))
+		})
+
+		XIt("should be able to handle exception of unexpected", func() {
+			workManager.ArchiveWorksFunc = func(id []types.ID, sec *security.Context) error {
+				return errors.New("unexpected exception")
+			}
+			req := httptest.NewRequest(http.MethodPost, "/v1/archived-works", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusInternalServerError))
 			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"unexpected exception","data":null}`))
@@ -310,6 +357,7 @@ type workManagerMock struct {
 	DeleteWorkFunc             func(id types.ID, sec *security.Context) error
 	UpdateWorkFunc             func(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error)
 	UpdateStateRangeOrdersFunc func(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *security.Context) error
+	ArchiveWorksFunc           func(ids []types.ID, sec *security.Context) error
 }
 
 func (m *workManagerMock) QueryWork(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
@@ -329,4 +377,7 @@ func (m *workManagerMock) DeleteWork(id types.ID, sec *security.Context) error {
 }
 func (m *workManagerMock) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *security.Context) error {
 	return m.UpdateStateRangeOrdersFunc(wantedOrders, sec)
+}
+func (m *workManagerMock) ArchiveWorks(ids []types.ID, sec *security.Context) error {
+	return m.ArchiveWorksFunc(ids, sec)
 }

@@ -2,6 +2,7 @@ package work
 
 import (
 	"errors"
+	"flywheel/bizerror"
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
@@ -87,7 +88,7 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkStateTransi
 			return err
 		}
 		if !sec.HasRole(fmt.Sprintf("%s_%d", domain.RoleOwner, work.GroupID)) {
-			return common.ErrForbidden
+			return bizerror.ErrForbidden
 		}
 
 		query := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID, StateName: c.FromState}).

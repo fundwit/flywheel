@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/work"
@@ -43,7 +44,7 @@ func main() {
 	}
 
 	engine := gin.Default()
-	engine.Use(servehttp.ErrorHandling())
+	engine.Use(bizerror.ErrorHandling())
 	engine.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "flywheel")
 	})

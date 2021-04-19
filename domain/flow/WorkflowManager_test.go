@@ -1,7 +1,7 @@
 package flow_test
 
 import (
-	"flywheel/common"
+	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/state"
@@ -109,7 +109,7 @@ var _ = Describe("WorkflowManager", func() {
 			creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: creationDemo.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_2"}))
 			Expect(workflow).To(BeNil())
-			Expect(err).To(Equal(common.ErrForbidden))
+			Expect(err).To(Equal(bizerror.ErrForbidden))
 		})
 
 		It("should catch database errors", func() {
@@ -351,7 +351,7 @@ var _ = Describe("WorkflowManager", func() {
 				StateBeginTime: nil, ProcessBeginTime: nil, ProcessEndTime: nil})
 
 			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{"owner_1"}))
-			Expect(err).To(Equal(common.ErrWorkflowIsReferenced))
+			Expect(err).To(Equal(bizerror.ErrWorkflowIsReferenced))
 		})
 		It("should forbid to delete workflow if it still be referenced by workProcessStep", func() {
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -361,7 +361,7 @@ var _ = Describe("WorkflowManager", func() {
 			testDatabase.DS.GormDB().Save(&domain.WorkProcessStep{WorkID: 1, FlowID: workflow.ID, StateName: "PENDING", StateCategory: 0, BeginTime: time.Now()})
 
 			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{"owner_1"}))
-			Expect(err).To(Equal(common.ErrWorkflowIsReferenced))
+			Expect(err).To(Equal(bizerror.ErrWorkflowIsReferenced))
 		})
 		It("should forbid to delete workflow if it still be referenced by workStateTransition", func() {
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -375,7 +375,7 @@ var _ = Describe("WorkflowManager", func() {
 			})
 
 			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{"owner_1"}))
-			Expect(err).To(Equal(common.ErrWorkflowIsReferenced))
+			Expect(err).To(Equal(bizerror.ErrWorkflowIsReferenced))
 		})
 
 		It("should be able to delete workflow if everything is ok", func() {
@@ -482,12 +482,12 @@ var _ = Describe("WorkflowManager", func() {
 			// case 1: from state not exist
 			err = manager.CreateWorkflowStateTransitions(workflow.ID, []state.Transition{{Name: "start", From: "NotExist", To: domain.StateDoing.Name}}, sec)
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal(common.ErrUnknownState.Error()))
+			Expect(err.Error()).To(Equal(bizerror.ErrUnknownState.Error()))
 
 			// case 1: to state not exist
 			err = manager.CreateWorkflowStateTransitions(workflow.ID, []state.Transition{{Name: "start", From: domain.StateDoing.Name, To: "NotExist"}}, sec)
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal(common.ErrUnknownState.Error()))
+			Expect(err.Error()).To(Equal(bizerror.ErrUnknownState.Error()))
 		})
 
 		It("should be able to create workflow transitions if everything is ok", func() {
@@ -669,7 +669,7 @@ var _ = Describe("WorkflowManager", func() {
 			// failed when origin name and new name are not equals (state DOING is existed)
 			err = manager.UpdateWorkflowState(workflow.ID, flow.WorkflowStateUpdating{OriginName: domain.StatePending.Name, Name: domain.StateDoing.Name}, sec)
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal(common.ErrStateExisted.Error()))
+			Expect(err.Error()).To(Equal(bizerror.ErrStateExisted.Error()))
 
 			// success when origin name and new name are equals
 			err = manager.UpdateWorkflowState(workflow.ID, flow.WorkflowStateUpdating{OriginName: domain.StatePending.Name, Name: domain.StatePending.Name}, sec)
@@ -918,12 +918,12 @@ var _ = Describe("WorkflowManager", func() {
 			err = manager.CreateState(workflow.ID, &flow.StateCreating{Name: "NEW", Category: 1, Order: 101,
 				Transitions: []state.Transition{{Name: "test", From: "NotExist", To: domain.StatePending.Name}}}, sec)
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal(common.ErrUnknownState.Error()))
+			Expect(err.Error()).To(Equal(bizerror.ErrUnknownState.Error()))
 
 			err = manager.CreateState(workflow.ID, &flow.StateCreating{Name: "NEW", Category: 1, Order: 101,
 				Transitions: []state.Transition{{Name: "test", From: domain.StatePending.Name, To: "NotExist"}}}, sec)
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal(common.ErrUnknownState.Error()))
+			Expect(err.Error()).To(Equal(bizerror.ErrUnknownState.Error()))
 		})
 
 		It("should success if everything is ok when creating state", func() {

@@ -1,6 +1,7 @@
 package servehttp
 
 import (
+	"flywheel/bizerror"
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
@@ -63,10 +64,10 @@ func (h *workflowHandler) handleCreateWorkflow(c *gin.Context) {
 	creation := flow.WorkflowCreation{}
 	err := c.ShouldBindBodyWith(&creation, binding.JSON)
 	if err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 	if err = h.validator.Struct(creation); err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
 	workflow, err := h.workflowManager.CreateWorkflow(&creation, security.FindSecurityContext(c))
@@ -104,10 +105,10 @@ func (h *workflowHandler) handleUpdateWorkflowsBase(c *gin.Context) {
 	updating := flow.WorkflowBaseUpdation{}
 	err = c.ShouldBindBodyWith(&updating, binding.JSON)
 	if err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 	if err = h.validator.Struct(updating); err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
 	workflow, err := h.workflowManager.UpdateWorkflowBase(id, &updating, security.FindSecurityContext(c))
@@ -140,11 +141,11 @@ func (h *workflowHandler) handleQueryTransitions(c *gin.Context) {
 	_ = c.MustBindWith(&query, binding.Form)
 	err := c.ShouldBindUri(&query)
 	if err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
 	if err = h.validator.Struct(query); err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
 	workflow, err := h.workflowManager.DetailWorkflow(query.FlowID, security.FindSecurityContext(c))
@@ -168,11 +169,11 @@ func (h *workflowHandler) handleCreateStateMachineTransitions(c *gin.Context) {
 	var transitions []state.Transition
 	err = c.ShouldBindBodyWith(&transitions, binding.JSON)
 	if err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 	for _, t := range transitions {
 		if err = h.validator.Struct(t); err != nil {
-			panic(&common.ErrBadParam{Cause: err})
+			panic(&bizerror.ErrBadParam{Cause: err})
 		}
 	}
 
@@ -195,11 +196,11 @@ func (h *workflowHandler) handleDeleteStateMachineTransitions(c *gin.Context) {
 	var transitions []state.Transition
 	err = c.ShouldBindBodyWith(&transitions, binding.JSON)
 	if err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 	for _, t := range transitions {
 		if err = h.validator.Struct(t); err != nil {
-			panic(&common.ErrBadParam{Cause: err})
+			panic(&bizerror.ErrBadParam{Cause: err})
 		}
 	}
 
@@ -222,10 +223,10 @@ func (h *workflowHandler) handleUpdateStateMachineState(c *gin.Context) {
 	var updating flow.WorkflowStateUpdating
 	err = c.ShouldBindBodyWith(&updating, binding.JSON)
 	if err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 	if err = h.validator.Struct(updating); err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
 	err = h.workflowManager.UpdateWorkflowState(id, updating, security.FindSecurityContext(c))
@@ -247,12 +248,12 @@ func (h *workflowHandler) handleUpdateStateMachineStateOrders(c *gin.Context) {
 	var orderUpdating []flow.StateOrderRangeUpdating
 	err = c.ShouldBindBodyWith(&orderUpdating, binding.JSON)
 	if err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
 	for _, updating := range orderUpdating {
 		if err = h.validator.Struct(updating); err != nil {
-			panic(&common.ErrBadParam{Cause: err})
+			panic(&bizerror.ErrBadParam{Cause: err})
 		}
 	}
 	err = h.workflowManager.UpdateStateRangeOrders(id, &orderUpdating, security.FindSecurityContext(c))
@@ -274,7 +275,7 @@ func (h *workflowHandler) handleCreateStateMachineState(c *gin.Context) {
 	var stateCreating flow.StateCreating
 	err = c.ShouldBindBodyWith(&stateCreating, binding.JSON)
 	if err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
 	err = h.workflowManager.CreateState(id, &stateCreating, security.FindSecurityContext(c))

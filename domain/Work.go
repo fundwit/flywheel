@@ -26,6 +26,8 @@ type Work struct {
 	ProcessEndTime   *time.Time     `json:"processEndTime" sql:"type:DATETIME(3)"`
 
 	// Properties []PropertyAssign `json:"properties"`
+
+	ArchiveTime *time.Time `json:"archivedTime" sql:"type:DATETIME(3)"`
 }
 
 type PropertyDefinition struct {

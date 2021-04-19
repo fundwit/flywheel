@@ -2,7 +2,7 @@ package work_test
 
 import (
 	"errors"
-	"flywheel/common"
+	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/state"
@@ -74,7 +74,7 @@ var _ = Describe("WorkManager", func() {
 			work, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
 			Expect(work).To(BeNil())
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal(common.ErrUnknownState.Error()))
+			Expect(err.Error()).To(Equal(bizerror.ErrUnknownState.Error()))
 		})
 
 		It("should create new work successfully", func() {
@@ -474,6 +474,65 @@ var _ = Describe("WorkManager", func() {
 			err = workManager.DeleteWork(detail.ID, testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
+		})
+	})
+
+	Describe("ArchiveWorks", func() {
+		It("should forbid to archive without permissions", func() {
+			detail, err := workManager.CreateWork(
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeZero())
+
+			err = workManager.ArchiveWorks([]types.ID{detail.ID}, testinfra.BuildSecCtx(2, []string{"owner_123"}))
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("forbidden"))
+		})
+
+		It("should not be able to archive when work is not in a completed state", func() {
+			secCtx := testinfra.BuildSecCtx(1, []string{"owner_1"})
+			detail, err := workManager.CreateWork(
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
+				secCtx)
+			Expect(err).To(BeZero())
+
+			err = workManager.ArchiveWorks([]types.ID{detail.ID}, secCtx)
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal(bizerror.ErrStateInvalid.Error()))
+		})
+
+		It("should be able to catch db errors when archive work", func() {
+			detail, err := workManager.CreateWork(
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeZero())
+
+			testDatabase.DS.GormDB().DropTable(&domain.Work{})
+			err = workManager.ArchiveWorks([]types.ID{detail.ID}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
+		})
+
+		It("should be able to archive work by id", func() {
+			_, err := workManager.CreateWork(
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StateDone.Name},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeZero())
+
+			works, err := workManager.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+			Expect(works).ToNot(BeNil())
+			Expect(len(*works)).To(Equal(1))
+			Expect((*works)[0].ArchiveTime).To(BeNil())
+
+			// do archive work
+			workIdToArchive := (*works)[0].ID
+			err = workManager.ArchiveWorks([]types.ID{workIdToArchive}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+			works, err = workManager.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+			Expect(len(*works)).To(Equal(1))
+			Expect((*works)[0].ArchiveTime).ToNot(BeNil())
 		})
 	})
 

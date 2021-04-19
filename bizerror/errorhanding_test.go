@@ -1,10 +1,9 @@
-package servehttp_test
+package bizerror_test
 
 import (
 	"errors"
-	"flywheel/common"
+	"flywheel/bizerror"
 	"flywheel/i18n"
-	"flywheel/servehttp"
 	"flywheel/testinfra"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -19,7 +18,7 @@ var _ = Describe("ErrorHandlingMiddleware", func() {
 	var r *gin.Engine
 	BeforeEach(func() {
 		r = gin.Default()
-		r.Use(servehttp.ErrorHandling())
+		r.Use(bizerror.ErrorHandling())
 	})
 
 	Context("panic handling", func() {
@@ -96,7 +95,7 @@ var _ = Describe("ErrorHandlingMiddleware", func() {
 	Context("specified errors", func() {
 		It("should handle common.ErrForbidden", func() {
 			r.GET("/", func(c *gin.Context) {
-				_ = c.Error(common.ErrForbidden)
+				_ = c.Error(bizerror.ErrForbidden)
 			})
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, r)
@@ -123,8 +122,8 @@ type demoError struct {
 func (e *demoError) Error() string {
 	return fmt.Sprintf("demo error: %s", e.Message)
 }
-func (e *demoError) Respond() *common.BizErrorDetail {
-	return &common.BizErrorDetail{
+func (e *demoError) Respond() *bizerror.BizErrorDetail {
+	return &bizerror.BizErrorDetail{
 		Status: 444, Code: "common.demo",
 		Message: e.Error(), Data: e.Data, Cause: nil,
 	}

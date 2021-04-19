@@ -2,6 +2,7 @@ package servehttp
 
 import (
 	"errors"
+	"flywheel/bizerror"
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/work"
@@ -26,6 +27,9 @@ func RegisterWorkHandler(r *gin.Engine, m work.WorkManagerTraits, middleWares ..
 
 	o := r.Group("/v1/work-orders", middleWares...)
 	o.PUT("", handler.handleUpdateOrders)
+
+	a := r.Group("/v1/archived-works", middleWares...)
+	a.POST("", handler.handleCreateArchivedWorks)
 }
 
 type workHandler struct {
@@ -37,11 +41,11 @@ func (h *workHandler) handleCreate(c *gin.Context) {
 	creation := domain.WorkCreation{}
 	err := c.ShouldBindBodyWith(&creation, binding.JSON)
 	if err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
 	if err = h.validator.Struct(creation); err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
 	detail, err := h.workManager.CreateWork(&creation, security.FindSecurityContext(c))
@@ -79,13 +83,13 @@ func (h *workHandler) handleQuery(c *gin.Context) {
 func (h *workHandler) handleUpdate(c *gin.Context) {
 	parsedId, err := types.ParseID(c.Param("id"))
 	if err != nil {
-		panic(&common.ErrBadParam{Cause: errors.New("invalid id '" + c.Param("id") + "'")})
+		panic(&bizerror.ErrBadParam{Cause: errors.New("invalid id '" + c.Param("id") + "'")})
 	}
 
 	updating := domain.WorkUpdating{}
 	err = c.ShouldBindBodyWith(&updating, binding.JSON)
 	if err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
 	updatedWork, err := h.workManager.UpdateWork(parsedId, &updating, security.FindSecurityContext(c))
@@ -99,7 +103,7 @@ func (h *workHandler) handleUpdateOrders(c *gin.Context) {
 	var updating []domain.WorkOrderRangeUpdating
 	err := c.ShouldBindBodyWith(&updating, binding.JSON)
 	if err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 	err = h.workManager.UpdateStateRangeOrders(&updating, security.FindSecurityContext(c))
 	if err != nil {
@@ -111,10 +115,23 @@ func (h *workHandler) handleUpdateOrders(c *gin.Context) {
 func (h *workHandler) handleDelete(c *gin.Context) {
 	parsedId, err := types.ParseID(c.Param("id"))
 	if err != nil {
-		panic(&common.ErrBadParam{Cause: errors.New("invalid id '" + c.Param("id") + "'")})
+		panic(&bizerror.ErrBadParam{Cause: errors.New("invalid id '" + c.Param("id") + "'")})
 	}
 
 	err = h.workManager.DeleteWork(parsedId, security.FindSecurityContext(c))
+	if err != nil {
+		panic(err)
+	}
+	c.AbortWithStatus(http.StatusNoContent)
+}
+
+func (h *workHandler) handleCreateArchivedWorks(c *gin.Context) {
+	query := domain.WorkSelection{}
+	if err := c.ShouldBindBodyWith(&query, binding.JSON); err != nil {
+		panic(err)
+	}
+
+	err := h.workManager.ArchiveWorks(query.WorkIdList, security.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}

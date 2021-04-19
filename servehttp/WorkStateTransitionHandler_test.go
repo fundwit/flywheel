@@ -3,6 +3,7 @@ package servehttp_test
 import (
 	"bytes"
 	"errors"
+	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/security"
 	"flywheel/servehttp"
@@ -25,7 +26,7 @@ var _ = Describe("WorkStateTransitionHandler", func() {
 
 	BeforeEach(func() {
 		router = gin.Default()
-		router.Use(servehttp.ErrorHandling())
+		router.Use(bizerror.ErrorHandling())
 		workProcessManager = &workProcessManagerMock{}
 		servehttp.RegisterWorkStateTransitionHandler(router, workProcessManager)
 	})

@@ -2,6 +2,7 @@ package work
 
 import (
 	"errors"
+	"flywheel/bizerror"
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
@@ -22,6 +23,8 @@ type WorkManagerTraits interface {
 	UpdateWork(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error)
 	DeleteWork(id types.ID, sec *security.Context) error
 	UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *security.Context) error
+
+	ArchiveWorks(ids []types.ID, sec *security.Context) error
 }
 
 type WorkManager struct {
@@ -90,7 +93,7 @@ func (m *WorkManager) WorkDetail(id types.ID, sec *security.Context) (*domain.Wo
 	}
 
 	if !sec.HasRoleSuffix("_" + workDetail.GroupID.String()) {
-		return nil, common.ErrForbidden
+		return nil, bizerror.ErrForbidden
 	}
 
 	workflowDetail, err := m.workflowManager.DetailWorkflow(workDetail.FlowID, sec)
@@ -109,7 +112,7 @@ func (m *WorkManager) WorkDetail(id types.ID, sec *security.Context) (*domain.Wo
 
 func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {
 	if !sec.HasRoleSuffix("_" + c.GroupID.String()) {
-		return nil, common.ErrForbidden
+		return nil, bizerror.ErrForbidden
 	}
 
 	db := m.dataSource.GormDB()
@@ -123,7 +126,7 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 
 		initialState, found := workflowDetail.StateMachine.FindState(c.InitialStateName)
 		if !found {
-			return common.ErrUnknownState
+			return bizerror.ErrUnknownState
 		}
 
 		workDetail = BuildWorkDetail(common.NextId(m.idWorker), c, workflowDetail, initialState)
@@ -157,12 +160,12 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 }
 
 func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error) {
-	if err := m.checkPerms(id, sec); err != nil {
-		return nil, err
-	}
-
 	var work domain.Work
 	err := m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
+		if err := m.checkPerms(tx, id, sec); err != nil {
+			return err
+		}
+
 		db := tx.Model(&domain.Work{}).Where(&domain.Work{ID: id}).Update(u)
 		if err := db.Error; err != nil {
 			return err
@@ -201,7 +204,7 @@ func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRan
 	return m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
 		for _, orderUpdating := range *wantedOrders {
 			// TODO transition issues
-			if err := m.checkPerms(orderUpdating.ID, sec); err != nil {
+			if err := m.checkPerms(tx, orderUpdating.ID, sec); err != nil {
 				return err
 			}
 			db := tx.Model(&domain.Work{}).Where(&domain.Work{ID: orderUpdating.ID, OrderInState: orderUpdating.OldOlder}).
@@ -218,11 +221,10 @@ func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRan
 }
 
 func (m *WorkManager) DeleteWork(id types.ID, sec *security.Context) error {
-	if err := m.checkPerms(id, sec); err != nil {
-		return err
-	}
-
 	err := m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
+		if err := m.checkPerms(tx, id, sec); err != nil {
+			return err
+		}
 		if err := tx.Delete(domain.Work{}, "id = ?", id).Error; err != nil {
 			return err
 		}
@@ -238,13 +240,40 @@ func (m *WorkManager) DeleteWork(id types.ID, sec *security.Context) error {
 	return err
 }
 
-func (m *WorkManager) checkPerms(id types.ID, sec *security.Context) error {
+func (m *WorkManager) ArchiveWorks(ids []types.ID, sec *security.Context) error {
+	now := time.Now()
+	err := m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
+		for _, id := range ids {
+			if err := m.checkPerms(tx, id, sec); err != nil {
+				return err
+			}
+
+			var work domain.Work
+			if err := m.dataSource.GormDB().Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
+				return err
+			}
+			if work.StateCategory != state.Done && work.StateCategory != state.Rejected {
+				return bizerror.ErrStateInvalid
+			}
+
+			db := tx.Model(&domain.Work{ID: id}).Updates(&domain.Work{ArchiveTime: &now})
+			if err := db.Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	return err
+}
+
+func (m *WorkManager) checkPerms(db *gorm.DB, id types.ID, sec *security.Context) error {
 	var work domain.Work
-	if err := m.dataSource.GormDB().Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
+	if err := db.Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
 		return err
 	}
 	if sec == nil || !sec.HasRoleSuffix("_"+work.GroupID.String()) {
-		return common.ErrForbidden
+		return bizerror.ErrForbidden
 	}
 	return nil
 }

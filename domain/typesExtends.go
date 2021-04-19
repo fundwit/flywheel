@@ -35,6 +35,10 @@ type WorkQuery struct {
 	StateCategories []state.Category `json:"stateCategories" form:"stateCategory"`
 }
 
+type WorkSelection struct {
+	WorkIdList []types.ID `json:"workIdList" form:"workIdList" binding:"required,gt=0"`
+}
+
 type WorkflowQuery struct {
 	Name    string   `json:"name" form:"name"`
 	GroupID types.ID `json:"groupId" form:"groupId"`

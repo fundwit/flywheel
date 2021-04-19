@@ -2,6 +2,7 @@ package flow
 
 import (
 	"errors"
+	"flywheel/bizerror"
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/state"
@@ -78,7 +79,7 @@ func NewWorkflowManager(ds *persistence.DataSourceManager) *WorkflowManager {
 
 func (m *WorkflowManager) CreateWorkflow(c *WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error) {
 	if !sec.HasRoleSuffix("_" + c.GroupID.String()) {
-		return nil, common.ErrForbidden
+		return nil, bizerror.ErrForbidden
 	}
 
 	workflow := &domain.WorkflowDetail{
@@ -136,7 +137,7 @@ func (m *WorkflowManager) DetailWorkflow(id types.ID, sec *security.Context) (*d
 			return err
 		}
 		if !sec.HasRoleSuffix("_" + workflowDetail.GroupID.String()) {
-			return common.ErrForbidden
+			return bizerror.ErrForbidden
 		}
 
 		var stateRecords []domain.WorkflowState
@@ -199,7 +200,7 @@ func (m *WorkflowManager) UpdateWorkflowBase(id types.ID, c *WorkflowBaseUpdatio
 			return err
 		}
 		if !sec.HasRoleSuffix("owner_" + wf.GroupID.String()) {
-			return common.ErrForbidden
+			return bizerror.ErrForbidden
 		}
 		if err := tx.Model(&domain.Workflow{}).Where(&domain.Workflow{ID: id}).
 			Update(&domain.Workflow{Name: c.Name, ThemeIcon: c.ThemeIcon, ThemeColor: c.ThemeColor}).Error; err != nil {
@@ -225,7 +226,7 @@ func (m *WorkflowManager) DeleteWorkflow(id types.ID, sec *security.Context) err
 			return err
 		}
 		if !sec.HasRoleSuffix("owner_" + wf.GroupID.String()) {
-			return common.ErrForbidden
+			return bizerror.ErrForbidden
 		}
 
 		if err := isWorkflowReferenced(tx, wf.ID); err != nil {
@@ -256,7 +257,7 @@ func (m *WorkflowManager) CreateWorkflowStateTransitions(id types.ID, transition
 			return err
 		}
 		if !sec.HasRoleSuffix("owner_" + workflow.GroupID.String()) {
-			return common.ErrForbidden
+			return bizerror.ErrForbidden
 		}
 
 		var states []domain.WorkflowState
@@ -270,10 +271,10 @@ func (m *WorkflowManager) CreateWorkflowStateTransitions(id types.ID, transition
 
 		for _, t := range transitions {
 			if _, found := stateIndex[t.From]; !found {
-				return common.ErrUnknownState
+				return bizerror.ErrUnknownState
 			}
 			if _, found := stateIndex[t.To]; !found {
-				return common.ErrUnknownState
+				return bizerror.ErrUnknownState
 			}
 			transition := &domain.WorkflowStateTransition{
 				WorkflowID: workflow.ID, Name: t.Name, FromState: t.From, ToState: t.To, CreateTime: time.Now(),
@@ -294,7 +295,7 @@ func (m *WorkflowManager) DeleteWorkflowStateTransitions(id types.ID, transition
 			return err
 		}
 		if !sec.HasRoleSuffix("owner_" + wf.GroupID.String()) {
-			return common.ErrForbidden
+			return bizerror.ErrForbidden
 		}
 
 		for _, t := range transitions {
@@ -318,7 +319,7 @@ func (m *WorkflowManager) UpdateWorkflowState(id types.ID, updating WorkflowStat
 			return err
 		}
 		if !sec.HasRoleSuffix("owner_" + workflow.GroupID.String()) {
-			return common.ErrForbidden
+			return bizerror.ErrForbidden
 		}
 
 		// origin state must exist
@@ -334,7 +335,7 @@ func (m *WorkflowManager) UpdateWorkflowState(id types.ID, updating WorkflowStat
 				return err
 			}
 			if len(existState) > 0 {
-				return common.ErrStateExisted
+				return bizerror.ErrStateExisted
 			}
 		}
 
@@ -427,7 +428,7 @@ func (m *WorkflowManager) CreateState(workflowID types.ID, creating *StateCreati
 
 		for _, t := range creating.Transitions {
 			if stateMap[t.From] == "" || stateMap[t.To] == "" {
-				return common.ErrUnknownState
+				return bizerror.ErrUnknownState
 			}
 
 			transition := &domain.WorkflowStateTransition{
@@ -472,7 +473,7 @@ func (m *WorkflowManager) checkPerms(id types.ID, sec *security.Context) error {
 		return err
 	}
 	if sec == nil || !sec.HasRoleSuffix("_"+workflow.GroupID.String()) {
-		return common.ErrForbidden
+		return bizerror.ErrForbidden
 	}
 	return nil
 }
@@ -481,7 +482,7 @@ func isWorkflowReferenced(db *gorm.DB, workflowID types.ID) error {
 	var work domain.Work
 	err := db.Model(&domain.Work{}).Where(&domain.Work{FlowID: workflowID}).First(&work).Error
 	if err == nil {
-		return common.ErrWorkflowIsReferenced
+		return bizerror.ErrWorkflowIsReferenced
 	}
 	if err != gorm.ErrRecordNotFound {
 		return err
@@ -490,7 +491,7 @@ func isWorkflowReferenced(db *gorm.DB, workflowID types.ID) error {
 	var workProcessStep domain.WorkProcessStep
 	err = db.Model(&domain.WorkProcessStep{}).Where(&domain.WorkProcessStep{FlowID: workflowID}).First(&workProcessStep).Error
 	if err == nil {
-		return common.ErrWorkflowIsReferenced
+		return bizerror.ErrWorkflowIsReferenced
 	}
 	if err != gorm.ErrRecordNotFound {
 		return err
@@ -500,7 +501,7 @@ func isWorkflowReferenced(db *gorm.DB, workflowID types.ID) error {
 	err = db.Model(&domain.WorkStateTransition{}).Where(&domain.WorkStateTransition{WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FlowID: workflowID}}).
 		First(&workStateTransition).Error
 	if err == nil {
-		return common.ErrWorkflowIsReferenced
+		return bizerror.ErrWorkflowIsReferenced
 	}
 	if err != gorm.ErrRecordNotFound {
 		return err

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"flywheel/common"
+	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/state"
@@ -29,7 +29,7 @@ var _ = Describe("WorkflowHandler", func() {
 
 	BeforeEach(func() {
 		router = gin.Default()
-		router.Use(servehttp.ErrorHandling())
+		router.Use(bizerror.ErrorHandling())
 		workflowManager = &workflowManagerMock{}
 		servehttp.RegisterWorkflowHandler(router, workflowManager)
 	})
@@ -421,7 +421,7 @@ var _ = Describe("WorkflowHandler", func() {
 
 		It("should return 400 state is unknown", func() {
 			workflowManager.CreateWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *security.Context) error {
-				return common.ErrUnknownState
+				return bizerror.ErrUnknownState
 			}
 
 			reqBody, err := json.Marshal(&[]state.Transition{{Name: "test", From: "PENDING", To: "DOING"}})
@@ -576,7 +576,7 @@ var _ = Describe("WorkflowHandler", func() {
 
 		It("should return 400 when new state is exist", func() {
 			workflowManager.UpdateWorkflowStateFunc = func(id types.ID, updating flow.WorkflowStateUpdating, sec *security.Context) error {
-				return common.ErrStateExisted
+				return bizerror.ErrStateExisted
 			}
 
 			reqBody, err := json.Marshal(&flow.WorkflowStateUpdating{OriginName: "PENDING", Name: "QUEUED", Order: 2000})

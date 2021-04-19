@@ -1,7 +1,7 @@
 package servehttp
 
 import (
-	"flywheel/common"
+	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/work"
 	"flywheel/security"
@@ -27,11 +27,11 @@ func (h *workStateTransitionHandler) handleCreate(c *gin.Context) {
 	creation := domain.WorkStateTransitionBrief{}
 	err := c.ShouldBindBodyWith(&creation, binding.JSON)
 	if err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
 	if err = h.validator.Struct(creation); err != nil {
-		panic(&common.ErrBadParam{Cause: err})
+		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
 	transitionId, err := h.manager.CreateWorkStateTransition(&creation, security.FindSecurityContext(c))

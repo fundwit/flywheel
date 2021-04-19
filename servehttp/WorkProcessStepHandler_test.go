@@ -2,6 +2,7 @@ package servehttp_test
 
 import (
 	"errors"
+	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/security"
 	"flywheel/servehttp"
@@ -23,7 +24,7 @@ var _ = Describe("WorkProcessStepHandler", func() {
 
 	BeforeEach(func() {
 		router = gin.Default()
-		router.Use(servehttp.ErrorHandling())
+		router.Use(bizerror.ErrorHandling())
 		workProcessManager = &workProcessManagerMock{}
 		servehttp.RegisterWorkProcessStepHandler(router, workProcessManager)
 	})

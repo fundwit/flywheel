@@ -52,6 +52,15 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 	if len(query.StateCategories) > 0 {
 		q = q.Where("state_category in (?)", query.StateCategories)
 	}
+
+	if query.ArchiveState == domain.StatusOn {
+		q = q.Where("archive_time IS NOT NULL")
+	} else if query.ArchiveState == domain.StatusAll {
+		// archive_time not in where clause
+	} else {
+		q = q.Where("archive_time IS NULL")
+	}
+
 	visibleGroups := sec.VisibleGroups()
 	if len(visibleGroups) == 0 {
 		return &[]domain.Work{}, nil
@@ -160,10 +169,15 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 }
 
 func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error) {
-	var work domain.Work
+	var updatedWork domain.Work
 	err := m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
-		if err := m.checkPerms(tx, id, sec); err != nil {
+		originWork, err := m.findWorkAndCheckPerms(tx, id, sec)
+		if err != nil {
 			return err
+		}
+
+		if originWork.ArchiveTime != nil {
+			return bizerror.ErrArchiveStatusInvalid
 		}
 
 		db := tx.Model(&domain.Work{}).Where(&domain.Work{ID: id}).Update(u)
@@ -173,19 +187,19 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *secur
 		if db.RowsAffected != 1 {
 			return errors.New("expected affected row is 1, but actual is " + strconv.FormatInt(db.RowsAffected, 10))
 		}
-		if err := tx.Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
+		if err := tx.Where(&domain.Work{ID: id}).First(&updatedWork).Error; err != nil {
 			return err
 		}
 		// TODO transition issues
-		workflowDetail, err := m.workflowManager.DetailWorkflow(work.FlowID, sec)
+		workflowDetail, err := m.workflowManager.DetailWorkflow(updatedWork.FlowID, sec)
 		if err != nil {
 			return err
 		}
-		stateFound, found := workflowDetail.FindState(work.StateName)
+		stateFound, found := workflowDetail.FindState(updatedWork.StateName)
 		if !found {
 			return domain.ErrInvalidState
 		}
-		work.State = stateFound
+		updatedWork.State = stateFound
 
 		return nil
 	})
@@ -193,7 +207,7 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *secur
 		return nil, err
 	}
 
-	return &work, nil
+	return &updatedWork, nil
 }
 
 func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *security.Context) error {
@@ -204,7 +218,8 @@ func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRan
 	return m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
 		for _, orderUpdating := range *wantedOrders {
 			// TODO transition issues
-			if err := m.checkPerms(tx, orderUpdating.ID, sec); err != nil {
+			_, err := m.findWorkAndCheckPerms(tx, orderUpdating.ID, sec)
+			if err != nil {
 				return err
 			}
 			db := tx.Model(&domain.Work{}).Where(&domain.Work{ID: orderUpdating.ID, OrderInState: orderUpdating.OldOlder}).
@@ -222,7 +237,8 @@ func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRan
 
 func (m *WorkManager) DeleteWork(id types.ID, sec *security.Context) error {
 	err := m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
-		if err := m.checkPerms(tx, id, sec); err != nil {
+		_, err := m.findWorkAndCheckPerms(tx, id, sec)
+		if err != nil {
 			return err
 		}
 		if err := tx.Delete(domain.Work{}, "id = ?", id).Error; err != nil {
@@ -244,16 +260,15 @@ func (m *WorkManager) ArchiveWorks(ids []types.ID, sec *security.Context) error 
 	now := time.Now()
 	err := m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
 		for _, id := range ids {
-			if err := m.checkPerms(tx, id, sec); err != nil {
-				return err
-			}
-
-			var work domain.Work
-			if err := m.dataSource.GormDB().Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
+			work, err := m.findWorkAndCheckPerms(tx, id, sec)
+			if err != nil {
 				return err
 			}
 			if work.StateCategory != state.Done && work.StateCategory != state.Rejected {
-				return bizerror.ErrStateInvalid
+				return bizerror.ErrStateCategoryInvalid
+			}
+			if work.ArchiveTime != nil {
+				return nil
 			}
 
 			db := tx.Model(&domain.Work{ID: id}).Updates(&domain.Work{ArchiveTime: &now})
@@ -267,15 +282,15 @@ func (m *WorkManager) ArchiveWorks(ids []types.ID, sec *security.Context) error 
 	return err
 }
 
-func (m *WorkManager) checkPerms(db *gorm.DB, id types.ID, sec *security.Context) error {
+func (m *WorkManager) findWorkAndCheckPerms(db *gorm.DB, id types.ID, sec *security.Context) (*domain.Work, error) {
 	var work domain.Work
 	if err := db.Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
-		return err
+		return nil, err
 	}
 	if sec == nil || !sec.HasRoleSuffix("_"+work.GroupID.String()) {
-		return bizerror.ErrForbidden
+		return nil, bizerror.ErrForbidden
 	}
-	return nil
+	return &work, nil
 }
 
 func BuildWorkDetail(id types.ID, c *domain.WorkCreation, workflow *domain.WorkflowDetail, initState state.State) *domain.WorkDetail {

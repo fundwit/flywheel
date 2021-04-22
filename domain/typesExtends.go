@@ -29,10 +29,18 @@ type WorkDetail struct {
 	Type Workflow `json:"type"`
 }
 
+const (
+	StatusOn  = "ON"
+	StatusOff = "OFF" // default
+	StatusAll = "ALL"
+)
+
 type WorkQuery struct {
 	Name            string           `json:"name" form:"name"`
 	GroupID         types.ID         `json:"groupId" form:"groupId"`
 	StateCategories []state.Category `json:"stateCategories" form:"stateCategory"`
+
+	ArchiveState string `json:"archiveState" form:"archiveState" binding:"omitempty,oneof=ON OFF ALL"`
 }
 
 type WorkSelection struct {

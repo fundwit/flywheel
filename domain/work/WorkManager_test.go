@@ -288,6 +288,46 @@ var _ = Describe("WorkManager", func() {
 			Expect((*works)[1].ID).To(Equal(work2.ID))
 		})
 
+		It("should be able to query by archive status", func() {
+			secCtx := testinfra.BuildSecCtx(1, []string{"owner_1"})
+			work1, err := workManager.CreateWork(
+				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name}, secCtx)
+			Expect(err).To(BeZero())
+			work2, err := workManager.CreateWork(
+				&domain.WorkCreation{Name: "test work2", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StateDone.Name}, secCtx)
+			Expect(err).To(BeZero())
+			Expect(workManager.ArchiveWorks([]types.ID{work2.ID}, secCtx)).To(BeNil())
+			work3, err := workManager.CreateWork(
+				&domain.WorkCreation{Name: "test work3", GroupID: types.ID(1), FlowID: flowDetail.ID, InitialStateName: domain.StateDone.Name}, secCtx)
+			Expect(err).To(BeZero())
+
+			// default is OFF
+			works, err := workManager.QueryWork(&domain.WorkQuery{GroupID: types.ID(1)}, secCtx)
+			Expect(err).To(BeNil())
+			Expect(works).ToNot(BeNil())
+			Expect(len(*works)).To(Equal(2))
+			Expect((*works)[0].ID).To(Equal(work1.ID))
+			Expect((*works)[1].ID).To(Equal(work3.ID))
+
+			works, err = workManager.QueryWork(&domain.WorkQuery{GroupID: types.ID(1), ArchiveState: domain.StatusOff}, secCtx)
+			Expect(err).To(BeNil())
+			Expect(works).ToNot(BeNil())
+			Expect(len(*works)).To(Equal(2))
+			Expect((*works)[0].ID).To(Equal(work1.ID))
+			Expect((*works)[1].ID).To(Equal(work3.ID))
+
+			works, err = workManager.QueryWork(&domain.WorkQuery{GroupID: types.ID(1), ArchiveState: domain.StatusOn}, secCtx)
+			Expect(err).To(BeNil())
+			Expect(works).ToNot(BeNil())
+			Expect(len(*works)).To(Equal(1))
+			Expect((*works)[0].ID).To(Equal(work2.ID))
+
+			works, err = workManager.QueryWork(&domain.WorkQuery{GroupID: types.ID(1), ArchiveState: domain.StatusAll}, secCtx)
+			Expect(err).To(BeNil())
+			Expect(works).ToNot(BeNil())
+			Expect(len(*works)).To(Equal(3))
+		})
+
 		It("works should be ordered by orderInState asc and id asc", func() {
 			now := time.Now()
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", GroupID: 1,
@@ -391,6 +431,21 @@ var _ = Describe("WorkManager", func() {
 			Expect(err).ToNot(BeNil())
 			Expect(updatedWork).To(BeNil())
 			Expect(err.Error()).To(Equal("invalid state"))
+		})
+
+		It("should failed when work is archived when update work", func() {
+			now := time.Now()
+			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", GroupID: 1,
+				CreateTime: time.Now(), FlowID: flowDetail.ID, OrderInState: 2,
+				StateName: domain.StateDone.Name, StateCategory: domain.StateDone.Category, StateBeginTime: &now}).Error).To(BeNil())
+			Expect(workManager.ArchiveWorks([]types.ID{2}, testinfra.BuildSecCtx(1, []string{"owner_1"}))).To(BeNil())
+
+			updatedWork, err := workManager.UpdateWork(2,
+				&domain.WorkUpdating{Name: "test work1 new"},
+				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).ToNot(BeNil())
+			Expect(updatedWork).To(BeNil())
+			Expect(err).To(Equal(bizerror.ErrArchiveStatusInvalid))
 		})
 	})
 
@@ -498,7 +553,7 @@ var _ = Describe("WorkManager", func() {
 
 			err = workManager.ArchiveWorks([]types.ID{detail.ID}, secCtx)
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal(bizerror.ErrStateInvalid.Error()))
+			Expect(err).To(Equal(bizerror.ErrStateCategoryInvalid))
 		})
 
 		It("should be able to catch db errors when archive work", func() {
@@ -529,10 +584,17 @@ var _ = Describe("WorkManager", func() {
 			workIdToArchive := (*works)[0].ID
 			err = workManager.ArchiveWorks([]types.ID{workIdToArchive}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeNil())
-			works, err = workManager.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			works, err = workManager.QueryWork(&domain.WorkQuery{ArchiveState: domain.StatusOn}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
 			Expect(err).To(BeNil())
 			Expect(len(*works)).To(Equal(1))
 			Expect((*works)[0].ArchiveTime).ToNot(BeNil())
+
+			// do archive again
+			err = workManager.ArchiveWorks([]types.ID{workIdToArchive}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+			works1, err := workManager.QueryWork(&domain.WorkQuery{ArchiveState: domain.StatusAll}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			Expect(err).To(BeNil())
+			Expect((*works1)[0].ArchiveTime).To(Equal((*works)[0].ArchiveTime))
 		})
 	})
 

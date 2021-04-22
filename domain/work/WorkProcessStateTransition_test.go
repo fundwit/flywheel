@@ -1,6 +1,7 @@
 package work_test
 
 import (
+	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/state"
@@ -121,6 +122,26 @@ var _ = Describe("WorkStateTransition Manager", func() {
 				testinfra.BuildSecCtx(types.ID(123), []string{"owner_333"}))
 			Expect(id).To(BeZero())
 			Expect(err).ToNot(BeZero())
+		})
+
+		It("should failed to create work state transition when work is archived", func() {
+			sec := testinfra.BuildSecCtx(types.ID(123), []string{"owner_333"})
+			workflowCreation := &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(333), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
+			Expect(err).To(BeNil())
+			detail := testinfra.BuildWorker(workManager, "test work", workflow.ID, types.ID(333), sec)
+
+			transition := domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DONE"}
+			id, err := manager.CreateWorkStateTransition(&transition, sec)
+			Expect(id).ToNot(BeZero())
+			Expect(err).To(BeZero())
+
+			Expect(workManager.ArchiveWorks([]types.ID{detail.ID}, sec)).To(BeNil())
+
+			transition = domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DONE", ToState: "PENDING"}
+			id, err = manager.CreateWorkStateTransition(&transition, sec)
+			Expect(id).To(BeZero())
+			Expect(err).To(Equal(bizerror.ErrArchiveStatusInvalid))
 		})
 
 		It("should success when all conditions be satisfied", func() {

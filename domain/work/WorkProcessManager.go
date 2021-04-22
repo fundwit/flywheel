@@ -90,6 +90,9 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkStateTransi
 		if !sec.HasRole(fmt.Sprintf("%s_%d", domain.RoleOwner, work.GroupID)) {
 			return bizerror.ErrForbidden
 		}
+		if work.ArchiveTime != nil {
+			return bizerror.ErrArchiveStatusInvalid
+		}
 
 		query := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID, StateName: c.FromState}).
 			Update(&domain.Work{StateName: c.ToState, StateCategory: toState.Category, StateBeginTime: &now})

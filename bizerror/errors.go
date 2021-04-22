@@ -10,6 +10,8 @@ var ErrWorkflowIsReferenced = errors.New("workflow is referenced")
 var ErrUnknownState = errors.New("unknown workflow state")
 var ErrStateExisted = errors.New("state existed")
 var ErrStateInvalid = errors.New("state is invalid")
+var ErrStateCategoryInvalid = errors.New("state category is invalid")
+var ErrArchiveStatusInvalid = errors.New("archive status is invalid")
 
 type BizError interface {
 	Respond() *BizErrorDetail

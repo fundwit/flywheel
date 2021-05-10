@@ -130,11 +130,15 @@ func LoadPerms(uid types.ID) ([]string, []domain.GroupRole) {
 
 	for i := 0; i < len(groupRoles); i++ {
 		groupRole := groupRoles[i]
-		name := m[groupRole.GroupID].Name
-		if name == "" {
+
+		group := m[groupRole.GroupID]
+		if (group == domain.Group{}) {
 			panic(errors.New("group " + groupRole.GroupID.String() + " is not exist"))
 		}
-		groupRole.GroupName = name
+
+		groupRole.GroupName = group.Name
+		groupRole.GroupIdentifier = group.Identifier
+
 		groupRoles[i] = groupRole
 	}
 

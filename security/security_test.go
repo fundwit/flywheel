@@ -220,7 +220,7 @@ var _ = Describe("Security", func() {
 			token := uuid.New().String()
 			security.TokenCache.Set(token, &security.Context{Token: token, Identity: security.Identity{Name: "ann", ID: 1},
 				Perms: []string{"owner_1"}, GroupRoles: []domain.GroupRole{{
-					Role: "owner", GroupName: "group1", GroupID: types.ID(1),
+					Role: "owner", GroupName: "group1", GroupIdentifier: "TES", GroupID: types.ID(1),
 				}}}, cache.DefaultExpiration)
 
 			req := httptest.NewRequest(http.MethodGet, "/me", nil)
@@ -228,7 +228,7 @@ var _ = Describe("Security", func() {
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"identity":{"id":"1","name":"ann"}, "token":"` + token +
-				`", "perms":["owner_1"], "groupRoles":[{"groupId":"1", "groupName":"group1", "role":"owner"}]}`))
+				`", "perms":["owner_1"], "groupRoles":[{"groupId":"1", "groupName":"group1", "groupIdentifier":"TES", "role":"owner"}]}`))
 		})
 
 		It("should failed when token is missing", func() {
@@ -276,7 +276,8 @@ var _ = Describe("Security", func() {
 			s, gr := security.LoadPerms(3)
 			Expect(len(s)).To(Equal(2))
 			Expect(s).To(Equal([]string{"owner_1", "viewer_20"}))
-			Expect(gr).To(Equal([]domain.GroupRole{{GroupID: 1, GroupName: "group1", Role: "owner"}, {GroupID: 20, GroupName: "group20", Role: "viewer"}}))
+			Expect(gr).To(Equal([]domain.GroupRole{{GroupID: 1, GroupName: "group1", Role: "owner", GroupIdentifier: "1"},
+				{GroupID: 20, GroupName: "group20", GroupIdentifier: "20", Role: "viewer"}}))
 
 			s, gr = security.LoadPerms(1)
 			Expect(len(s)).To(Equal(0))

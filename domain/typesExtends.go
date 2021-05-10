@@ -53,7 +53,9 @@ type WorkflowQuery struct {
 }
 
 type GroupRole struct {
-	GroupID   types.ID `json:"groupId"`
-	GroupName string   `json:"groupName"`
-	Role      string   `json:"role"`
+	GroupID types.ID `json:"groupId"`
+	Role    string   `json:"role"`
+
+	GroupName       string `json:"groupName"`
+	GroupIdentifier string `json:"groupIdentifier"`
 }

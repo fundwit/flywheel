@@ -59,6 +59,7 @@ var _ = Describe("WorkHandler", func() {
 					Work: domain.Work{
 						ID:            123,
 						Name:          creation.Name,
+						Identifier:    "TEST-1",
 						GroupID:       creation.GroupID,
 						FlowID:        demoWorkflow.ID,
 						OrderInState:  demoTime.UnixNano() / 1e6,
@@ -78,7 +79,7 @@ var _ = Describe("WorkHandler", func() {
 			req := httptest.NewRequest(http.MethodPost, "/v1/works", bytes.NewReader(reqBody))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusCreated))
-			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"333","flowId":"` + demoWorkflow.ID.String() + `", "orderInState": ` +
+			Expect(body).To(MatchJSON(`{"id":"123","name":"test work", "identifier":"TEST-1","groupId":"333","flowId":"` + demoWorkflow.ID.String() + `", "orderInState": ` +
 				strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `, "createTime":"` + timeString + `",
 				"stateName":"PENDING", "stateCategory": 1, "type": ` + demoWorkflowJson + `,"state":{"name": "PENDING", "category": 1, "order": 1},
 				"stateBeginTime": null,"processBeginTime":null, "processEndTime":null, "archivedTime": null}`))
@@ -120,9 +121,9 @@ var _ = Describe("WorkHandler", func() {
 		It("should be able to serve query request", func() {
 			workManager.QueryWorkFunc = func(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
 				works := []domain.Work{
-					{ID: 1, Name: "work1", GroupID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.UnixNano() / 1e6,
+					{ID: 1, Name: "work1", Identifier: "W-1", GroupID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.UnixNano() / 1e6,
 						StateName: "PENDING", State: domain.StatePending, StateCategory: state.InBacklog},
-					{ID: 2, Name: "work2", GroupID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.UnixNano() / 1e6,
+					{ID: 2, Name: "work2", Identifier: "W-2", GroupID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.UnixNano() / 1e6,
 						StateName: "DONE", State: domain.StateDone, StateCategory: state.Done},
 				}
 				return &works, nil
@@ -131,11 +132,11 @@ var _ = Describe("WorkHandler", func() {
 			req := httptest.NewRequest(http.MethodGet, "/v1/works?name=aaa", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"data":[{"id":"1","name":"work1","groupId":"333","flowId":"1",
+			Expect(body).To(MatchJSON(`{"data":[{"id":"1","name":"work1","identifier":"W-1","groupId":"333","flowId":"1",
 				"createTime":"` + timeString + `","orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + ` ,
 				"stateName":"PENDING", "stateCategory": 1, "state":{"name":"PENDING", "category":1, "order": 1},
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null}, 
-				{"id":"2","name":"work2","groupId":"333","flowId":"1", "orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `,
+				{"id":"2","name":"work2","identifier":"W-2","groupId":"333","flowId":"1", "orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `,
 				"createTime":"` + timeString + `","stateName":"DONE", "stateCategory": 3, "state":{"name":"DONE", "category":3, "order": 3},
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null
 				}],"total": 2}`))
@@ -169,14 +170,8 @@ var _ = Describe("WorkHandler", func() {
 	})
 
 	Describe("handleDetail", func() {
-		It("should failed when id is invalid", func() {
-			req := httptest.NewRequest(http.MethodGet, "/v1/works/abc", bytes.NewReader([]byte(`bad json`)))
-			status, body, _ := testinfra.ExecuteRequest(req, router)
-			Expect(status).To(Equal(http.StatusBadRequest))
-			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid id 'abc'","data":null}`))
-		})
 		It("should return 500 when service failed", func() {
-			workManager.WorkDetailFunc = func(id types.ID, sec *security.Context) (*domain.WorkDetail, error) {
+			workManager.WorkDetailFunc = func(id string, sec *security.Context) (*domain.WorkDetail, error) {
 				return nil, errors.New("a mocked error")
 			}
 			req := httptest.NewRequest(http.MethodGet, "/v1/works/123", nil)
@@ -186,10 +181,10 @@ var _ = Describe("WorkHandler", func() {
 		})
 
 		It("should return work detail as expected when everything is ok", func() {
-			workManager.WorkDetailFunc = func(id types.ID, sec *security.Context) (*domain.WorkDetail, error) {
+			workManager.WorkDetailFunc = func(id string, sec *security.Context) (*domain.WorkDetail, error) {
 				return &domain.WorkDetail{
 					Work: domain.Work{
-						ID: 123, Name: "test work", GroupID: 100, CreateTime: demoTime, FlowID: demoWorkflow.ID, OrderInState: 999,
+						ID: 123, Name: "test work", Identifier: "W-1", GroupID: 100, CreateTime: demoTime, FlowID: demoWorkflow.ID, OrderInState: 999,
 						StateName: "DOING", StateCategory: demoWorkflow.StateMachine.States[1].Category, State: demoWorkflow.StateMachine.States[1],
 						StateBeginTime: &demoTime, ProcessBeginTime: &demoTime, ProcessEndTime: &demoTime,
 					},
@@ -199,7 +194,7 @@ var _ = Describe("WorkHandler", func() {
 			req := httptest.NewRequest(http.MethodGet, "/v1/works/123", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","groupId":"100","flowId":"` + demoWorkflow.ID.String() + `",
+			Expect(body).To(MatchJSON(`{"id":"123","name":"test work","identifier":"W-1", "groupId":"100","flowId":"` + demoWorkflow.ID.String() + `",
 				"createTime":"` + timeString + `","orderInState": 999,
 				"stateName":"DOING", "stateCategory": 2, "state":{"name":"DOING", "category":2, "order": 2},
 				"stateBeginTime": "` + timeString + `", "processBeginTime": "` + timeString + `", "processEndTime": "` + timeString + `",
@@ -232,7 +227,7 @@ var _ = Describe("WorkHandler", func() {
 		})
 		It("should be able to update work successfully", func() {
 			workManager.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error) {
-				return &domain.Work{ID: 100, Name: "new-name", GroupID: types.ID(333), CreateTime: demoTime,
+				return &domain.Work{ID: 100, Name: "new-name", Identifier: "W-1", GroupID: types.ID(333), CreateTime: demoTime,
 					FlowID: 1, OrderInState: demoTime.UnixNano() / 1e6,
 					StateName: "PENDING", StateCategory: domain.StatePending.Category, State: domain.StatePending}, nil
 			}
@@ -240,7 +235,7 @@ var _ = Describe("WorkHandler", func() {
 				`{"name": "new-name"}`)))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","stateName":"PENDING", "stateCategory": 1,
+			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","identifier":"W-1","stateName":"PENDING", "stateCategory": 1,
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null,
 				"state":{"name":"PENDING", "category":1, "order": 1},"groupId":"333","flowId":"1","createTime":"` +
 				timeString + `", "orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `}`))
@@ -352,7 +347,7 @@ var _ = Describe("WorkHandler", func() {
 
 type workManagerMock struct {
 	QueryWorkFunc              func(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error)
-	WorkDetailFunc             func(id types.ID, sec *security.Context) (*domain.WorkDetail, error)
+	WorkDetailFunc             func(id string, sec *security.Context) (*domain.WorkDetail, error)
 	CreateWorkFunc             func(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error)
 	DeleteWorkFunc             func(id types.ID, sec *security.Context) error
 	UpdateWorkFunc             func(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error)
@@ -363,7 +358,7 @@ type workManagerMock struct {
 func (m *workManagerMock) QueryWork(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
 	return m.QueryWorkFunc(q, sec)
 }
-func (m *workManagerMock) WorkDetail(id types.ID, sec *security.Context) (*domain.WorkDetail, error) {
+func (m *workManagerMock) WorkDetail(id string, sec *security.Context) (*domain.WorkDetail, error) {
 	return m.WorkDetailFunc(id, sec)
 }
 func (m *workManagerMock) CreateWork(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {

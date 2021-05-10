@@ -6,6 +6,7 @@ import (
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
+	"flywheel/domain/namespace"
 	"flywheel/domain/state"
 	"flywheel/persistence"
 	"flywheel/security"
@@ -18,7 +19,7 @@ import (
 
 type WorkManagerTraits interface {
 	QueryWork(query *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error)
-	WorkDetail(id types.ID, sec *security.Context) (*domain.WorkDetail, error)
+	WorkDetail(id string, sec *security.Context) (*domain.WorkDetail, error)
 	CreateWork(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error)
 	UpdateWork(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error)
 	DeleteWork(id types.ID, sec *security.Context) error
@@ -94,10 +95,12 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 	return &works, nil
 }
 
-func (m *WorkManager) WorkDetail(id types.ID, sec *security.Context) (*domain.WorkDetail, error) {
+func (m *WorkManager) WorkDetail(identifier string, sec *security.Context) (*domain.WorkDetail, error) {
+	id, err := types.ParseID(identifier)
+
 	workDetail := domain.WorkDetail{}
 	db := m.dataSource.GormDB()
-	if err := db.Where(&domain.Work{ID: id}).First(&(workDetail.Work)).Error; err != nil {
+	if err := db.Where("id = ? OR identifier LIKE ?", id, identifier).First(&(workDetail.Work)).Error; err != nil {
 		return nil, err
 	}
 
@@ -150,6 +153,13 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 				return err
 			}
 		}
+
+		identifier, err := namespace.NextWorkIdentifier(c.GroupID, tx)
+		if err != nil {
+			return err
+		}
+		workDetail.Identifier = identifier
+
 		if err := tx.Create(workDetail.Work).Error; err != nil {
 			return err
 		}

@@ -56,12 +56,7 @@ func (h *workHandler) handleCreate(c *gin.Context) {
 }
 
 func (h *workHandler) handleDetail(c *gin.Context) {
-	id, err := types.ParseID(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("id") + "'"})
-		return
-	}
-	detail, err := h.workManager.WorkDetail(id, security.FindSecurityContext(c))
+	detail, err := h.workManager.WorkDetail(c.Param("id"), security.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		return

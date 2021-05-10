@@ -3,13 +3,13 @@ package work_test
 import (
 	"flywheel/domain"
 	"flywheel/domain/flow"
+	"flywheel/domain/namespace"
 	"flywheel/domain/state"
 	"flywheel/domain/work"
+	"flywheel/persistence"
 	"flywheel/testinfra"
-	"github.com/fundwit/go-commons/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"log"
 	"time"
 )
 
@@ -19,19 +19,23 @@ var _ = Describe("WorkProcessManager", func() {
 		workManager        *work.WorkManager
 		testDatabase       *testinfra.TestDatabase
 		workflowDetail     *domain.WorkflowDetail
+		group1             *domain.Group
 	)
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
 		// migration
-		err := testDatabase.DS.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{}, &domain.WorkStateTransition{},
-			&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error
-		if err != nil {
-			log.Fatalf("database migration failed %v\n", err)
-		}
+		Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.Group{}, &domain.GroupMember{}, &domain.Work{}, &domain.WorkProcessStep{}, &domain.WorkStateTransition{},
+			&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error).To(BeNil())
+
+		persistence.ActiveDataSourceManager = testDatabase.DS
+		var err error
+		group1, err = namespace.CreateGroup(&domain.GroupCreating{Name: "group 1", Identifier: "GR1"}, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+		Expect(err).To(BeNil())
+
 		workflowManager := flow.NewWorkflowManager(testDatabase.DS)
 		workProcessManager = work.NewWorkProcessManager(testDatabase.DS, workflowManager)
-		creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-		workflowDetail, err = workflowManager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+		creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: group1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+		workflowDetail, err = workflowManager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_" + group1.ID.String()}))
 		Expect(err).To(BeNil())
 
 		workManager = work.NewWorkManager(testDatabase.DS, workflowManager)
@@ -42,9 +46,9 @@ var _ = Describe("WorkProcessManager", func() {
 
 	Describe("QueryProcessSteps", func() {
 		It("should be able to catch db errors", func() {
-			secCtx := testinfra.BuildSecCtx(1, []string{"owner_1"})
+			secCtx := testinfra.BuildSecCtx(1, []string{"owner_" + group1.ID.String()})
 			work, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), InitialStateName: domain.StatePending.Name}, secCtx)
+				&domain.WorkCreation{Name: "test work1", GroupID: group1.ID, InitialStateName: domain.StatePending.Name}, secCtx)
 			Expect(err).To(BeZero())
 
 			testDatabase.DS.GormDB().DropTable(&domain.WorkProcessStep{})
@@ -69,8 +73,8 @@ var _ = Describe("WorkProcessManager", func() {
 
 		It("should return empty when access without permissions", func() {
 			detail, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), InitialStateName: domain.StatePending.Name},
-				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+				&domain.WorkCreation{Name: "test work1", GroupID: group1.ID, InitialStateName: domain.StatePending.Name},
+				testinfra.BuildSecCtx(1, []string{"owner_" + group1.ID.String()}))
 			Expect(err).To(BeZero())
 
 			work, err := workProcessManager.QueryProcessSteps(
@@ -80,9 +84,9 @@ var _ = Describe("WorkProcessManager", func() {
 		})
 
 		It("should return correct result", func() {
-			secCtx := testinfra.BuildSecCtx(1, []string{"owner_1"})
+			secCtx := testinfra.BuildSecCtx(1, []string{"owner_" + group1.ID.String()})
 			// will create init process step
-			work1, err := workManager.CreateWork(&domain.WorkCreation{Name: "test work1", GroupID: types.ID(1), InitialStateName: domain.StatePending.Name}, secCtx)
+			work1, err := workManager.CreateWork(&domain.WorkCreation{Name: "test work1", GroupID: group1.ID, InitialStateName: domain.StatePending.Name}, secCtx)
 			Expect(err).To(BeZero())
 
 			// do transition

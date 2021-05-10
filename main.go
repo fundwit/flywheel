@@ -34,6 +34,7 @@ func main() {
 		log.Fatalf("database conneciton failed %v\n", err)
 	}
 	defer ds.Stop()
+	persistence.ActiveDataSourceManager = ds
 
 	// database migration (race condition)
 	err = ds.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkStateTransition{}, &domain.WorkProcessStep{},

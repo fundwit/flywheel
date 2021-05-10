@@ -261,9 +261,9 @@ var _ = Describe("Security", func() {
 			now := time.Now()
 			Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.GroupMember{}, &domain.Group{}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.Group{ID: 1, Name: "group1", Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
+				&domain.Group{ID: 1, Name: "group1", Identifier: "1", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.Group{ID: 20, Name: "group20", Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
+				&domain.Group{ID: 20, Name: "group20", Identifier: "20", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
 
 			Expect(testDatabase.DS.GormDB().Create(
 				&domain.GroupMember{GroupID: 1, MemberId: 3, Role: "owner", CreateTime: now}).Error).To(BeNil())

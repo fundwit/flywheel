@@ -6,6 +6,8 @@ import (
 	"os"
 )
 
+var ActiveDataSourceManager *DataSourceManager
+
 type DataSourceManager struct {
 	gormDB *gorm.DB
 

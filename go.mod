@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/deckarep/golang-set v1.7.1
+	github.com/fundwit/go-chars v0.1.0 // indirect
 	github.com/fundwit/go-commons v0.1.2
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-playground/validator/v10 v10.4.1

@@ -13,6 +13,8 @@ var ErrStateInvalid = errors.New("state is invalid")
 var ErrStateCategoryInvalid = errors.New("state category is invalid")
 var ErrArchiveStatusInvalid = errors.New("archive status is invalid")
 
+var ErrInvalidPassword = errors.New("invalid password")
+
 type BizError interface {
 	Respond() *BizErrorDetail
 }

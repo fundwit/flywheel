@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flywheel/common"
 	"flywheel/domain"
+	"flywheel/persistence"
 	"fmt"
 	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
@@ -20,7 +21,6 @@ import (
 const TokenExpiration = 24 * time.Hour
 
 var TokenCache = cache.New(TokenExpiration, 1*time.Minute)
-var DB *gorm.DB
 
 type LoginRequest struct {
 	Name     string `json:"name"`
@@ -63,7 +63,7 @@ func UserInfoQueryHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, &secCtx)
 }
 
-func RegisterWorkHandler(r *gin.Engine) {
+func RegisterSessionHandler(r *gin.Engine) {
 	g := r.Group("/v1/sessions")
 	g.POST("", SimpleLoginHandler)
 	g.DELETE("", SimpleLogoutHandler)
@@ -85,7 +85,7 @@ func SimpleLoginHandler(c *gin.Context) {
 		return
 	}
 	identity := Identity{}
-	if err := DB.Model(&User{}).Where(&User{Name: login.Name, Secret: HashSha256(login.Password)}).Scan(&identity).Error; err != nil {
+	if err := persistence.ActiveDataSourceManager.GormDB().Model(&User{}).Where(&User{Name: login.Name, Secret: HashSha256(login.Password)}).Scan(&identity).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusUnauthorized, &common.ErrorBody{Code: "common.unauthenticated", Message: "unauthenticated"})
 			return
@@ -105,7 +105,7 @@ func SimpleLoginHandler(c *gin.Context) {
 // as a simple initial solution, we use group member relationship as the metadata of permissions
 func LoadPerms(uid types.ID) ([]string, []domain.GroupRole) {
 	var gms []domain.GroupMember
-	if err := DB.Model(&domain.GroupMember{}).Where(&domain.GroupMember{MemberId: uid}).Scan(&gms).Error; err != nil {
+	if err := persistence.ActiveDataSourceManager.GormDB().Model(&domain.GroupMember{}).Where(&domain.GroupMember{MemberId: uid}).Scan(&gms).Error; err != nil {
 		panic(err)
 	}
 	var roles []string
@@ -120,7 +120,7 @@ func LoadPerms(uid types.ID) ([]string, []domain.GroupRole) {
 	m := map[types.ID]domain.Group{}
 	if len(groupIds) > 0 {
 		var groups []domain.Group
-		if err := DB.Model(&domain.Group{}).Where("id in (?)", groupIds).Scan(&groups).Error; err != nil {
+		if err := persistence.ActiveDataSourceManager.GormDB().Model(&domain.Group{}).Where("id in (?)", groupIds).Scan(&groups).Error; err != nil {
 			panic(err)
 		}
 		for _, group := range groups {

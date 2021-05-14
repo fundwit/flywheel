@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"flywheel/domain"
+	"flywheel/persistence"
 	"flywheel/security"
 	"flywheel/testinfra"
 	"github.com/fundwit/go-commons/types"
@@ -63,14 +64,14 @@ var _ = Describe("Security", func() {
 		)
 		BeforeEach(func() {
 			router = gin.Default()
-			security.RegisterWorkHandler(router)
+			security.RegisterSessionHandler(router)
 			security.TokenCache.Flush()
 			testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
+			persistence.ActiveDataSourceManager = testDatabase.DS
 			err := testDatabase.DS.GormDB().AutoMigrate(&security.User{}, &domain.GroupMember{}).Error
 			if err != nil {
 				log.Fatalf("database migration failed %v\n", err)
 			}
-			security.DB = testDatabase.DS.GormDB()
 		})
 		AfterEach(func() {
 			testinfra.StopMysqlTestDatabase(testDatabase)
@@ -257,6 +258,7 @@ var _ = Describe("Security", func() {
 		It("should return actual permissions when matched", func() {
 			testDatabase := testinfra.StartMysqlTestDatabase("flywheel")
 			defer testinfra.StopMysqlTestDatabase(testDatabase)
+			persistence.ActiveDataSourceManager = testDatabase.DS
 
 			now := time.Now()
 			Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.GroupMember{}, &domain.Group{}).Error).To(BeNil())
@@ -272,7 +274,6 @@ var _ = Describe("Security", func() {
 			Expect(testDatabase.DS.GormDB().Create(
 				&domain.GroupMember{GroupID: 20, MemberId: 3, Role: "viewer", CreateTime: now}).Error).To(BeNil())
 
-			security.DB = testDatabase.DS.GormDB()
 			s, gr := security.LoadPerms(3)
 			Expect(len(s)).To(Equal(2))
 			Expect(s).To(Equal([]string{"owner_1", "viewer_20"}))
@@ -284,22 +285,12 @@ var _ = Describe("Security", func() {
 			Expect(len(gr)).To(Equal(0))
 		})
 
-		It("should failed when database access failed", func() {
-			func() {
-				defer func() {
-					err := recover()
-					Expect(err).To(Equal(errors.New("sql: database is closed")))
-				}()
-				security.LoadPerms(3)
-			}()
-		})
-
 		It("should panic when group record is not found", func() {
 			func() {
 				testDatabase := testinfra.StartMysqlTestDatabase("flywheel")
 				defer testinfra.StopMysqlTestDatabase(testDatabase)
 				Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.GroupMember{}, &domain.Group{}).Error).To(BeNil())
-				security.DB = testDatabase.DS.GormDB()
+				persistence.ActiveDataSourceManager = testDatabase.DS
 
 				now := time.Now()
 				Expect(testDatabase.DS.GormDB().Create(
@@ -319,7 +310,7 @@ var _ = Describe("Security", func() {
 				testDatabase := testinfra.StartMysqlTestDatabase("flywheel")
 				defer testinfra.StopMysqlTestDatabase(testDatabase)
 				Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.GroupMember{}).Error).To(BeNil())
-				security.DB = testDatabase.DS.GormDB()
+				persistence.ActiveDataSourceManager = testDatabase.DS
 
 				now := time.Now()
 				Expect(testDatabase.DS.GormDB().Create(

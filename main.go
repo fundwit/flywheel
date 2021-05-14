@@ -50,11 +50,12 @@ func main() {
 		c.String(http.StatusOK, "flywheel")
 	})
 
-	security.DB = ds.GormDB()
-	security.RegisterWorkHandler(engine)
+	security.RegisterSessionHandler(engine)
 
 	securityMiddle := security.SimpleAuthFilter()
 	engine.GET("/me", securityMiddle, security.UserInfoQueryHandler)
+
+	security.RegisterSessionUsersHandler(engine, securityMiddle)
 
 	workflowManager := flow.NewWorkflowManager(ds)
 	workProcessManager := work.NewWorkProcessManager(ds, workflowManager)

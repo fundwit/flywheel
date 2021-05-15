@@ -9,12 +9,24 @@ import (
 
 var (
 	UpdateBasicAuthSecretFunc = UpdateBasicAuthSecret
+	QueryUsersFunc            = QueryUsers
 )
 
 func RegisterSessionUsersHandler(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 	u := r.Group("/v1/session-users", middleWares...)
 
 	u.PUT("basic-auths", HandleUpdateBaseAuth)
+
+	users := r.Group("/v1/users", middleWares...)
+	users.GET("", HandleQueryUsers)
+}
+
+func HandleQueryUsers(c *gin.Context) {
+	results, err := QueryUsersFunc(FindSecurityContext(c))
+	if err != nil {
+		panic(err)
+	}
+	c.JSON(http.StatusOK, results)
 }
 
 func HandleUpdateBaseAuth(c *gin.Context) {

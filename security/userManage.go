@@ -23,3 +23,11 @@ func UpdateBasicAuthSecret(u *BasicAuthUpdating, sec *Context) error {
 
 	return nil
 }
+
+func QueryUsers(sec *Context) (*[]UserInfo, error) {
+	var users []UserInfo
+	if err := persistence.ActiveDataSourceManager.GormDB().Model(&User{}).Scan(&users).Error; err != nil {
+		return nil, err
+	}
+	return &users, nil
+}

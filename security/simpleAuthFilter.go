@@ -33,6 +33,11 @@ type User struct {
 	Secret string   `json:"secret"`
 }
 
+type UserInfo struct {
+	ID   types.ID `json:"id"`
+	Name string   `json:"name"`
+}
+
 const KeySecCtx = "SecCtx"
 const KeySecToken = "sec_token"
 

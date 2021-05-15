@@ -57,4 +57,17 @@ var _ = Describe("UserRestApi", func() {
 			Expect(payload).To(BeNil())
 		})
 	})
+
+	Describe("HandleQueryUsers", func() {
+		It("should return 200 when query successful", func() {
+			security.QueryUsersFunc = func(sec *security.Context) (*[]security.UserInfo, error) {
+				return &[]security.UserInfo{{ID: 123, Name: "test"}}, nil
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/v1/users", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusOK))
+			Expect(body).To(MatchJSON(`[{"id": "123", "name": "test"}]`))
+		})
+	})
 })

@@ -39,4 +39,16 @@ var _ = Describe("userManage", func() {
 			Expect(user.Secret).To(Equal(security.HashSha256("654321")))
 		})
 	})
+
+	Describe("QueryUsers", func() {
+		It("should be able to query users correctly", func() {
+			sec := security.Context{Identity: security.Identity{ID: 1}}
+			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 1, Name: "aaa", Secret: security.HashSha256("123456")}).Error).To(BeNil())
+
+			users, err := security.QueryUsers(&sec)
+			Expect(err).To(BeNil())
+			Expect(len(*users)).To(Equal(1))
+			Expect((*users)[0]).To(Equal(security.UserInfo{ID: 1, Name: "aaa"}))
+		})
+	})
 })

@@ -10,6 +10,7 @@ import (
 var (
 	UpdateBasicAuthSecretFunc = UpdateBasicAuthSecret
 	QueryUsersFunc            = QueryUsers
+	CreateUserFunc            = CreateUser
 )
 
 func RegisterSessionUsersHandler(r *gin.Engine, middleWares ...gin.HandlerFunc) {
@@ -19,6 +20,7 @@ func RegisterSessionUsersHandler(r *gin.Engine, middleWares ...gin.HandlerFunc) 
 
 	users := r.Group("/v1/users", middleWares...)
 	users.GET("", HandleQueryUsers)
+	users.POST("", HandleCreateUser)
 }
 
 func HandleQueryUsers(c *gin.Context) {
@@ -41,4 +43,18 @@ func HandleUpdateBaseAuth(c *gin.Context) {
 		panic(err)
 	}
 	c.Status(http.StatusOK)
+}
+
+func HandleCreateUser(c *gin.Context) {
+	payload := UserCreation{}
+	err := c.ShouldBindBodyWith(&payload, binding.JSON)
+	if err != nil {
+		panic(&bizerror.ErrBadParam{Cause: err})
+	}
+
+	u, err := CreateUserFunc(&payload, FindSecurityContext(c))
+	if err != nil {
+		panic(err)
+	}
+	c.JSON(http.StatusOK, u)
 }

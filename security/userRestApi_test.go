@@ -70,4 +70,21 @@ var _ = Describe("UserRestApi", func() {
 			Expect(body).To(MatchJSON(`[{"id": "123", "name": "test"}]`))
 		})
 	})
+
+	Describe("HandleCreateUser", func() {
+		It("should return 200 when create successful", func() {
+			var payload *security.UserCreation
+			security.CreateUserFunc = func(c *security.UserCreation, sec *security.Context) (*security.UserInfo, error) {
+				payload = c
+				return &security.UserInfo{ID: 123, Name: "test"}, nil
+			}
+
+			req := httptest.NewRequest(http.MethodPost, "/v1/users", bytes.NewReader([]byte(
+				`{"name":"test","secret":"123456"}`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusOK))
+			Expect(body).To(MatchJSON(`{"id": "123", "name": "test"}`))
+			Expect(*payload).To(Equal(security.UserCreation{Name: "test", Secret: "123456"}))
+		})
+	})
 })

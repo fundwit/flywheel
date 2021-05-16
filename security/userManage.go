@@ -2,9 +2,19 @@ package security
 
 import (
 	"flywheel/bizerror"
+	"flywheel/common"
 	"flywheel/persistence"
 	"github.com/jinzhu/gorm"
+	"github.com/sony/sonyflake"
 )
+
+var (
+	userIdWorker *sonyflake.Sonyflake
+)
+
+func init() {
+	userIdWorker = sonyflake.NewSonyflake(sonyflake.Settings{})
+}
 
 func UpdateBasicAuthSecret(u *BasicAuthUpdating, sec *Context) error {
 	user := User{}
@@ -30,4 +40,12 @@ func QueryUsers(sec *Context) (*[]UserInfo, error) {
 		return nil, err
 	}
 	return &users, nil
+}
+
+func CreateUser(c *UserCreation, sec *Context) (*UserInfo, error) {
+	user := User{ID: common.NextId(userIdWorker), Name: c.Name, Secret: HashSha256(c.Secret)}
+	if err := persistence.ActiveDataSourceManager.GormDB().Save(&user).Error; err != nil {
+		return nil, err
+	}
+	return &UserInfo{ID: user.ID, Name: user.Name}, nil
 }

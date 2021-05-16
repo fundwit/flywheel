@@ -51,4 +51,18 @@ var _ = Describe("userManage", func() {
 			Expect((*users)[0]).To(Equal(security.UserInfo{ID: 1, Name: "aaa"}))
 		})
 	})
+
+	Describe("CreateUser", func() {
+		It("should be able to create users correctly", func() {
+			sec := &security.Context{Identity: security.Identity{ID: 1}}
+			u, err := security.CreateUser(&security.UserCreation{Name: "test", Secret: "123456"}, sec)
+			Expect(err).To(BeNil())
+			Expect((*u).ID).ToNot(BeZero())
+			Expect(*u).To(Equal(security.UserInfo{ID: u.ID, Name: "test"}))
+
+			user := security.User{}
+			Expect(testDatabase.DS.GormDB().Model(&security.User{}).Where(&security.User{ID: u.ID}).First(&user).Error).To(BeNil())
+			Expect(user).To(Equal(security.User{ID: u.ID, Name: "test", Secret: security.HashSha256("123456")}))
+		})
+	})
 })

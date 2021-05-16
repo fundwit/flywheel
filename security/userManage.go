@@ -1,6 +1,8 @@
 package security
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"flywheel/bizerror"
 	"flywheel/common"
 	"flywheel/persistence"
@@ -14,6 +16,13 @@ var (
 
 func init() {
 	userIdWorker = sonyflake.NewSonyflake(sonyflake.Settings{})
+}
+
+func HashSha256(raw string) string {
+	h := sha256.New()
+	h.Write([]byte(raw))
+	sum := h.Sum(nil)
+	return hex.EncodeToString(sum)
 }
 
 func UpdateBasicAuthSecret(u *BasicAuthUpdating, sec *Context) error {
@@ -35,6 +44,10 @@ func UpdateBasicAuthSecret(u *BasicAuthUpdating, sec *Context) error {
 }
 
 func QueryUsers(sec *Context) (*[]UserInfo, error) {
+	if !sec.HasRole(SystemAdminPermission.ID) {
+		return nil, bizerror.ErrForbidden
+	}
+
 	var users []UserInfo
 	if err := persistence.ActiveDataSourceManager.GormDB().Model(&User{}).Scan(&users).Error; err != nil {
 		return nil, err
@@ -43,6 +56,10 @@ func QueryUsers(sec *Context) (*[]UserInfo, error) {
 }
 
 func CreateUser(c *UserCreation, sec *Context) (*UserInfo, error) {
+	if !sec.HasRole(SystemAdminPermission.ID) {
+		return nil, bizerror.ErrForbidden
+	}
+
 	user := User{ID: common.NextId(userIdWorker), Name: c.Name, Secret: HashSha256(c.Secret)}
 	if err := persistence.ActiveDataSourceManager.GormDB().Save(&user).Error; err != nil {
 		return nil, err

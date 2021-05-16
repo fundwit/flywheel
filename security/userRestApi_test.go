@@ -3,11 +3,15 @@ package security_test
 import (
 	"bytes"
 	"flywheel/bizerror"
+	"flywheel/domain"
 	"flywheel/security"
 	"flywheel/testinfra"
+	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/patrickmn/go-cache"
 	"net/http"
 	"net/http/httptest"
 )
@@ -19,7 +23,52 @@ var _ = Describe("UserRestApi", func() {
 	BeforeEach(func() {
 		router = gin.Default()
 		router.Use(bizerror.ErrorHandling())
-		security.RegisterSessionUsersHandler(router)
+		security.RegisterUsersHandler(router)
+	})
+
+	Describe("UserInfoQueryHandler", func() {
+		var (
+			router *gin.Engine
+		)
+		BeforeEach(func() {
+			router = gin.Default()
+			router.GET("/me", security.SimpleAuthFilter(), security.UserInfoQueryHandler)
+		})
+		It("should success when token is valid", func() {
+			token := uuid.New().String()
+			security.TokenCache.Set(token, &security.Context{Token: token, Identity: security.Identity{Name: "ann", ID: 1},
+				Perms: []string{"owner_1"}, GroupRoles: []domain.GroupRole{{
+					Role: "owner", GroupName: "group1", GroupIdentifier: "TES", GroupID: types.ID(1),
+				}}}, cache.DefaultExpiration)
+
+			req := httptest.NewRequest(http.MethodGet, "/me", nil)
+			req.AddCookie(&http.Cookie{Name: security.KeySecToken, Value: token})
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusOK))
+			Expect(body).To(MatchJSON(`{"identity":{"id":"1","name":"ann"}, "token":"` + token +
+				`", "perms":["owner_1"], "groupRoles":[{"groupId":"1", "groupName":"group1", "groupIdentifier":"TES", "role":"owner"}]}`))
+		})
+
+		It("should failed when token is missing", func() {
+			token := uuid.New().String()
+			security.TokenCache.Set(token, &security.Context{Token: token, Identity: security.Identity{Name: "ann", ID: 1}}, cache.DefaultExpiration)
+
+			req := httptest.NewRequest(http.MethodGet, "/me", nil)
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusUnauthorized))
+			Expect(body).To(MatchJSON(`{"code":"common.unauthenticated","message":"unauthenticated", "data": null}`))
+		})
+
+		It("should failed when token not match", func() {
+			token := uuid.New().String()
+			security.TokenCache.Set(token, &security.Context{Token: token, Identity: security.Identity{Name: "ann", ID: 1}}, cache.DefaultExpiration)
+
+			req := httptest.NewRequest(http.MethodGet, "/me", nil)
+			req.AddCookie(&http.Cookie{Name: security.KeySecToken, Value: "bad token"})
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusUnauthorized))
+			Expect(body).To(MatchJSON(`{"code":"common.unauthenticated","message":"unauthenticated", "data": null}`))
+		})
 	})
 
 	Describe("HandleUpdateBaseAuth", func() {

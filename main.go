@@ -44,6 +44,10 @@ func main() {
 		log.Fatalf("database migration failed %v\n", err)
 	}
 
+	if err := security.DefaultSecurityConfiguration(); err != nil {
+		log.Fatalf("failed to prepare default security configuration %v\n", err)
+	}
+
 	engine := gin.Default()
 	engine.Use(bizerror.ErrorHandling())
 	engine.GET("/", func(c *gin.Context) {
@@ -53,9 +57,8 @@ func main() {
 	security.RegisterSessionHandler(engine)
 
 	securityMiddle := security.SimpleAuthFilter()
-	engine.GET("/me", securityMiddle, security.UserInfoQueryHandler)
 
-	security.RegisterSessionUsersHandler(engine, securityMiddle)
+	security.RegisterUsersHandler(engine, securityMiddle)
 
 	workflowManager := flow.NewWorkflowManager(ds)
 	workProcessManager := work.NewWorkProcessManager(ds, workflowManager)

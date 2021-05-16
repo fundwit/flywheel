@@ -13,18 +13,13 @@ var _ = Describe("userManage", func() {
 	var (
 		testDatabase *testinfra.TestDatabase
 	)
-	BeforeSuite(func() {
-		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
-	})
-	AfterSuite(func() {
-		testinfra.StopMysqlTestDatabase(testDatabase)
-	})
 	BeforeEach(func() {
+		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
 		persistence.ActiveDataSourceManager = testDatabase.DS
 		Expect(testDatabase.DS.GormDB().AutoMigrate(&security.User{}).Error).To(BeNil())
 	})
 	AfterEach(func() {
-		Expect(testDatabase.DS.GormDB().DropTable(&security.User{}).Error).To(BeNil())
+		testinfra.StopMysqlTestDatabase(testDatabase)
 	})
 
 	Describe("UpdateBasicAuthSecret", func() {
@@ -41,8 +36,17 @@ var _ = Describe("userManage", func() {
 	})
 
 	Describe("QueryUsers", func() {
-		It("should be able to query users correctly", func() {
+		It("should be blocked when user lack of permission", func() {
 			sec := security.Context{Identity: security.Identity{ID: 1}}
+			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 1, Name: "aaa", Secret: security.HashSha256("123456")}).Error).To(BeNil())
+
+			users, err := security.QueryUsers(&sec)
+			Expect(err).To(Equal(bizerror.ErrForbidden))
+			Expect(users).To(BeNil())
+		})
+
+		It("should be able to query users correctly", func() {
+			sec := security.Context{Identity: security.Identity{ID: 1}, Perms: []string{security.SystemAdminPermission.ID}}
 			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 1, Name: "aaa", Secret: security.HashSha256("123456")}).Error).To(BeNil())
 
 			users, err := security.QueryUsers(&sec)
@@ -53,8 +57,16 @@ var _ = Describe("userManage", func() {
 	})
 
 	Describe("CreateUser", func() {
-		It("should be able to create users correctly", func() {
+		It("should be blocked when user lack of permission", func() {
 			sec := &security.Context{Identity: security.Identity{ID: 1}}
+
+			u, err := security.CreateUser(&security.UserCreation{Name: "test", Secret: "123456"}, sec)
+			Expect(err).To(Equal(bizerror.ErrForbidden))
+			Expect(u).To(BeNil())
+		})
+
+		It("should be able to create users correctly", func() {
+			sec := &security.Context{Identity: security.Identity{ID: 1}, Perms: []string{security.SystemAdminPermission.ID}}
 			u, err := security.CreateUser(&security.UserCreation{Name: "test", Secret: "123456"}, sec)
 			Expect(err).To(BeNil())
 			Expect((*u).ID).ToNot(BeZero())

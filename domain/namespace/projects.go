@@ -2,6 +2,7 @@ package namespace
 
 import (
 	"errors"
+	"flywheel/bizerror"
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/persistence"
@@ -17,7 +18,23 @@ var (
 	idWorker = sonyflake.NewSonyflake(sonyflake.Settings{})
 )
 
+func QueryProjects(sec *security.Context) (*[]domain.Group, error) {
+	if !sec.HasRole(security.SystemAdminPermission.ID) {
+		return nil, bizerror.ErrForbidden
+	}
+
+	var groups []domain.Group
+	if err := persistence.ActiveDataSourceManager.GormDB().Find(&groups).Error; err != nil {
+		return nil, err
+	}
+	return &groups, nil
+}
+
 func CreateGroup(c *domain.GroupCreating, sec *security.Context) (*domain.Group, error) {
+	if !sec.HasRole(security.SystemAdminPermission.ID) {
+		return nil, bizerror.ErrForbidden
+	}
+
 	now := time.Now()
 	g := domain.Group{ID: common.NextId(idWorker), Name: c.Name, Identifier: c.Identifier, NextWorkId: 1, CreateTime: now, Creator: sec.Identity.ID}
 	r := domain.GroupMember{GroupID: g.ID, MemberId: sec.Identity.ID, Role: domain.RoleOwner, CreateTime: now}
@@ -34,6 +51,24 @@ func CreateGroup(c *domain.GroupCreating, sec *security.Context) (*domain.Group,
 		return nil, err
 	}
 	return &g, nil
+}
+
+func UpdateGroup(id types.ID, d *domain.GroupUpdating, sec *security.Context) error {
+	if !sec.HasRole(security.SystemAdminPermission.ID) {
+		return bizerror.ErrForbidden
+	}
+
+	return persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+		var group domain.Group
+		if err := tx.Where(domain.Group{ID: id}).First(&group).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Model(&domain.Group{ID: id}).Where(domain.Group{ID: id}).Update(domain.Group{Name: d.Name}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 func QueryGroupRole(groupId types.ID, sec *security.Context) (string, error) {

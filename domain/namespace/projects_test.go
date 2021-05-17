@@ -1,9 +1,11 @@
 package namespace_test
 
 import (
+	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/namespace"
 	"flywheel/persistence"
+	"flywheel/security"
 	"flywheel/testinfra"
 	"github.com/fundwit/go-commons/types"
 	. "github.com/onsi/ginkgo"
@@ -11,7 +13,7 @@ import (
 	"time"
 )
 
-var _ = Describe("GroupManager", func() {
+var _ = Describe("Projects", func() {
 	var (
 		testDatabase *testinfra.TestDatabase
 	)
@@ -26,7 +28,8 @@ var _ = Describe("GroupManager", func() {
 
 	Describe("CreateGroup", func() {
 		It("should be able to create group with a default owner member", func() {
-			g, err := namespace.CreateGroup(&domain.GroupCreating{Name: "demo", Identifier: "DEM"}, testinfra.BuildSecCtx(types.ID(1), nil))
+			sec := testinfra.BuildSecCtx(types.ID(1), []string{security.SystemAdminPermission.ID})
+			g, err := namespace.CreateGroup(&domain.GroupCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).To(BeNil())
 			Expect(g).ToNot(BeNil())
 			Expect(g.Name).To(Equal("demo"))
@@ -57,17 +60,73 @@ var _ = Describe("GroupManager", func() {
 			Expect(q[0].Creator).To(Equal(g.Creator))
 		})
 
+		It("only administrator can create group", func() {
+			sec := testinfra.BuildSecCtx(types.ID(1), []string{})
+			g, err := namespace.CreateGroup(&domain.GroupCreating{Name: "demo", Identifier: "DEM"}, sec)
+			Expect(g).To(BeNil())
+			Expect(err).To(Equal(bizerror.ErrForbidden))
+		})
+
 		It("should return error when database action failed", func() {
 			testDatabase.DS.GormDB().DropTable(&domain.GroupMember{})
 
-			g, err := namespace.CreateGroup(&domain.GroupCreating{Name: "demo", Identifier: "DEM"}, testinfra.BuildSecCtx(types.ID(1), nil))
+			sec := testinfra.BuildSecCtx(types.ID(1), []string{security.SystemAdminPermission.ID})
+			g, err := namespace.CreateGroup(&domain.GroupCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).ToNot(BeNil())
 			Expect(g).To(BeNil())
 
 			testDatabase.DS.GormDB().DropTable(&domain.Group{})
-			g, err = namespace.CreateGroup(&domain.GroupCreating{Name: "demo", Identifier: "DEM"}, testinfra.BuildSecCtx(types.ID(1), nil))
+			g, err = namespace.CreateGroup(&domain.GroupCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).ToNot(BeNil())
 			Expect(g).To(BeNil())
+		})
+	})
+
+	Describe("QueryGroups", func() {
+		It("only administrator can query all groups", func() {
+			t := time.Date(2021, 1, 1, 0, 0, 0, 0, time.Local)
+			testDatabase.DS.GormDB().Save(&domain.Group{ID: 123, Identifier: "TED", Name: "test", NextWorkId: 10, CreateTime: t, Creator: 1})
+
+			b, err := namespace.QueryProjects(testinfra.BuildSecCtx(types.ID(2), nil))
+			Expect(b).To(BeNil())
+			Expect(err).To(Equal(bizerror.ErrForbidden))
+
+			b, err = namespace.QueryProjects(testinfra.BuildSecCtx(types.ID(2), []string{security.SystemAdminPermission.ID}))
+			Expect(err).To(BeNil())
+			Expect(*b).To(Equal([]domain.Group{{ID: 123, Identifier: "TED", Name: "test", NextWorkId: 10, CreateTime: t, Creator: 1}}))
+		})
+
+		It("should be able to return database error", func() {
+			testDatabase.DS.GormDB().DropTable(&domain.Group{})
+
+			b, err := namespace.QueryProjects(testinfra.BuildSecCtx(types.ID(2), []string{security.SystemAdminPermission.ID}))
+			Expect(b).To(BeNil())
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".groups' doesn't exist"))
+		})
+	})
+
+	Describe("UpdateGroup", func() {
+		It("only administrator can update group", func() {
+			t := time.Date(2021, 1, 1, 0, 0, 0, 0, time.Local)
+			testDatabase.DS.GormDB().Save(&domain.Group{ID: 123, Identifier: "TED", Name: "test", NextWorkId: 10, CreateTime: t, Creator: 111})
+
+			err := namespace.UpdateGroup(123, &domain.GroupUpdating{Name: "new name"}, testinfra.BuildSecCtx(types.ID(2), nil))
+			Expect(err).To(Equal(bizerror.ErrForbidden))
+
+			err = namespace.UpdateGroup(123, &domain.GroupUpdating{Name: "new name"}, testinfra.BuildSecCtx(types.ID(2), []string{security.SystemAdminPermission.ID}))
+			Expect(err).To(BeNil())
+
+			var q []domain.Group
+			Expect(testDatabase.DS.GormDB().Find(&q).Error).To(BeNil())
+			Expect(q).ToNot(BeNil())
+			Expect(len(q)).To(Equal(1))
+			Expect(q[0].Name).To(Equal("new name"))
+			Expect(q[0].Identifier).To(Equal("TED"))
+			Expect(q[0].NextWorkId).To(Equal(10))
+			Expect(q[0].ID).To(Equal(types.ID(123)))
+			Expect(q[0].CreateTime).To(Equal(t))
+			Expect(q[0].Creator).To(Equal(types.ID(111)))
 		})
 	})
 
@@ -97,9 +156,11 @@ var _ = Describe("GroupManager", func() {
 
 	Describe("NextWorkIdentifier", func() {
 		It("should be able to generate next work identifier", func() {
-			g1, err := namespace.CreateGroup(&domain.GroupCreating{Name: "group1", Identifier: "G1"}, testinfra.BuildSecCtx(types.ID(1), nil))
+			sec := testinfra.BuildSecCtx(types.ID(1), []string{security.SystemAdminPermission.ID})
+
+			g1, err := namespace.CreateGroup(&domain.GroupCreating{Name: "group1", Identifier: "G1"}, sec)
 			Expect(err).To(BeNil())
-			g2, err := namespace.CreateGroup(&domain.GroupCreating{Name: "group2", Identifier: "G2"}, testinfra.BuildSecCtx(types.ID(1), nil))
+			g2, err := namespace.CreateGroup(&domain.GroupCreating{Name: "group2", Identifier: "G2"}, sec)
 			Expect(err).To(BeNil())
 
 			nextId, err := namespace.NextWorkIdentifier(g1.ID, testDatabase.DS.GormDB())

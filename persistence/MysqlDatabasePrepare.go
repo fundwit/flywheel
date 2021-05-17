@@ -5,6 +5,7 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"log"
+	"os"
 	"strings"
 )
 
@@ -31,7 +32,11 @@ func PrepareMysqlDatabase(mysqlDriverArgs string) error {
 		return err
 	}
 	initSql := "CREATE DATABASE IF NOT EXISTS `" + databaseName + "` DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_unicode_ci;"
-	db.LogMode(true)
+
+	if os.Getenv("GIN_MODE") == "debug" {
+		db.LogMode(true)
+	}
+
 	err = db.Exec(initSql).Error
 	if err != nil {
 		return err

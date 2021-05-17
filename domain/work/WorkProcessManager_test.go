@@ -7,6 +7,7 @@ import (
 	"flywheel/domain/state"
 	"flywheel/domain/work"
 	"flywheel/persistence"
+	"flywheel/security"
 	"flywheel/testinfra"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -29,7 +30,8 @@ var _ = Describe("WorkProcessManager", func() {
 
 		persistence.ActiveDataSourceManager = testDatabase.DS
 		var err error
-		group1, err = namespace.CreateGroup(&domain.GroupCreating{Name: "group 1", Identifier: "GR1"}, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+		group1, err = namespace.CreateGroup(&domain.GroupCreating{Name: "group 1", Identifier: "GR1"},
+			testinfra.BuildSecCtx(100, []string{"owner_1", security.SystemAdminPermission.ID}))
 		Expect(err).To(BeNil())
 
 		workflowManager := flow.NewWorkflowManager(testDatabase.DS)

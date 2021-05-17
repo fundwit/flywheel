@@ -20,7 +20,7 @@ func (m *DataSourceManager) Start() error {
 		return err
 	}
 	m.gormDB = db
-	if os.Getenv("GIN_MODE") != "release" {
+	if os.Getenv("GIN_MODE") == "debug" {
 		m.gormDB.LogMode(true)
 	}
 	return nil

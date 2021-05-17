@@ -8,6 +8,7 @@ import (
 	"flywheel/domain/state"
 	"flywheel/domain/work"
 	"flywheel/persistence"
+	"flywheel/security"
 	"flywheel/testinfra"
 	"github.com/fundwit/go-commons/types"
 	. "github.com/onsi/ginkgo"
@@ -30,9 +31,11 @@ var _ = Describe("WorkStateTransition Manager", func() {
 
 		persistence.ActiveDataSourceManager = testDatabase.DS
 		var err error
-		group1, err = namespace.CreateGroup(&domain.GroupCreating{Name: "group 1", Identifier: "GR1"}, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+		group1, err = namespace.CreateGroup(&domain.GroupCreating{Name: "group 1", Identifier: "GR1"},
+			testinfra.BuildSecCtx(100, []string{"owner_1", security.SystemAdminPermission.ID}))
 		Expect(err).To(BeNil())
-		group2, err = namespace.CreateGroup(&domain.GroupCreating{Name: "group 2", Identifier: "GR2"}, testinfra.BuildSecCtx(100, []string{"owner_2"}))
+		group2, err = namespace.CreateGroup(&domain.GroupCreating{Name: "group 2", Identifier: "GR2"},
+			testinfra.BuildSecCtx(100, []string{"owner_2", security.SystemAdminPermission.ID}))
 		Expect(err).To(BeNil())
 
 		flowManager = flow.NewWorkflowManager(testDatabase.DS)

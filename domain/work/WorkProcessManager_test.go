@@ -30,7 +30,7 @@ var _ = Describe("WorkProcessManager", func() {
 
 		persistence.ActiveDataSourceManager = testDatabase.DS
 		var err error
-		group1, err = namespace.CreateGroup(&domain.GroupCreating{Name: "group 1", Identifier: "GR1"},
+		group1, err = namespace.CreateProject(&domain.ProjectCreating{Name: "group 1", Identifier: "GR1"},
 			testinfra.BuildSecCtx(100, []string{"owner_1", security.SystemAdminPermission.ID}))
 		Expect(err).To(BeNil())
 

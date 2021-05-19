@@ -30,7 +30,7 @@ func QueryProjects(sec *security.Context) (*[]domain.Group, error) {
 	return &groups, nil
 }
 
-func CreateGroup(c *domain.GroupCreating, sec *security.Context) (*domain.Group, error) {
+func CreateProject(c *domain.ProjectCreating, sec *security.Context) (*domain.Group, error) {
 	if !sec.HasRole(security.SystemAdminPermission.ID) {
 		return nil, bizerror.ErrForbidden
 	}
@@ -53,7 +53,7 @@ func CreateGroup(c *domain.GroupCreating, sec *security.Context) (*domain.Group,
 	return &g, nil
 }
 
-func UpdateGroup(id types.ID, d *domain.GroupUpdating, sec *security.Context) error {
+func UpdateProject(id types.ID, d *domain.ProjectUpdating, sec *security.Context) error {
 	if !sec.HasRole(security.SystemAdminPermission.ID) {
 		return bizerror.ErrForbidden
 	}
@@ -71,8 +71,8 @@ func UpdateGroup(id types.ID, d *domain.GroupUpdating, sec *security.Context) er
 	})
 }
 
-func QueryGroupRole(groupId types.ID, sec *security.Context) (string, error) {
-	gm := domain.GroupMember{GroupID: groupId, MemberId: sec.Identity.ID}
+func QueryProjectRole(projectId types.ID, sec *security.Context) (string, error) {
+	gm := domain.GroupMember{GroupID: projectId, MemberId: sec.Identity.ID}
 	db := persistence.ActiveDataSourceManager.GormDB()
 	var founds []domain.GroupMember
 	if err := db.Model(domain.GroupMember{}).Where(&gm).Find(&founds).Error; err != nil || founds == nil || len(founds) == 0 {
@@ -81,16 +81,16 @@ func QueryGroupRole(groupId types.ID, sec *security.Context) (string, error) {
 	return founds[0].Role, nil
 }
 
-func NextWorkIdentifier(groupId types.ID, tx *gorm.DB) (string, error) {
+func NextWorkIdentifier(projectId types.ID, tx *gorm.DB) (string, error) {
 	group := domain.Group{}
-	if err := tx.Where(&domain.Group{ID: groupId}).First(&group).Error; err != nil {
+	if err := tx.Where(&domain.Group{ID: projectId}).First(&group).Error; err != nil {
 		return "", err
 	}
 
 	// consume current value
 	nextWorkID := fmt.Sprintf("%s-%d", group.Identifier, group.NextWorkId)
 	// generate next value
-	db := tx.Model(&domain.Group{}).Where(&domain.Group{ID: groupId, NextWorkId: group.NextWorkId}).
+	db := tx.Model(&domain.Group{}).Where(&domain.Group{ID: projectId, NextWorkId: group.NextWorkId}).
 		Update("next_work_id", group.NextWorkId+1)
 	if db.Error != nil {
 		return "", db.Error

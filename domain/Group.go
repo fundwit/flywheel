@@ -24,12 +24,12 @@ type GroupMember struct {
 	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
 }
 
-type GroupCreating struct {
+type ProjectCreating struct {
 	Name       string `json:"name" binding:"required,lte=60"`
 	Identifier string `json:"identifier" binding:"required,lte=6,uppercase"`
 }
 
-type GroupUpdating struct {
+type ProjectUpdating struct {
 	Name string `json:"name" binding:"required,lte=60"`
 }
 

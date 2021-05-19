@@ -26,10 +26,10 @@ var _ = Describe("Projects", func() {
 		testinfra.StopMysqlTestDatabase(testDatabase)
 	})
 
-	Describe("CreateGroup", func() {
+	Describe("CreateProject", func() {
 		It("should be able to create group with a default owner member", func() {
 			sec := testinfra.BuildSecCtx(types.ID(1), []string{security.SystemAdminPermission.ID})
-			g, err := namespace.CreateGroup(&domain.GroupCreating{Name: "demo", Identifier: "DEM"}, sec)
+			g, err := namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).To(BeNil())
 			Expect(g).ToNot(BeNil())
 			Expect(g.Name).To(Equal("demo"))
@@ -62,7 +62,7 @@ var _ = Describe("Projects", func() {
 
 		It("only administrator can create group", func() {
 			sec := testinfra.BuildSecCtx(types.ID(1), []string{})
-			g, err := namespace.CreateGroup(&domain.GroupCreating{Name: "demo", Identifier: "DEM"}, sec)
+			g, err := namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(g).To(BeNil())
 			Expect(err).To(Equal(bizerror.ErrForbidden))
 		})
@@ -71,12 +71,12 @@ var _ = Describe("Projects", func() {
 			testDatabase.DS.GormDB().DropTable(&domain.GroupMember{})
 
 			sec := testinfra.BuildSecCtx(types.ID(1), []string{security.SystemAdminPermission.ID})
-			g, err := namespace.CreateGroup(&domain.GroupCreating{Name: "demo", Identifier: "DEM"}, sec)
+			g, err := namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).ToNot(BeNil())
 			Expect(g).To(BeNil())
 
 			testDatabase.DS.GormDB().DropTable(&domain.Group{})
-			g, err = namespace.CreateGroup(&domain.GroupCreating{Name: "demo", Identifier: "DEM"}, sec)
+			g, err = namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).ToNot(BeNil())
 			Expect(g).To(BeNil())
 		})
@@ -106,15 +106,15 @@ var _ = Describe("Projects", func() {
 		})
 	})
 
-	Describe("UpdateGroup", func() {
+	Describe("UpdateProject", func() {
 		It("only administrator can update group", func() {
 			t := time.Date(2021, 1, 1, 0, 0, 0, 0, time.Local)
 			testDatabase.DS.GormDB().Save(&domain.Group{ID: 123, Identifier: "TED", Name: "test", NextWorkId: 10, CreateTime: t, Creator: 111})
 
-			err := namespace.UpdateGroup(123, &domain.GroupUpdating{Name: "new name"}, testinfra.BuildSecCtx(types.ID(2), nil))
+			err := namespace.UpdateProject(123, &domain.ProjectUpdating{Name: "new name"}, testinfra.BuildSecCtx(types.ID(2), nil))
 			Expect(err).To(Equal(bizerror.ErrForbidden))
 
-			err = namespace.UpdateGroup(123, &domain.GroupUpdating{Name: "new name"}, testinfra.BuildSecCtx(types.ID(2), []string{security.SystemAdminPermission.ID}))
+			err = namespace.UpdateProject(123, &domain.ProjectUpdating{Name: "new name"}, testinfra.BuildSecCtx(types.ID(2), []string{security.SystemAdminPermission.ID}))
 			Expect(err).To(BeNil())
 
 			var q []domain.Group
@@ -130,12 +130,12 @@ var _ = Describe("Projects", func() {
 		})
 	})
 
-	Describe("QueryGroupRole", func() {
+	Describe("QueryProjectRole", func() {
 		It("should return actual role if group is accessible for user", func() {
 			Expect(testDatabase.DS.GormDB().Create(
 				&domain.GroupMember{GroupID: 1, MemberId: 2, Role: domain.RoleOwner, CreateTime: time.Now()}).Error).To(BeNil())
 
-			b, err := namespace.QueryGroupRole(1, testinfra.BuildSecCtx(types.ID(2), nil))
+			b, err := namespace.QueryProjectRole(1, testinfra.BuildSecCtx(types.ID(2), nil))
 			Expect(b).To(Equal("owner"))
 			Expect(err).To(BeNil())
 		})
@@ -143,12 +143,12 @@ var _ = Describe("Projects", func() {
 			Expect(testDatabase.DS.GormDB().Create(
 				&domain.GroupMember{GroupID: 1, MemberId: 3, Role: "owner", CreateTime: time.Now()}).Error).To(BeNil())
 
-			b, err := namespace.QueryGroupRole(1, testinfra.BuildSecCtx(types.ID(2), nil))
+			b, err := namespace.QueryProjectRole(1, testinfra.BuildSecCtx(types.ID(2), nil))
 			Expect(b).To(BeEmpty())
 			Expect(err).To(BeNil())
 		})
 		It("should return empty if group member relationship is not exist", func() {
-			b, err := namespace.QueryGroupRole(1, testinfra.BuildSecCtx(types.ID(2), nil))
+			b, err := namespace.QueryProjectRole(1, testinfra.BuildSecCtx(types.ID(2), nil))
 			Expect(b).To(BeEmpty())
 			Expect(err).To(BeNil())
 		})
@@ -158,9 +158,9 @@ var _ = Describe("Projects", func() {
 		It("should be able to generate next work identifier", func() {
 			sec := testinfra.BuildSecCtx(types.ID(1), []string{security.SystemAdminPermission.ID})
 
-			g1, err := namespace.CreateGroup(&domain.GroupCreating{Name: "group1", Identifier: "G1"}, sec)
+			g1, err := namespace.CreateProject(&domain.ProjectCreating{Name: "group1", Identifier: "G1"}, sec)
 			Expect(err).To(BeNil())
-			g2, err := namespace.CreateGroup(&domain.GroupCreating{Name: "group2", Identifier: "G2"}, sec)
+			g2, err := namespace.CreateProject(&domain.ProjectCreating{Name: "group2", Identifier: "G2"}, sec)
 			Expect(err).To(BeNil())
 
 			nextId, err := namespace.NextWorkIdentifier(g1.ID, testDatabase.DS.GormDB())

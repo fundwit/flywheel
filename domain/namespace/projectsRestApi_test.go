@@ -23,7 +23,7 @@ var _ = Describe("ProjectRestApi", func() {
 	BeforeEach(func() {
 		router = gin.Default()
 		router.Use(bizerror.ErrorHandling())
-		namespace.RegisterNamespaceRestApis(router)
+		namespace.RegisterProjectsRestApis(router)
 	})
 
 	Describe("HandleQueryProjects", func() {
@@ -44,8 +44,8 @@ var _ = Describe("ProjectRestApi", func() {
 
 	Describe("HandleCreateProject", func() {
 		It("should be able to create project successfully", func() {
-			var payload *domain.GroupCreating
-			namespace.CreateProjectFunc = func(c *domain.GroupCreating, sec *security.Context) (*domain.Group, error) {
+			var payload *domain.ProjectCreating
+			namespace.CreateProjectFunc = func(c *domain.ProjectCreating, sec *security.Context) (*domain.Group, error) {
 				payload = c
 				t := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 				return &domain.Group{ID: 123, Identifier: c.Identifier, Name: c.Name, NextWorkId: 10, CreateTime: t, Creator: 100}, nil
@@ -60,15 +60,15 @@ var _ = Describe("ProjectRestApi", func() {
 			`))
 			Expect(status).To(Equal(http.StatusOK))
 
-			Expect(*payload).To(Equal(domain.GroupCreating{Name: "test project", Identifier: "TEP"}))
+			Expect(*payload).To(Equal(domain.ProjectCreating{Name: "test project", Identifier: "TEP"}))
 		})
 	})
 
 	Describe("HandleUpdateProject", func() {
 		It("should be able to update project successfully", func() {
 			var resId types.ID
-			var payload *domain.GroupUpdating
-			namespace.UpdateProjectFunc = func(id types.ID, d *domain.GroupUpdating, sec *security.Context) error {
+			var payload *domain.ProjectUpdating
+			namespace.UpdateProjectFunc = func(id types.ID, d *domain.ProjectUpdating, sec *security.Context) error {
 				resId = id
 				payload = d
 				return nil
@@ -82,7 +82,7 @@ var _ = Describe("ProjectRestApi", func() {
 			Expect(status).To(Equal(http.StatusOK))
 
 			Expect(resId).To(Equal(types.ID(123)))
-			Expect(*payload).To(Equal(domain.GroupUpdating{Name: "new project name"}))
+			Expect(*payload).To(Equal(domain.ProjectUpdating{Name: "new project name"}))
 		})
 	})
 })

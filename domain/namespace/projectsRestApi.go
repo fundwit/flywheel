@@ -13,11 +13,11 @@ var (
 	ProjectsApiRoot = "/v1/projects"
 
 	QueryProjectsFunc = QueryProjects
-	CreateProjectFunc = CreateGroup
-	UpdateProjectFunc = UpdateGroup
+	CreateProjectFunc = CreateProject
+	UpdateProjectFunc = UpdateProject
 )
 
-func RegisterNamespaceRestApis(r *gin.Engine, middleWares ...gin.HandlerFunc) {
+func RegisterProjectsRestApis(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 	projects := r.Group(ProjectsApiRoot, middleWares...)
 	projects.GET("", HandleQueryProjects)
 	projects.POST("", HandleCreateProject)
@@ -33,7 +33,7 @@ func HandleQueryProjects(c *gin.Context) {
 }
 
 func HandleCreateProject(c *gin.Context) {
-	payload := domain.GroupCreating{}
+	payload := domain.ProjectCreating{}
 	err := c.ShouldBindBodyWith(&payload, binding.JSON)
 	if err != nil {
 		panic(err)
@@ -51,7 +51,7 @@ func HandleUpdateProject(c *gin.Context) {
 		panic(err)
 	}
 
-	payload := domain.GroupUpdating{}
+	payload := domain.ProjectUpdating{}
 	err = c.ShouldBindBodyWith(&payload, binding.JSON)
 	if err != nil {
 		panic(err)

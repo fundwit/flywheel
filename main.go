@@ -4,6 +4,7 @@ import (
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/flow"
+	"flywheel/domain/namespace"
 	"flywheel/domain/work"
 	"flywheel/persistence"
 	"flywheel/security"
@@ -60,6 +61,7 @@ func main() {
 
 	securityMiddle := security.SimpleAuthFilter()
 
+	namespace.RegisterProjectsRestApis(engine, securityMiddle)
 	security.RegisterUsersHandler(engine, securityMiddle)
 
 	workflowManager := flow.NewWorkflowManager(ds)

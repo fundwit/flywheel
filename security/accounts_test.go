@@ -5,6 +5,7 @@ import (
 	"flywheel/persistence"
 	"flywheel/security"
 	"flywheel/testinfra"
+	"github.com/fundwit/go-commons/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -75,6 +76,28 @@ var _ = Describe("userManage", func() {
 			user := security.User{}
 			Expect(testDatabase.DS.GormDB().Model(&security.User{}).Where(&security.User{ID: u.ID}).First(&user).Error).To(BeNil())
 			Expect(user).To(Equal(security.User{ID: u.ID, Name: "test", Secret: security.HashSha256("123456")}))
+		})
+	})
+
+	Describe("QueryAccountNames", func() {
+		It("should return correct account names", func() {
+			ret, err := security.QueryAccountNames(nil)
+			Expect(err).To(BeNil())
+			Expect(len(ret)).To(BeZero())
+
+			ret, err = security.QueryAccountNames([]types.ID{})
+			Expect(err).To(BeNil())
+			Expect(len(ret)).To(BeZero())
+
+			db := testDatabase.DS.GormDB()
+			Expect(db.Save(&security.User{ID: 1, Name: "u1", Secret: "xxx"}).Error).To(BeNil())
+			Expect(db.Save(&security.User{ID: 2, Name: "u2", Secret: "xxx"}).Error).To(BeNil())
+			Expect(db.Save(&security.User{ID: 3, Name: "u3", Secret: "xxx"}).Error).To(BeNil())
+
+			ret, err = security.QueryAccountNames([]types.ID{1, 2, 4})
+			Expect(err).To(BeNil())
+			Expect(len(ret)).To(Equal(2))
+			Expect(ret).To(Equal(map[types.ID]string{1: "u1", 2:"u2"}))
 		})
 	})
 })

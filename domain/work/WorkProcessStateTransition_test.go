@@ -10,6 +10,7 @@ import (
 	"flywheel/persistence"
 	"flywheel/security"
 	"flywheel/testinfra"
+
 	"github.com/fundwit/go-commons/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -21,21 +22,21 @@ var _ = Describe("WorkStateTransition Manager", func() {
 		flowManager  flow.WorkflowManagerTraits
 		workManager  work.WorkManagerTraits
 		manager      work.WorkProcessManagerTraits
-		group1       *domain.Group
-		group2       *domain.Group
+		group1       *domain.Project
+		group2       *domain.Project
 	)
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
-		Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.Group{}, &domain.GroupMember{}, &domain.Work{}, &domain.WorkStateTransition{}, &domain.WorkProcessStep{},
+		Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkStateTransition{}, &domain.WorkProcessStep{},
 			&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error).To(BeNil())
 
 		persistence.ActiveDataSourceManager = testDatabase.DS
 		var err error
 		group1, err = namespace.CreateProject(&domain.ProjectCreating{Name: "group 1", Identifier: "GR1"},
-			testinfra.BuildSecCtx(100, []string{"owner_1", security.SystemAdminPermission.ID}))
+			testinfra.BuildSecCtx(100, "owner_1", security.SystemAdminPermission.ID))
 		Expect(err).To(BeNil())
 		group2, err = namespace.CreateProject(&domain.ProjectCreating{Name: "group 2", Identifier: "GR2"},
-			testinfra.BuildSecCtx(100, []string{"owner_2", security.SystemAdminPermission.ID}))
+			testinfra.BuildSecCtx(100, "owner_2", security.SystemAdminPermission.ID))
 		Expect(err).To(BeNil())
 
 		flowManager = flow.NewWorkflowManager(testDatabase.DS)
@@ -48,13 +49,13 @@ var _ = Describe("WorkStateTransition Manager", func() {
 
 	Describe("CreateWorkStateTransition", func() {
 		It("should failed if workflow is not exist", func() {
-			id, err := manager.CreateWorkStateTransition(&domain.WorkStateTransitionBrief{FlowID: 2}, testinfra.BuildSecCtx(123, []string{}))
+			id, err := manager.CreateWorkStateTransition(&domain.WorkStateTransitionBrief{FlowID: 2}, testinfra.BuildSecCtx(123))
 			Expect(id).To(BeNil())
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("record not found"))
 		})
 		It("should failed if transition is not acceptable", func() {
-			sec := testinfra.BuildSecCtx(123, []string{"owner_" + group1.ID.String()})
+			sec := testinfra.BuildSecCtx(123, "owner_"+group1.ID.String())
 			workflowCreation := &flow.WorkflowCreation{Name: "test workflow", GroupID: group1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
 			Expect(err).To(BeNil())
@@ -71,12 +72,12 @@ var _ = Describe("WorkStateTransition Manager", func() {
 
 			id, err := manager.CreateWorkStateTransition(
 				&domain.WorkStateTransitionBrief{FlowID: 1, WorkID: 1, FromState: "PENDING", ToState: "DOING"},
-				testinfra.BuildSecCtx(123, []string{}))
+				testinfra.BuildSecCtx(123))
 			Expect(id).To(BeNil())
 			Expect(err).ToNot(BeNil())
 		})
 		It("should failed when work is not exist", func() {
-			sec := testinfra.BuildSecCtx(types.ID(111), []string{"owner_" + group1.ID.String()})
+			sec := testinfra.BuildSecCtx(types.ID(111), "owner_"+group1.ID.String())
 			workflowCreation := &flow.WorkflowCreation{Name: "test workflow", GroupID: group1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
 			Expect(err).To(BeNil())
@@ -88,25 +89,25 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			Expect(err.Error()).To(Equal("record not found"))
 		})
 		It("should failed when work is forbidden for current user", func() {
-			sec := testinfra.BuildSecCtx(types.ID(3), []string{"owner_" + group1.ID.String()})
+			sec := testinfra.BuildSecCtx(types.ID(3), "owner_"+group1.ID.String())
 			workflowCreation := &flow.WorkflowCreation{Name: "test workflow", GroupID: group1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
 			Expect(err).To(BeNil())
 			detail := testinfra.BuildWorker(workManager, "test work", workflow.ID, group1.ID, sec)
 
 			workflowCreation = &flow.WorkflowCreation{Name: "test workflow", GroupID: group2.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-			workflow, err = flowManager.CreateWorkflow(workflowCreation, testinfra.BuildSecCtx(types.ID(2), []string{"owner_" + group2.ID.String()}))
+			workflow, err = flowManager.CreateWorkflow(workflowCreation, testinfra.BuildSecCtx(types.ID(2), "owner_"+group2.ID.String()))
 			Expect(err).To(BeNil())
 
 			id, err := manager.CreateWorkStateTransition(
 				&domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DOING"},
-				testinfra.BuildSecCtx(types.ID(1), []string{"owner_100", "owner_" + group2.ID.String()}))
+				testinfra.BuildSecCtx(types.ID(1), "owner_100", "owner_"+group2.ID.String()))
 			Expect(id).To(BeNil())
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 		})
 		It("should failed if stateName is not match fromState", func() {
-			sec := testinfra.BuildSecCtx(types.ID(123), []string{"owner_" + group1.ID.String()})
+			sec := testinfra.BuildSecCtx(types.ID(123), "owner_"+group1.ID.String())
 			workflowCreation := &flow.WorkflowCreation{Name: "test workflow", GroupID: group1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
 			Expect(err).To(BeNil())
@@ -120,7 +121,7 @@ var _ = Describe("WorkStateTransition Manager", func() {
 		})
 
 		It("should failed if create transition record failed", func() {
-			sec := testinfra.BuildSecCtx(types.ID(123), []string{"owner_" + group1.ID.String()})
+			sec := testinfra.BuildSecCtx(types.ID(123), "owner_"+group1.ID.String())
 			workflowCreation := &flow.WorkflowCreation{Name: "test workflow", GroupID: group1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
 			Expect(err).To(BeNil())
@@ -130,13 +131,13 @@ var _ = Describe("WorkStateTransition Manager", func() {
 
 			transition := domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DOING"}
 			id, err := manager.CreateWorkStateTransition(&transition,
-				testinfra.BuildSecCtx(types.ID(123), []string{"owner_333"}))
+				testinfra.BuildSecCtx(types.ID(123), "owner_333"))
 			Expect(id).To(BeZero())
 			Expect(err).ToNot(BeZero())
 		})
 
 		It("should failed to create work state transition when work is archived", func() {
-			sec := testinfra.BuildSecCtx(types.ID(123), []string{"owner_" + group1.ID.String()})
+			sec := testinfra.BuildSecCtx(types.ID(123), "owner_"+group1.ID.String())
 			workflowCreation := &flow.WorkflowCreation{Name: "test workflow", GroupID: group1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
 			Expect(err).To(BeNil())
@@ -156,7 +157,7 @@ var _ = Describe("WorkStateTransition Manager", func() {
 		})
 
 		It("should success when all conditions be satisfied", func() {
-			sec := testinfra.BuildSecCtx(types.ID(123), []string{"owner_" + group1.ID.String()})
+			sec := testinfra.BuildSecCtx(types.ID(123), "owner_"+group1.ID.String())
 			workflowCreation := &flow.WorkflowCreation{Name: "test workflow", GroupID: group1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
 			Expect(err).To(BeNil())

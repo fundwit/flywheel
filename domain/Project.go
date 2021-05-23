@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type Group struct {
+type Project struct {
 	ID types.ID `json:"id" gorm:"primary_key"`
 
 	Identifier string `json:"identifier"  gorm:"unique_index:identifier_unique"`
@@ -15,13 +15,6 @@ type Group struct {
 
 	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
 	Creator    types.ID  `json:"creator"`
-}
-
-type GroupMember struct {
-	GroupID    types.ID  `json:"groupId"  gorm:"primary_key" sql:"type:BIGINT UNSIGNED NOT NULL"`
-	MemberId   types.ID  `json:"memberId" gorm:"primary_key" sql:"type:BIGINT UNSIGNED NOT NULL"`
-	Role       string    `json:"role"`
-	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
 }
 
 type ProjectCreating struct {

@@ -48,7 +48,7 @@ func DefaultSecurityConfiguration() error {
 }
 
 // as a simple initial solution, we use group member relationship as the metadata of permissions
-func LoadPerms(uid types.ID) ([]string, []domain.GroupRole) {
+func LoadPerms(uid types.ID) ([]string, []domain.ProjectRole) {
 	var roles []string
 	db := persistence.ActiveDataSourceManager.GormDB()
 
@@ -68,23 +68,23 @@ func LoadPerms(uid types.ID) ([]string, []domain.GroupRole) {
 	}
 
 	// group role
-	var gms []domain.GroupMember
-	if err := db.Model(&domain.GroupMember{}).Where(&domain.GroupMember{MemberId: uid}).Scan(&gms).Error; err != nil {
+	var gms []domain.ProjectMember
+	if err := db.Model(&domain.ProjectMember{}).Where(&domain.ProjectMember{MemberId: uid}).Scan(&gms).Error; err != nil {
 		panic(err)
 	}
 
-	var groupRoles []domain.GroupRole
-	var groupIds []types.ID
+	var projectRoles []domain.ProjectRole
+	var projectIds []types.ID
 	for _, gm := range gms {
-		roles = append(roles, fmt.Sprintf("%s_%d", gm.Role, gm.GroupID))
-		groupRoles = append(groupRoles, domain.GroupRole{Role: gm.Role, GroupID: gm.GroupID})
-		groupIds = append(groupIds, gm.GroupID)
+		roles = append(roles, fmt.Sprintf("%s_%d", gm.Role, gm.ProjectId))
+		projectRoles = append(projectRoles, domain.ProjectRole{Role: gm.Role, GroupID: gm.ProjectId})
+		projectIds = append(projectIds, gm.ProjectId)
 	}
 
-	m := map[types.ID]domain.Group{}
-	if len(groupIds) > 0 {
-		var groups []domain.Group
-		if err := persistence.ActiveDataSourceManager.GormDB().Model(&domain.Group{}).Where("id in (?)", groupIds).Scan(&groups).Error; err != nil {
+	m := map[types.ID]domain.Project{}
+	if len(projectIds) > 0 {
+		var groups []domain.Project
+		if err := persistence.ActiveDataSourceManager.GormDB().Model(&domain.Project{}).Where("id in (?)", projectIds).Scan(&groups).Error; err != nil {
 			panic(err)
 		}
 		for _, group := range groups {
@@ -92,25 +92,25 @@ func LoadPerms(uid types.ID) ([]string, []domain.GroupRole) {
 		}
 	}
 
-	for i := 0; i < len(groupRoles); i++ {
-		groupRole := groupRoles[i]
+	for i := 0; i < len(projectRoles); i++ {
+		groupRole := projectRoles[i]
 
 		group := m[groupRole.GroupID]
-		if (group == domain.Group{}) {
+		if (group == domain.Project{}) {
 			panic(errors.New("group " + groupRole.GroupID.String() + " is not exist"))
 		}
 
 		groupRole.GroupName = group.Name
 		groupRole.GroupIdentifier = group.Identifier
 
-		groupRoles[i] = groupRole
+		projectRoles[i] = groupRole
 	}
 
 	if roles == nil {
 		roles = []string{}
 	}
-	if groupRoles == nil {
-		groupRoles = []domain.GroupRole{}
+	if projectRoles == nil {
+		projectRoles = []domain.ProjectRole{}
 	}
-	return roles, groupRoles
+	return roles, projectRoles
 }

@@ -6,12 +6,13 @@ import (
 	"flywheel/domain/flow"
 	"flywheel/domain/state"
 	"flywheel/testinfra"
+	"log"
+	"time"
+
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"log"
-	"time"
 )
 
 var creationDemo = &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), ThemeColor: "blue", ThemeIcon: "some-icon", StateMachine: state.StateMachine{
@@ -44,24 +45,24 @@ var _ = Describe("WorkflowManager", func() {
 		It("should query all workflows successfully", func() {
 			_, err := manager.CreateWorkflow(
 				&flow.WorkflowCreation{Name: "test workflow1", GroupID: types.ID(1), ThemeColor: "blue", ThemeIcon: "foo", StateMachine: creationDemo.StateMachine},
-				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+				testinfra.BuildSecCtx(1, "owner_1"))
 			Expect(err).To(BeZero())
 			_, err = manager.CreateWorkflow(
 				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(2), ThemeColor: "blue", ThemeIcon: "bar", StateMachine: creationDemo.StateMachine},
-				testinfra.BuildSecCtx(2, []string{"owner_2"}))
+				testinfra.BuildSecCtx(2, "owner_2"))
 			Expect(err).To(BeZero())
 
-			workflows, err := manager.QueryWorkflows(&domain.WorkflowQuery{}, testinfra.BuildSecCtx(1, []string{"owner_1", "owner_2"}))
+			workflows, err := manager.QueryWorkflows(&domain.WorkflowQuery{}, testinfra.BuildSecCtx(1, "owner_1", "owner_2"))
 			Expect(err).To(BeNil())
 			Expect(workflows).ToNot(BeNil())
 			Expect(len(*workflows)).To(Equal(2))
 
-			workflows, err = manager.QueryWorkflows(&domain.WorkflowQuery{}, testinfra.BuildSecCtx(1, []string{}))
+			workflows, err = manager.QueryWorkflows(&domain.WorkflowQuery{}, testinfra.BuildSecCtx(1))
 			Expect(err).To(BeNil())
 			Expect(workflows).ToNot(BeNil())
 			Expect(len(*workflows)).To(Equal(0))
 
-			workflows, err = manager.QueryWorkflows(&domain.WorkflowQuery{}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+			workflows, err = manager.QueryWorkflows(&domain.WorkflowQuery{}, testinfra.BuildSecCtx(1, "owner_1"))
 			Expect(err).To(BeNil())
 			Expect(workflows).ToNot(BeNil())
 			Expect(len(*workflows)).To(Equal(1))
@@ -77,19 +78,19 @@ var _ = Describe("WorkflowManager", func() {
 		It("should query by name and group id", func() {
 			_, err := manager.CreateWorkflow(
 				&flow.WorkflowCreation{Name: "test workflow1", GroupID: types.ID(1), ThemeColor: "blue", ThemeIcon: "icon", StateMachine: creationDemo.StateMachine},
-				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+				testinfra.BuildSecCtx(1, "owner_1"))
 			Expect(err).To(BeZero())
 			_, err = manager.CreateWorkflow(
 				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(1), ThemeColor: "blue", ThemeIcon: "icon", StateMachine: creationDemo.StateMachine},
-				testinfra.BuildSecCtx(1, []string{"owner_1"}))
+				testinfra.BuildSecCtx(1, "owner_1"))
 			Expect(err).To(BeZero())
 			_, err = manager.CreateWorkflow(
 				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(2), ThemeColor: "blue", ThemeIcon: "icon", StateMachine: creationDemo.StateMachine},
-				testinfra.BuildSecCtx(2, []string{"owner_2"}))
+				testinfra.BuildSecCtx(2, "owner_2"))
 			Expect(err).To(BeZero())
 
 			workflows, err := manager.QueryWorkflows(
-				&domain.WorkflowQuery{Name: "workflow2", GroupID: types.ID(1)}, testinfra.BuildSecCtx(1, []string{"owner_1"}))
+				&domain.WorkflowQuery{Name: "workflow2", GroupID: types.ID(1)}, testinfra.BuildSecCtx(1, "owner_1"))
 			Expect(err).To(BeNil())
 			Expect(workflows).ToNot(BeNil())
 			Expect(len(*workflows)).To(Equal(1))
@@ -107,30 +108,30 @@ var _ = Describe("WorkflowManager", func() {
 	Describe("CreateWorkflow", func() {
 		It("should forbid to create to other group", func() {
 			creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: creationDemo.StateMachine}
-			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_2"}))
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_2"))
 			Expect(workflow).To(BeNil())
 			Expect(err).To(Equal(bizerror.ErrForbidden))
 		})
 
 		It("should catch database errors", func() {
 			testDatabase.DS.GormDB().DropTable(&domain.WorkflowStateTransition{})
-			_, err := manager.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			_, err := manager.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflow_state_transitions' doesn't exist"))
 
 			testDatabase.DS.GormDB().DropTable(&domain.WorkflowState{})
-			_, err = manager.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			_, err = manager.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflow_states' doesn't exist"))
 
 			testDatabase.DS.GormDB().DropTable(&domain.Workflow{})
-			_, err = manager.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			_, err = manager.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflows' doesn't exist"))
 		})
 
 		It("should return created workflow and all data are persisted", func() {
-			workflow, err := manager.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			workflow, err := manager.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 			Expect(workflow.Name).To(Equal(creationDemo.Name))
 			Expect(workflow.ThemeColor).To(Equal("blue"))
@@ -179,17 +180,17 @@ var _ = Describe("WorkflowManager", func() {
 	Describe("DetailWorkflow", func() {
 		It("should forbid to get workflow detail with permissions", func() {
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 
-			detail, err := manager.DetailWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{"owner_2"}))
+			detail, err := manager.DetailWorkflow(workflow.ID, testinfra.BuildSecCtx(200, "owner_2"))
 			Expect(detail).To(BeNil())
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 		})
 
 		It("should return 404 when workflow not exist", func() {
-			detail, err := manager.DetailWorkflow(404, testinfra.BuildSecCtx(123, []string{}))
+			detail, err := manager.DetailWorkflow(404, testinfra.BuildSecCtx(123))
 			Expect(err).To(Equal(gorm.ErrRecordNotFound))
 			Expect(detail).To(BeNil())
 		})
@@ -197,10 +198,10 @@ var _ = Describe("WorkflowManager", func() {
 		It("should be able to return workflow detail if everything is ok", func() {
 			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_333"}))
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_333"))
 			Expect(err).To(BeNil())
 
-			detail, err := manager.DetailWorkflow(workflow.ID, testinfra.BuildSecCtx(123, []string{"owner_333"}))
+			detail, err := manager.DetailWorkflow(workflow.ID, testinfra.BuildSecCtx(123, "owner_333"))
 			Expect(err).To(BeNil())
 			Expect(detail.ID).ToNot(BeNil())
 			Expect(detail.Name).To(Equal("test work"))
@@ -214,7 +215,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to catch database error", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sec := testinfra.BuildSecCtx(100, "owner_333")
 			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
@@ -242,24 +243,24 @@ var _ = Describe("WorkflowManager", func() {
 
 	Describe("UpdateWorkflowBase", func() {
 		It("should return 404 when workflow not exist", func() {
-			wf, err := manager.UpdateWorkflowBase(404, &flow.WorkflowBaseUpdation{}, testinfra.BuildSecCtx(123, []string{}))
+			wf, err := manager.UpdateWorkflowBase(404, &flow.WorkflowBaseUpdation{}, testinfra.BuildSecCtx(123))
 			Expect(err).To(Equal(gorm.ErrRecordNotFound))
 			Expect(wf).To(BeNil())
 		})
 
 		It("should forbid to update workflow basic info without correct permissions", func() {
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 
 			// case 1: without any permission
-			wf, err := manager.UpdateWorkflowBase(workflow.ID, &flow.WorkflowBaseUpdation{}, testinfra.BuildSecCtx(200, []string{}))
+			wf, err := manager.UpdateWorkflowBase(workflow.ID, &flow.WorkflowBaseUpdation{}, testinfra.BuildSecCtx(200))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 			Expect(wf).To(BeNil())
 
 			// case 1: with other permission
-			wf, err = manager.UpdateWorkflowBase(workflow.ID, &flow.WorkflowBaseUpdation{}, testinfra.BuildSecCtx(200, []string{"owner_2", "reader_1"}))
+			wf, err = manager.UpdateWorkflowBase(workflow.ID, &flow.WorkflowBaseUpdation{}, testinfra.BuildSecCtx(200, "owner_2", "reader_1"))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 			Expect(wf).To(BeNil())
@@ -268,16 +269,16 @@ var _ = Describe("WorkflowManager", func() {
 		It("should be able to update workflow if everything is ok", func() {
 			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_333"}))
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_333"))
 			Expect(err).To(BeNil())
 
 			creationCG := &flow.WorkflowCreation{Name: "test work CG", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-			workflowCG, err := manager.CreateWorkflow(creationCG, testinfra.BuildSecCtx(100, []string{"owner_333"}))
+			workflowCG, err := manager.CreateWorkflow(creationCG, testinfra.BuildSecCtx(100, "owner_333"))
 			Expect(err).To(BeNil())
 
 			wf, err := manager.UpdateWorkflowBase(workflow.ID, &flow.WorkflowBaseUpdation{Name: "updated work", ThemeColor: "red", ThemeIcon: "bar"},
-				testinfra.BuildSecCtx(200, []string{"owner_333"}))
+				testinfra.BuildSecCtx(200, "owner_333"))
 			Expect(err).To(BeNil())
 			Expect(wf).ToNot(BeNil())
 			Expect(wf.Name).To(Equal("updated work"))
@@ -307,7 +308,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to catch database error", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sec := testinfra.BuildSecCtx(100, "owner_333")
 			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
@@ -321,51 +322,51 @@ var _ = Describe("WorkflowManager", func() {
 
 	Describe("DeleteWorkflow", func() {
 		It("should return 404 when workflow not exist", func() {
-			err := manager.DeleteWorkflow(404, testinfra.BuildSecCtx(123, []string{}))
+			err := manager.DeleteWorkflow(404, testinfra.BuildSecCtx(123))
 			Expect(err).To(Equal(gorm.ErrRecordNotFound))
 		})
 
 		It("should forbid to delete workflow without correct permissions", func() {
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 
 			// case 1: without any permission
-			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{}))
+			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 
 			// case 1: with other permission
-			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{"owner_2", "reader_1"}))
+			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, "owner_2", "reader_1"))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 		})
 
 		It("should forbid to delete workflow if it still be referenced by work", func() {
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 
 			testDatabase.DS.GormDB().Save(&domain.Work{ID: 1, Name: "test", GroupID: 100, CreateTime: time.Now(), FlowID: workflow.ID,
 				OrderInState: 1, StateName: "PENDING", StateCategory: 0, State: domain.StatePending,
 				StateBeginTime: nil, ProcessBeginTime: nil, ProcessEndTime: nil})
 
-			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{"owner_1"}))
+			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, "owner_1"))
 			Expect(err).To(Equal(bizerror.ErrWorkflowIsReferenced))
 		})
 		It("should forbid to delete workflow if it still be referenced by workProcessStep", func() {
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 
 			testDatabase.DS.GormDB().Save(&domain.WorkProcessStep{WorkID: 1, FlowID: workflow.ID, StateName: "PENDING", StateCategory: 0, BeginTime: time.Now()})
 
-			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{"owner_1"}))
+			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, "owner_1"))
 			Expect(err).To(Equal(bizerror.ErrWorkflowIsReferenced))
 		})
 		It("should forbid to delete workflow if it still be referenced by workStateTransition", func() {
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 
 			testDatabase.DS.GormDB().Save(&domain.WorkStateTransition{
@@ -374,14 +375,14 @@ var _ = Describe("WorkflowManager", func() {
 					FlowID: workflow.ID, WorkID: 1, FromState: "PENDING", ToState: "DOING"},
 			})
 
-			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, []string{"owner_1"}))
+			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, "owner_1"))
 			Expect(err).To(Equal(bizerror.ErrWorkflowIsReferenced))
 		})
 
 		It("should be able to delete workflow if everything is ok", func() {
 			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_333"}))
+			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_333"))
 			Expect(err).To(BeNil())
 
 			flowCount := 0
@@ -398,7 +399,7 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(flowStateTransitionCount).To(Equal(5))
 
 			// do delete
-			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(123, []string{"owner_333"}))
+			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(123, "owner_333"))
 			Expect(err).To(BeNil())
 
 			// validate: record have be deleted
@@ -417,7 +418,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to catch database error", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sec := testinfra.BuildSecCtx(100, "owner_333")
 			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
@@ -451,30 +452,30 @@ var _ = Describe("WorkflowManager", func() {
 
 	Describe("CreateWorkflowStateTransitions", func() {
 		It("should return 404 when workflow not exist", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			err := manager.CreateWorkflowStateTransitions(404, []state.Transition{}, sec)
 			Expect(err).To(Equal(gorm.ErrRecordNotFound))
 		})
 
 		It("should be forbidden without correct permissions", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
 			// case 1: without any permission
-			err = manager.CreateWorkflowStateTransitions(workflow.ID, []state.Transition{}, testinfra.BuildSecCtx(200, []string{}))
+			err = manager.CreateWorkflowStateTransitions(workflow.ID, []state.Transition{}, testinfra.BuildSecCtx(200))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 
 			// case 1: with other permission
-			err = manager.CreateWorkflowStateTransitions(workflow.ID, []state.Transition{}, testinfra.BuildSecCtx(200, []string{"owner_2", "reader_1"}))
+			err = manager.CreateWorkflowStateTransitions(workflow.ID, []state.Transition{}, testinfra.BuildSecCtx(200, "owner_2", "reader_1"))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 		})
 
 		It("should be failed when from state or to state not exist", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
@@ -491,7 +492,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to create workflow transitions if everything is ok", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sec := testinfra.BuildSecCtx(100, "owner_333")
 			sm := state.NewStateMachine([]state.State{domain.StatePending, domain.StateDoing, domain.StateDone}, []state.Transition{
 				{Name: "begin", From: domain.StatePending.Name, To: domain.StateDoing.Name},
 			})
@@ -521,7 +522,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to catch database error", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sec := testinfra.BuildSecCtx(100, "owner_333")
 			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
@@ -548,30 +549,30 @@ var _ = Describe("WorkflowManager", func() {
 
 	Describe("DeleteWorkflowStateTransitions", func() {
 		It("should return 404 when workflow not exist", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			err := manager.DeleteWorkflowStateTransitions(404, []state.Transition{}, sec)
 			Expect(err).To(Equal(gorm.ErrRecordNotFound))
 		})
 
 		It("should be forbidden without correct permissions", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
 			// case 1: without any permission
-			err = manager.DeleteWorkflowStateTransitions(workflow.ID, []state.Transition{}, testinfra.BuildSecCtx(200, []string{}))
+			err = manager.DeleteWorkflowStateTransitions(workflow.ID, []state.Transition{}, testinfra.BuildSecCtx(200))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 
 			// case 1: with other permission
-			err = manager.DeleteWorkflowStateTransitions(workflow.ID, []state.Transition{}, testinfra.BuildSecCtx(200, []string{"owner_2", "reader_1"}))
+			err = manager.DeleteWorkflowStateTransitions(workflow.ID, []state.Transition{}, testinfra.BuildSecCtx(200, "owner_2", "reader_1"))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 		})
 
 		It("should be able to delete workflow transitions if everything is ok", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sec := testinfra.BuildSecCtx(100, "owner_333")
 			sm := state.NewStateMachine([]state.State{domain.StatePending, domain.StateDoing, domain.StateDone}, []state.Transition{
 				{Name: "begin", From: domain.StatePending.Name, To: domain.StateDoing.Name},
 				{Name: "reset", From: domain.StateDoing.Name, To: domain.StatePending.Name},
@@ -604,7 +605,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to catch database error", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sec := testinfra.BuildSecCtx(100, "owner_333")
 			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
@@ -627,30 +628,30 @@ var _ = Describe("WorkflowManager", func() {
 
 	Describe("UpdateWorkflowState", func() {
 		It("should return 404 when workflow not exist", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			err := manager.UpdateWorkflowState(404, flow.WorkflowStateUpdating{}, sec)
 			Expect(err).To(Equal(gorm.ErrRecordNotFound))
 		})
 
 		It("should be forbidden without correct permissions", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
 			// case 1: without any permission
-			err = manager.UpdateWorkflowState(workflow.ID, flow.WorkflowStateUpdating{}, testinfra.BuildSecCtx(200, []string{}))
+			err = manager.UpdateWorkflowState(workflow.ID, flow.WorkflowStateUpdating{}, testinfra.BuildSecCtx(200))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 
 			// case 1: with other permission
-			err = manager.UpdateWorkflowState(workflow.ID, flow.WorkflowStateUpdating{}, testinfra.BuildSecCtx(200, []string{"owner_2", "reader_1"}))
+			err = manager.UpdateWorkflowState(workflow.ID, flow.WorkflowStateUpdating{}, testinfra.BuildSecCtx(200, "owner_2", "reader_1"))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 		})
 
 		It("should failed when origin state not exist", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
@@ -661,7 +662,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should failed when new state exist", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
@@ -677,7 +678,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to update workflow state if everything is ok", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sec := testinfra.BuildSecCtx(100, "owner_333")
 			sm := state.NewStateMachine([]state.State{domain.StatePending, domain.StateDoing, domain.StateDone}, []state.Transition{
 				{Name: "begin", From: domain.StatePending.Name, To: domain.StateDoing.Name},
 				{Name: "reset", From: domain.StateDoing.Name, To: domain.StatePending.Name},
@@ -751,7 +752,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to catch database error", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sec := testinfra.BuildSecCtx(100, "owner_333")
 			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
@@ -787,32 +788,32 @@ var _ = Describe("WorkflowManager", func() {
 
 	Describe("UpdateStateRangeOrders", func() {
 		It("should return 404 when workflow not exist", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			err := manager.UpdateStateRangeOrders(404, &[]flow.StateOrderRangeUpdating{{State: "UNKNOWN", OldOlder: 100, NewOlder: 101}}, sec)
 			Expect(err).To(Equal(gorm.ErrRecordNotFound))
 		})
 
 		It("should be forbidden without correct permissions", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sec := testinfra.BuildSecCtx(100, "owner_333")
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(333), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
 			// case 1: without any permission
 			err = manager.UpdateStateRangeOrders(workflow.ID, &[]flow.StateOrderRangeUpdating{{State: "UNKNOWN", OldOlder: 100, NewOlder: 101}},
-				testinfra.BuildSecCtx(200, []string{}))
+				testinfra.BuildSecCtx(200))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 
 			// case 1: with other permission
 			err = manager.UpdateStateRangeOrders(workflow.ID, &[]flow.StateOrderRangeUpdating{{State: "UNKNOWN", OldOlder: 100, NewOlder: 101}},
-				testinfra.BuildSecCtx(200, []string{"owner_2", "reader_1"}))
+				testinfra.BuildSecCtx(200, "owner_2", "reader_1"))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 		})
 
 		It("should failed when origin state not exist", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
@@ -823,7 +824,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should success if changes is empty or nil", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
@@ -836,7 +837,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to update state orders if everything is ok", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sec := testinfra.BuildSecCtx(100, "owner_333")
 			sm := state.NewStateMachine([]state.State{
 				{Name: "QUEUED", Category: state.InBacklog},
 				{Name: "PENDING", Category: state.InBacklog},
@@ -868,7 +869,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to catch database error", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sec := testinfra.BuildSecCtx(100, "owner_333")
 			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
@@ -886,31 +887,31 @@ var _ = Describe("WorkflowManager", func() {
 
 	Describe("CreateState", func() {
 		It("should return 404 when workflow not exist when creating state", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			err := manager.CreateState(404, &flow.StateCreating{Name: "NEW", Category: 1, Order: 101, Transitions: []state.Transition{}}, sec)
 			Expect(err).To(Equal(gorm.ErrRecordNotFound))
 		})
 
 		It("should be forbidden without correct permissions when creating state", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sec := testinfra.BuildSecCtx(100, "owner_333")
 			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", GroupID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}, sec)
 			Expect(err).To(BeNil())
 
 			creation := &flow.StateCreating{Name: "NEW", Category: 1, Order: 101, Transitions: []state.Transition{}}
 			// case 1: without any permission
-			err = manager.CreateState(workflow.ID, creation, testinfra.BuildSecCtx(200, []string{}))
+			err = manager.CreateState(workflow.ID, creation, testinfra.BuildSecCtx(200))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 
 			// case 1: with other permission
-			err = manager.CreateState(workflow.ID, creation, testinfra.BuildSecCtx(200, []string{"owner_2", "reader_1"}))
+			err = manager.CreateState(workflow.ID, creation, testinfra.BuildSecCtx(200, "owner_2", "reader_1"))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 		})
 
 		It("should failed when state in transitions not exist", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}, sec)
 			Expect(err).To(BeNil())
@@ -927,7 +928,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should success if everything is ok when creating state", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_1"})
+			sec := testinfra.BuildSecCtx(100, "owner_1")
 			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}, sec)
 			Expect(err).To(BeNil())
@@ -959,7 +960,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to catch database error when creating state", func() {
-			sec := testinfra.BuildSecCtx(100, []string{"owner_333"})
+			sec := testinfra.BuildSecCtx(100, "owner_333")
 			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}, sec)
 			Expect(err).To(BeNil())

@@ -9,9 +9,10 @@ import (
 	"flywheel/persistence"
 	"flywheel/security"
 	"flywheel/servehttp"
-	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -40,7 +41,7 @@ func main() {
 	// database migration (race condition)
 	err = ds.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkStateTransition{}, &domain.WorkProcessStep{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{},
-		&security.User{}, &domain.Group{}, &domain.GroupMember{},
+		&security.User{}, &domain.Project{}, &domain.ProjectMember{},
 		&security.Role{}, &security.Permission{},
 		&security.UserRoleBinding{}, &security.RolePermissionBinding{}).Error
 	if err != nil {
@@ -62,6 +63,7 @@ func main() {
 	securityMiddle := security.SimpleAuthFilter()
 
 	namespace.RegisterProjectsRestApis(engine, securityMiddle)
+	namespace.RegisterProjectMembersRestApis(engine, securityMiddle)
 	security.RegisterUsersHandler(engine, securityMiddle)
 
 	workflowManager := flow.NewWorkflowManager(ds)

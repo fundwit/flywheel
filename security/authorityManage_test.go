@@ -88,23 +88,23 @@ var _ = Describe("AuthorityManage", func() {
 	Describe("LoadPerms", func() {
 		It("should return actual permissions when matched", func() {
 			now := time.Now()
-			Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.GroupMember{}, &domain.Group{}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.ProjectMember{}, &domain.Project{}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.Group{ID: 1, Name: "group1", Identifier: "1", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
+				&domain.Project{ID: 1, Name: "group1", Identifier: "1", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.Group{ID: 20, Name: "group20", Identifier: "20", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
+				&domain.Project{ID: 20, Name: "group20", Identifier: "20", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
 
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.GroupMember{GroupID: 1, MemberId: 3, Role: "owner", CreateTime: now}).Error).To(BeNil())
+				&domain.ProjectMember{ProjectId: 1, MemberId: 3, Role: "owner", CreateTime: now}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.GroupMember{GroupID: 10, MemberId: 30, Role: "viewer", CreateTime: now}).Error).To(BeNil())
+				&domain.ProjectMember{ProjectId: 10, MemberId: 30, Role: "viewer", CreateTime: now}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.GroupMember{GroupID: 20, MemberId: 3, Role: "viewer", CreateTime: now}).Error).To(BeNil())
+				&domain.ProjectMember{ProjectId: 20, MemberId: 3, Role: "viewer", CreateTime: now}).Error).To(BeNil())
 
 			s, gr := security.LoadPerms(3)
 			Expect(len(s)).To(Equal(2))
 			Expect(s).To(Equal([]string{"owner_1", "viewer_20"}))
-			Expect(gr).To(Equal([]domain.GroupRole{{GroupID: 1, GroupName: "group1", Role: "owner", GroupIdentifier: "1"},
+			Expect(gr).To(Equal([]domain.ProjectRole{{GroupID: 1, GroupName: "group1", Role: "owner", GroupIdentifier: "1"},
 				{GroupID: 20, GroupName: "group20", GroupIdentifier: "20", Role: "viewer"}}))
 
 			s, gr = security.LoadPerms(100)
@@ -117,23 +117,23 @@ var _ = Describe("AuthorityManage", func() {
 			Expect(testDatabase.DS.GormDB().Save(&security.UserRoleBinding{UserID: 3, RoleID: "system-admin"}).Error).To(BeNil())
 
 			now := time.Now()
-			Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.GroupMember{}, &domain.Group{}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.ProjectMember{}, &domain.Project{}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.Group{ID: 1, Name: "group1", Identifier: "1", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
+				&domain.Project{ID: 1, Name: "group1", Identifier: "1", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.Group{ID: 20, Name: "group20", Identifier: "20", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
+				&domain.Project{ID: 20, Name: "group20", Identifier: "20", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
 
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.GroupMember{GroupID: 1, MemberId: 3, Role: "owner", CreateTime: now}).Error).To(BeNil())
+				&domain.ProjectMember{ProjectId: 1, MemberId: 3, Role: "owner", CreateTime: now}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.GroupMember{GroupID: 10, MemberId: 30, Role: "viewer", CreateTime: now}).Error).To(BeNil())
+				&domain.ProjectMember{ProjectId: 10, MemberId: 30, Role: "viewer", CreateTime: now}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.GroupMember{GroupID: 20, MemberId: 3, Role: "viewer", CreateTime: now}).Error).To(BeNil())
+				&domain.ProjectMember{ProjectId: 20, MemberId: 3, Role: "viewer", CreateTime: now}).Error).To(BeNil())
 
 			s, gr := security.LoadPerms(3)
 			Expect(len(s)).To(Equal(3))
 			Expect(s).To(Equal([]string{"system:admin", "owner_1", "viewer_20"}))
-			Expect(gr).To(Equal([]domain.GroupRole{{GroupID: 1, GroupName: "group1", Role: "owner", GroupIdentifier: "1"},
+			Expect(gr).To(Equal([]domain.ProjectRole{{GroupID: 1, GroupName: "group1", Role: "owner", GroupIdentifier: "1"},
 				{GroupID: 20, GroupName: "group20", GroupIdentifier: "20", Role: "viewer"}}))
 
 			s, gr = security.LoadPerms(1)

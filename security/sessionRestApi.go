@@ -44,7 +44,7 @@ func SimpleLoginHandler(c *gin.Context) {
 	}
 	token := uuid.New().String()
 	perms, groupRoles := LoadPerms(identity.ID)
-	securityContext := Context{Token: token, Identity: identity, Perms: perms, GroupRoles: groupRoles}
+	securityContext := Context{Token: token, Identity: identity, Perms: perms, ProjectRoles: groupRoles}
 	TokenCache.Set(token, &securityContext, cache.DefaultExpiration)
 
 	c.SetCookie(KeySecToken, token, int(TokenExpiration/time.Second), "/", "", false, false)

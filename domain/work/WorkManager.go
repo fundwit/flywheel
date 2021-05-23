@@ -10,11 +10,12 @@ import (
 	"flywheel/domain/state"
 	"flywheel/persistence"
 	"flywheel/security"
+	"strconv"
+	"time"
+
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
-	"strconv"
-	"time"
 )
 
 type WorkManagerTraits interface {
@@ -62,7 +63,7 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 		q = q.Where("archive_time IS NULL")
 	}
 
-	visibleGroups := sec.VisibleGroups()
+	visibleGroups := sec.VisibleProjects()
 	if len(visibleGroups) == 0 {
 		return &[]domain.Work{}, nil
 	}
@@ -96,8 +97,7 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 }
 
 func (m *WorkManager) WorkDetail(identifier string, sec *security.Context) (*domain.WorkDetail, error) {
-	id, err := types.ParseID(identifier)
-
+	id, _ := types.ParseID(identifier)
 	workDetail := domain.WorkDetail{}
 	db := m.dataSource.GormDB()
 	if err := db.Where("id = ? OR identifier LIKE ?", id, identifier).First(&(workDetail.Work)).Error; err != nil {

@@ -7,10 +7,10 @@ import (
 )
 
 type Context struct {
-	Token      string             `json:"token"`
-	Identity   Identity           `json:"identity"`
-	Perms      []string           `json:"perms"`
-	GroupRoles []domain.GroupRole `json:"groupRoles"`
+	Token        string               `json:"token"`
+	Identity     Identity             `json:"identity"`
+	Perms        []string             `json:"perms"`
+	ProjectRoles []domain.ProjectRole `json:"groupRoles"`
 }
 
 type Identity struct {
@@ -45,8 +45,8 @@ func (c *Context) HasRoleSuffix(suffix string) bool {
 	return false
 }
 
-func (c *Context) VisibleGroups() []types.ID {
-	var groupIds []types.ID
+func (c *Context) VisibleProjects() []types.ID {
+	var projectIds []types.ID
 	for _, v := range c.Perms {
 		pairs := strings.Split(v, "_")
 		if len(pairs) == 2 {
@@ -54,11 +54,11 @@ func (c *Context) VisibleGroups() []types.ID {
 			if err != nil {
 				continue
 			}
-			groupIds = append(groupIds, id)
+			projectIds = append(projectIds, id)
 		}
 	}
-	if groupIds == nil {
+	if projectIds == nil {
 		return []types.ID{}
 	}
-	return groupIds
+	return projectIds
 }

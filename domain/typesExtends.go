@@ -52,7 +52,7 @@ type WorkflowQuery struct {
 	GroupID types.ID `json:"groupId" form:"groupId"`
 }
 
-type GroupRole struct {
+type ProjectRole struct {
 	GroupID types.ID `json:"groupId"`
 	Role    string   `json:"role"`
 

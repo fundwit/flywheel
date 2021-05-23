@@ -37,7 +37,7 @@ var _ = Describe("UserRestApi", func() {
 		It("should success when token is valid", func() {
 			token := uuid.New().String()
 			security.TokenCache.Set(token, &security.Context{Token: token, Identity: security.Identity{Name: "ann", ID: 1},
-				Perms: []string{"owner_1"}, GroupRoles: []domain.GroupRole{{
+				Perms: []string{"owner_1"}, ProjectRoles: []domain.ProjectRole{{
 					Role: "owner", GroupName: "group1", GroupIdentifier: "TES", GroupID: types.ID(1),
 				}}}, cache.DefaultExpiration)
 

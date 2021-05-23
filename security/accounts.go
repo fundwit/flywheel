@@ -6,6 +6,7 @@ import (
 	"flywheel/bizerror"
 	"flywheel/common"
 	"flywheel/persistence"
+	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
 )
@@ -65,4 +66,21 @@ func CreateUser(c *UserCreation, sec *Context) (*UserInfo, error) {
 		return nil, err
 	}
 	return &UserInfo{ID: user.ID, Name: user.Name}, nil
+}
+
+
+func QueryAccountNames (ids []types.ID) (map[types.ID]string, error) {
+	if len(ids) == 0 {
+		return map[types.ID]string{}, nil
+	}
+	db := persistence.ActiveDataSourceManager.GormDB()
+	var records []UserInfo
+	if err := db.Model(&User{}).Where("id IN (?)", ids).Scan(&records).Error; err != nil {
+		return nil, err
+	}
+	result := map[types.ID]string{}
+	for _, r := range records {
+		result[r.ID] = r.Name
+	}
+	return result, nil
 }

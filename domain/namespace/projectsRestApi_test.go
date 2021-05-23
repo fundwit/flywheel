@@ -28,9 +28,9 @@ var _ = Describe("ProjectRestApi", func() {
 
 	Describe("HandleQueryProjects", func() {
 		It("should be able to query projects successfully", func() {
-			namespace.QueryProjectsFunc = func(sec *security.Context) (*[]domain.Group, error) {
+			namespace.QueryProjectsFunc = func(sec *security.Context) (*[]domain.Project, error) {
 				t := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
-				return &[]domain.Group{{ID: 123, Identifier: "TED", Name: "test", NextWorkId: 10, CreateTime: t, Creator: 1}}, nil
+				return &[]domain.Project{{ID: 123, Identifier: "TED", Name: "test", NextWorkId: 10, CreateTime: t, Creator: 1}}, nil
 			}
 
 			req := httptest.NewRequest(http.MethodGet, namespace.ProjectsApiRoot, nil)
@@ -45,10 +45,10 @@ var _ = Describe("ProjectRestApi", func() {
 	Describe("HandleCreateProject", func() {
 		It("should be able to create project successfully", func() {
 			var payload *domain.ProjectCreating
-			namespace.CreateProjectFunc = func(c *domain.ProjectCreating, sec *security.Context) (*domain.Group, error) {
+			namespace.CreateProjectFunc = func(c *domain.ProjectCreating, sec *security.Context) (*domain.Project, error) {
 				payload = c
 				t := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
-				return &domain.Group{ID: 123, Identifier: c.Identifier, Name: c.Name, NextWorkId: 10, CreateTime: t, Creator: 100}, nil
+				return &domain.Project{ID: 123, Identifier: c.Identifier, Name: c.Name, NextWorkId: 10, CreateTime: t, Creator: 100}, nil
 			}
 
 			req := httptest.NewRequest(http.MethodPost, namespace.ProjectsApiRoot, common.StringReader(`

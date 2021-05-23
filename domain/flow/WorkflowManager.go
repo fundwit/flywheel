@@ -180,7 +180,7 @@ func (m *WorkflowManager) QueryWorkflows(query *domain.WorkflowQuery, sec *secur
 	if query.Name != "" {
 		q = q.Where("name like ?", "%"+query.Name+"%")
 	}
-	visibleGroups := sec.VisibleGroups()
+	visibleGroups := sec.VisibleProjects()
 	if len(visibleGroups) == 0 {
 		return &[]domain.Workflow{}, nil
 	}

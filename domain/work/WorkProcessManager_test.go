@@ -9,9 +9,10 @@ import (
 	"flywheel/persistence"
 	"flywheel/security"
 	"flywheel/testinfra"
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"time"
 )
 
 var _ = Describe("WorkProcessManager", func() {
@@ -20,24 +21,24 @@ var _ = Describe("WorkProcessManager", func() {
 		workManager        *work.WorkManager
 		testDatabase       *testinfra.TestDatabase
 		workflowDetail     *domain.WorkflowDetail
-		group1             *domain.Group
+		group1             *domain.Project
 	)
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
 		// migration
-		Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.Group{}, &domain.GroupMember{}, &domain.Work{}, &domain.WorkProcessStep{}, &domain.WorkStateTransition{},
+		Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{}, &domain.WorkStateTransition{},
 			&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error).To(BeNil())
 
 		persistence.ActiveDataSourceManager = testDatabase.DS
 		var err error
 		group1, err = namespace.CreateProject(&domain.ProjectCreating{Name: "group 1", Identifier: "GR1"},
-			testinfra.BuildSecCtx(100, []string{"owner_1", security.SystemAdminPermission.ID}))
+			testinfra.BuildSecCtx(100, "owner_1", security.SystemAdminPermission.ID))
 		Expect(err).To(BeNil())
 
 		workflowManager := flow.NewWorkflowManager(testDatabase.DS)
 		workProcessManager = work.NewWorkProcessManager(testDatabase.DS, workflowManager)
 		creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: group1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-		workflowDetail, err = workflowManager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, []string{"owner_" + group1.ID.String()}))
+		workflowDetail, err = workflowManager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_"+group1.ID.String()))
 		Expect(err).To(BeNil())
 
 		workManager = work.NewWorkManager(testDatabase.DS, workflowManager)
@@ -48,7 +49,7 @@ var _ = Describe("WorkProcessManager", func() {
 
 	Describe("QueryProcessSteps", func() {
 		It("should be able to catch db errors", func() {
-			secCtx := testinfra.BuildSecCtx(1, []string{"owner_" + group1.ID.String()})
+			secCtx := testinfra.BuildSecCtx(1, "owner_"+group1.ID.String())
 			work, err := workManager.CreateWork(
 				&domain.WorkCreation{Name: "test work1", GroupID: group1.ID, InitialStateName: domain.StatePending.Name}, secCtx)
 			Expect(err).To(BeZero())
@@ -68,7 +69,7 @@ var _ = Describe("WorkProcessManager", func() {
 
 		It("should return empty when work is not found", func() {
 			work, err := workProcessManager.QueryProcessSteps(
-				&domain.WorkProcessStepQuery{WorkID: 1}, testinfra.BuildSecCtx(100, []string{"owner_1"}))
+				&domain.WorkProcessStepQuery{WorkID: 1}, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 			Expect(len(*work)).To(Equal(0))
 		})
@@ -76,17 +77,17 @@ var _ = Describe("WorkProcessManager", func() {
 		It("should return empty when access without permissions", func() {
 			detail, err := workManager.CreateWork(
 				&domain.WorkCreation{Name: "test work1", GroupID: group1.ID, InitialStateName: domain.StatePending.Name},
-				testinfra.BuildSecCtx(1, []string{"owner_" + group1.ID.String()}))
+				testinfra.BuildSecCtx(1, "owner_"+group1.ID.String()))
 			Expect(err).To(BeZero())
 
 			work, err := workProcessManager.QueryProcessSteps(
-				&domain.WorkProcessStepQuery{WorkID: detail.ID}, testinfra.BuildSecCtx(100, []string{"owner_2"}))
+				&domain.WorkProcessStepQuery{WorkID: detail.ID}, testinfra.BuildSecCtx(100, "owner_2"))
 			Expect(err).To(BeNil())
 			Expect(len(*work)).To(Equal(0))
 		})
 
 		It("should return correct result", func() {
-			secCtx := testinfra.BuildSecCtx(1, []string{"owner_" + group1.ID.String()})
+			secCtx := testinfra.BuildSecCtx(1, "owner_"+group1.ID.String())
 			// will create init process step
 			work1, err := workManager.CreateWork(&domain.WorkCreation{Name: "test work1", GroupID: group1.ID, InitialStateName: domain.StatePending.Name}, secCtx)
 			Expect(err).To(BeZero())

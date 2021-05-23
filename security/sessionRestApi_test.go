@@ -27,7 +27,7 @@ var _ = Describe("SessionRestApi", func() {
 			security.TokenCache.Flush()
 			testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
 			persistence.ActiveDataSourceManager = testDatabase.DS
-			Expect(testDatabase.DS.GormDB().AutoMigrate(&security.User{}, &domain.GroupMember{},
+			Expect(testDatabase.DS.GormDB().AutoMigrate(&security.User{}, &domain.ProjectMember{},
 				&security.Role{}, &security.Permission{}, &security.UserRoleBinding{}, &security.RolePermissionBinding{}).Error).To(BeNil())
 		})
 		AfterEach(func() {
@@ -64,7 +64,7 @@ var _ = Describe("SessionRestApi", func() {
 				secCtx, ok := securityContextValue.(*security.Context)
 				Expect(ok).To(BeTrue())
 				Expect(*secCtx).To(Equal(security.Context{Token: resp.Cookies()[0].Value, Identity: security.Identity{ID: 2, Name: "ann"},
-					Perms: []string{}, GroupRoles: []domain.GroupRole{}}))
+					Perms: []string{}, ProjectRoles: []domain.ProjectRole{}}))
 			})
 
 			It("should return 401 when user not exist", func() {

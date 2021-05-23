@@ -2,8 +2,9 @@ package domain
 
 import (
 	"flywheel/domain/state"
-	"github.com/fundwit/go-commons/types"
 	"time"
+
+	"github.com/fundwit/go-commons/types"
 )
 
 type WorkflowTemplateDetail struct {
@@ -17,6 +18,6 @@ type WorkflowTemplate struct {
 	ID   types.ID `json:"id" gorm:"primary_key" sql:"type:BIGINT UNSIGNED NOT NULL"`
 	Name string   `json:"name"`
 
-	GroupID    types.ID  `json:"groupId"`
+	ProjectID  types.ID  `json:"projectId"`
 	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
 }

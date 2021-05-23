@@ -5,6 +5,7 @@ import (
 	"flywheel/domain"
 	"flywheel/persistence"
 	"fmt"
+
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 )
@@ -47,7 +48,7 @@ func DefaultSecurityConfiguration() error {
 	return nil
 }
 
-// as a simple initial solution, we use group member relationship as the metadata of permissions
+// as a simple initial solution, we use project member relationship as the metadata of permissions
 func LoadPerms(uid types.ID) ([]string, []domain.ProjectRole) {
 	var roles []string
 	db := persistence.ActiveDataSourceManager.GormDB()
@@ -67,7 +68,7 @@ func LoadPerms(uid types.ID) ([]string, []domain.ProjectRole) {
 		}
 	}
 
-	// group role
+	// project role
 	var gms []domain.ProjectMember
 	if err := db.Model(&domain.ProjectMember{}).Where(&domain.ProjectMember{MemberId: uid}).Scan(&gms).Error; err != nil {
 		panic(err)
@@ -77,33 +78,33 @@ func LoadPerms(uid types.ID) ([]string, []domain.ProjectRole) {
 	var projectIds []types.ID
 	for _, gm := range gms {
 		roles = append(roles, fmt.Sprintf("%s_%d", gm.Role, gm.ProjectId))
-		projectRoles = append(projectRoles, domain.ProjectRole{Role: gm.Role, GroupID: gm.ProjectId})
+		projectRoles = append(projectRoles, domain.ProjectRole{Role: gm.Role, ProjectID: gm.ProjectId})
 		projectIds = append(projectIds, gm.ProjectId)
 	}
 
 	m := map[types.ID]domain.Project{}
 	if len(projectIds) > 0 {
-		var groups []domain.Project
-		if err := persistence.ActiveDataSourceManager.GormDB().Model(&domain.Project{}).Where("id in (?)", projectIds).Scan(&groups).Error; err != nil {
+		var projects []domain.Project
+		if err := persistence.ActiveDataSourceManager.GormDB().Model(&domain.Project{}).Where("id in (?)", projectIds).Scan(&projects).Error; err != nil {
 			panic(err)
 		}
-		for _, group := range groups {
-			m[group.ID] = group
+		for _, project := range projects {
+			m[project.ID] = project
 		}
 	}
 
 	for i := 0; i < len(projectRoles); i++ {
-		groupRole := projectRoles[i]
+		projectRole := projectRoles[i]
 
-		group := m[groupRole.GroupID]
-		if (group == domain.Project{}) {
-			panic(errors.New("group " + groupRole.GroupID.String() + " is not exist"))
+		project := m[projectRole.ProjectID]
+		if (project == domain.Project{}) {
+			panic(errors.New("project " + projectRole.ProjectID.String() + " is not exist"))
 		}
 
-		groupRole.GroupName = group.Name
-		groupRole.GroupIdentifier = group.Identifier
+		projectRole.ProjectName = project.Name
+		projectRole.ProjectIdentifier = project.Identifier
 
-		projectRoles[i] = groupRole
+		projectRoles[i] = projectRole
 	}
 
 	if roles == nil {

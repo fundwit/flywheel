@@ -13,7 +13,7 @@ var GenericWorkflowTemplate = WorkflowTemplateDetail{
 	WorkflowTemplate: WorkflowTemplate{
 		ID:         1,
 		Name:       "GenericTask",
-		GroupID:    0,
+		ProjectID:  0,
 		CreateTime: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
 	},
 	StateMachine: *state.NewStateMachine([]state.State{StatePending, StateDoing, StateDone}, []state.Transition{

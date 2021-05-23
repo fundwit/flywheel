@@ -21,7 +21,7 @@ var _ = Describe("WorkProcessManager", func() {
 		workManager        *work.WorkManager
 		testDatabase       *testinfra.TestDatabase
 		workflowDetail     *domain.WorkflowDetail
-		group1             *domain.Project
+		project1           *domain.Project
 	)
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
@@ -31,14 +31,14 @@ var _ = Describe("WorkProcessManager", func() {
 
 		persistence.ActiveDataSourceManager = testDatabase.DS
 		var err error
-		group1, err = namespace.CreateProject(&domain.ProjectCreating{Name: "group 1", Identifier: "GR1"},
+		project1, err = namespace.CreateProject(&domain.ProjectCreating{Name: "project 1", Identifier: "GR1"},
 			testinfra.BuildSecCtx(100, "owner_1", security.SystemAdminPermission.ID))
 		Expect(err).To(BeNil())
 
 		workflowManager := flow.NewWorkflowManager(testDatabase.DS)
 		workProcessManager = work.NewWorkProcessManager(testDatabase.DS, workflowManager)
-		creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: group1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-		workflowDetail, err = workflowManager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_"+group1.ID.String()))
+		creation := &flow.WorkflowCreation{Name: "test workflow", ProjectID: project1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+		workflowDetail, err = workflowManager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_"+project1.ID.String()))
 		Expect(err).To(BeNil())
 
 		workManager = work.NewWorkManager(testDatabase.DS, workflowManager)
@@ -49,9 +49,9 @@ var _ = Describe("WorkProcessManager", func() {
 
 	Describe("QueryProcessSteps", func() {
 		It("should be able to catch db errors", func() {
-			secCtx := testinfra.BuildSecCtx(1, "owner_"+group1.ID.String())
+			secCtx := testinfra.BuildSecCtx(1, "owner_"+project1.ID.String())
 			work, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work1", GroupID: group1.ID, InitialStateName: domain.StatePending.Name}, secCtx)
+				&domain.WorkCreation{Name: "test work1", ProjectID: project1.ID, InitialStateName: domain.StatePending.Name}, secCtx)
 			Expect(err).To(BeZero())
 
 			testDatabase.DS.GormDB().DropTable(&domain.WorkProcessStep{})
@@ -76,8 +76,8 @@ var _ = Describe("WorkProcessManager", func() {
 
 		It("should return empty when access without permissions", func() {
 			detail, err := workManager.CreateWork(
-				&domain.WorkCreation{Name: "test work1", GroupID: group1.ID, InitialStateName: domain.StatePending.Name},
-				testinfra.BuildSecCtx(1, "owner_"+group1.ID.String()))
+				&domain.WorkCreation{Name: "test work1", ProjectID: project1.ID, InitialStateName: domain.StatePending.Name},
+				testinfra.BuildSecCtx(1, "owner_"+project1.ID.String()))
 			Expect(err).To(BeZero())
 
 			work, err := workProcessManager.QueryProcessSteps(
@@ -87,9 +87,9 @@ var _ = Describe("WorkProcessManager", func() {
 		})
 
 		It("should return correct result", func() {
-			secCtx := testinfra.BuildSecCtx(1, "owner_"+group1.ID.String())
+			secCtx := testinfra.BuildSecCtx(1, "owner_"+project1.ID.String())
 			// will create init process step
-			work1, err := workManager.CreateWork(&domain.WorkCreation{Name: "test work1", GroupID: group1.ID, InitialStateName: domain.StatePending.Name}, secCtx)
+			work1, err := workManager.CreateWork(&domain.WorkCreation{Name: "test work1", ProjectID: project1.ID, InitialStateName: domain.StatePending.Name}, secCtx)
 			Expect(err).To(BeZero())
 
 			// do transition

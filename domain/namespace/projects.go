@@ -8,10 +8,11 @@ import (
 	"flywheel/persistence"
 	"flywheel/security"
 	"fmt"
+	"time"
+
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
-	"time"
 )
 
 var (
@@ -23,11 +24,11 @@ func QueryProjects(sec *security.Context) (*[]domain.Project, error) {
 		return nil, bizerror.ErrForbidden
 	}
 
-	var groups []domain.Project
-	if err := persistence.ActiveDataSourceManager.GormDB().Find(&groups).Error; err != nil {
+	var projects []domain.Project
+	if err := persistence.ActiveDataSourceManager.GormDB().Find(&projects).Error; err != nil {
 		return nil, err
 	}
-	return &groups, nil
+	return &projects, nil
 }
 
 func CreateProject(c *domain.ProjectCreating, sec *security.Context) (*domain.Project, error) {
@@ -59,8 +60,8 @@ func UpdateProject(id types.ID, d *domain.ProjectUpdating, sec *security.Context
 	}
 
 	return persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
-		var group domain.Project
-		if err := tx.Where(domain.Project{ID: id}).First(&group).Error; err != nil {
+		var project domain.Project
+		if err := tx.Where(domain.Project{ID: id}).First(&project).Error; err != nil {
 			return err
 		}
 
@@ -82,16 +83,16 @@ func QueryProjectRole(projectId types.ID, sec *security.Context) (string, error)
 }
 
 func NextWorkIdentifier(projectId types.ID, tx *gorm.DB) (string, error) {
-	group := domain.Project{}
-	if err := tx.Where(&domain.Project{ID: projectId}).First(&group).Error; err != nil {
+	project := domain.Project{}
+	if err := tx.Where(&domain.Project{ID: projectId}).First(&project).Error; err != nil {
 		return "", err
 	}
 
 	// consume current value
-	nextWorkID := fmt.Sprintf("%s-%d", group.Identifier, group.NextWorkId)
+	nextWorkID := fmt.Sprintf("%s-%d", project.Identifier, project.NextWorkId)
 	// generate next value
-	db := tx.Model(&domain.Project{}).Where(&domain.Project{ID: projectId, NextWorkId: group.NextWorkId}).
-		Update("next_work_id", group.NextWorkId+1)
+	db := tx.Model(&domain.Project{}).Where(&domain.Project{ID: projectId, NextWorkId: project.NextWorkId}).
+		Update("next_work_id", project.NextWorkId+1)
 	if db.Error != nil {
 		return "", db.Error
 	}
@@ -101,8 +102,7 @@ func NextWorkIdentifier(projectId types.ID, tx *gorm.DB) (string, error) {
 	return nextWorkID, nil
 }
 
-
-func QueryProjectNames (ids []types.ID) (map[types.ID]string, error) {
+func QueryProjectNames(ids []types.ID) (map[types.ID]string, error) {
 	if len(ids) == 0 {
 		return map[types.ID]string{}, nil
 	}

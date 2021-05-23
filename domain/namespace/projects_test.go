@@ -7,10 +7,11 @@ import (
 	"flywheel/persistence"
 	"flywheel/security"
 	"flywheel/testinfra"
+	"time"
+
 	"github.com/fundwit/go-commons/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"time"
 )
 
 var _ = Describe("Projects", func() {
@@ -27,7 +28,7 @@ var _ = Describe("Projects", func() {
 	})
 
 	Describe("CreateProject", func() {
-		It("should be able to create group with a default owner member", func() {
+		It("should be able to create project with a default owner member", func() {
 			sec := testinfra.BuildSecCtx(types.ID(1), security.SystemAdminPermission.ID)
 			g, err := namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).To(BeNil())
@@ -60,7 +61,7 @@ var _ = Describe("Projects", func() {
 			Expect(q[0].Creator).To(Equal(g.Creator))
 		})
 
-		It("only administrator can create group", func() {
+		It("only administrator can create project", func() {
 			sec := testinfra.BuildSecCtx(types.ID(1))
 			g, err := namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(g).To(BeNil())
@@ -82,8 +83,8 @@ var _ = Describe("Projects", func() {
 		})
 	})
 
-	Describe("QueryGroups", func() {
-		It("only administrator can query all groups", func() {
+	Describe("QueryProjects", func() {
+		It("only administrator can query all projects", func() {
 			t := time.Date(2021, 1, 1, 0, 0, 0, 0, time.Local)
 			testDatabase.DS.GormDB().Save(&domain.Project{ID: 123, Identifier: "TED", Name: "test", NextWorkId: 10, CreateTime: t, Creator: 1})
 
@@ -107,7 +108,7 @@ var _ = Describe("Projects", func() {
 	})
 
 	Describe("UpdateProject", func() {
-		It("only administrator can update group", func() {
+		It("only administrator can update project", func() {
 			t := time.Date(2021, 1, 1, 0, 0, 0, 0, time.Local)
 			testDatabase.DS.GormDB().Save(&domain.Project{ID: 123, Identifier: "TED", Name: "test", NextWorkId: 10, CreateTime: t, Creator: 111})
 
@@ -132,7 +133,7 @@ var _ = Describe("Projects", func() {
 	})
 
 	Describe("QueryProjectRole", func() {
-		It("should return actual role if group is accessible for user", func() {
+		It("should return actual role if project is accessible for user", func() {
 			Expect(testDatabase.DS.GormDB().Create(
 				&domain.ProjectMember{ProjectId: 1, MemberId: 2, Role: domain.RoleOwner, CreateTime: time.Now()}).Error).To(BeNil())
 
@@ -140,7 +141,7 @@ var _ = Describe("Projects", func() {
 			Expect(b).To(Equal("owner"))
 			Expect(err).To(BeNil())
 		})
-		It("should return empty if group is not accessible for user", func() {
+		It("should return empty if project is not accessible for user", func() {
 			Expect(testDatabase.DS.GormDB().Create(
 				&domain.ProjectMember{ProjectId: 1, MemberId: 3, Role: "owner", CreateTime: time.Now()}).Error).To(BeNil())
 
@@ -148,7 +149,7 @@ var _ = Describe("Projects", func() {
 			Expect(b).To(BeEmpty())
 			Expect(err).To(BeNil())
 		})
-		It("should return empty if group member relationship is not exist", func() {
+		It("should return empty if project member relationship is not exist", func() {
 			b, err := namespace.QueryProjectRole(1, testinfra.BuildSecCtx(types.ID(2)))
 			Expect(b).To(BeEmpty())
 			Expect(err).To(BeNil())
@@ -159,9 +160,9 @@ var _ = Describe("Projects", func() {
 		It("should be able to generate next work identifier", func() {
 			sec := testinfra.BuildSecCtx(types.ID(1), security.SystemAdminPermission.ID)
 
-			g1, err := namespace.CreateProject(&domain.ProjectCreating{Name: "group1", Identifier: "G1"}, sec)
+			g1, err := namespace.CreateProject(&domain.ProjectCreating{Name: "project1", Identifier: "G1"}, sec)
 			Expect(err).To(BeNil())
-			g2, err := namespace.CreateProject(&domain.ProjectCreating{Name: "group2", Identifier: "G2"}, sec)
+			g2, err := namespace.CreateProject(&domain.ProjectCreating{Name: "project2", Identifier: "G2"}, sec)
 			Expect(err).To(BeNil())
 
 			nextId, err := namespace.NextWorkIdentifier(g1.ID, testDatabase.DS.GormDB())
@@ -212,7 +213,7 @@ var _ = Describe("Projects", func() {
 			ret, err = namespace.QueryProjectNames([]types.ID{1, 2, 4})
 			Expect(err).To(BeNil())
 			Expect(len(ret)).To(Equal(2))
-			Expect(ret).To(Equal(map[types.ID]string{1: "p1", 2:"p2"}))
+			Expect(ret).To(Equal(map[types.ID]string{1: "p1", 2: "p2"}))
 		})
 	})
 })

@@ -65,13 +65,13 @@ package "work" {
     PropertyAssign ..> PropertyDefinition
 }
 
-package "group" {
-    Group *--> Work
-    Group *--> Workflow
+package "project" {
+    Project *--> Work
+    Project *--> Workflow
 }
 
 package "account" {
-     Group "1..n" - "1..n" User
+     Project "1..n" - "1..n" User
 }
 
 @enduml

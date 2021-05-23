@@ -2,7 +2,7 @@
 class Work {
     ID  ID
     Name string
-    Group string
+    Project string
     FlowID  ID
     CreateTime time.Time
 

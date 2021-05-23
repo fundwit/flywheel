@@ -2,15 +2,16 @@ package domain
 
 import (
 	"flywheel/domain/state"
-	"github.com/fundwit/go-commons/types"
 	"time"
+
+	"github.com/fundwit/go-commons/types"
 )
 
 type Work struct {
 	ID         types.ID  `json:"id" gorm:"primary_key"`
 	Identifier string    `json:"identifier" gorm:"unique_index:identifier_unique"`
 	Name       string    `json:"name"`
-	GroupID    types.ID  `json:"groupId"`
+	ProjectID  types.ID  `json:"projectId"`
 	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
 
 	FlowID types.ID `json:"flowId"`

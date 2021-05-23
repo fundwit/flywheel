@@ -2,13 +2,14 @@ package domain
 
 import (
 	"flywheel/domain/state"
+
 	"github.com/fundwit/go-commons/types"
 )
 
 type WorkCreation struct {
-	Name    string   `json:"name" validate:"required"`
-	GroupID types.ID `json:"groupId" validate:"required"`
-	FlowID  types.ID `json:"flowId" validate:"required"`
+	Name      string   `json:"name" validate:"required"`
+	ProjectID types.ID `json:"projectId" validate:"required"`
+	FlowID    types.ID `json:"flowId" validate:"required"`
 
 	InitialStateName string `json:"initialStateName" validate:"required"`
 	PriorityLevel    int    `json:"priorityLevel"`
@@ -37,7 +38,7 @@ const (
 
 type WorkQuery struct {
 	Name            string           `json:"name" form:"name"`
-	GroupID         types.ID         `json:"groupId" form:"groupId"`
+	ProjectID       types.ID         `json:"projectId" form:"projectId"`
 	StateCategories []state.Category `json:"stateCategories" form:"stateCategory"`
 
 	ArchiveState string `json:"archiveState" form:"archiveState" binding:"omitempty,oneof=ON OFF ALL"`
@@ -48,14 +49,14 @@ type WorkSelection struct {
 }
 
 type WorkflowQuery struct {
-	Name    string   `json:"name" form:"name"`
-	GroupID types.ID `json:"groupId" form:"groupId"`
+	Name      string   `json:"name" form:"name"`
+	ProjectID types.ID `json:"projectId" form:"projectId"`
 }
 
 type ProjectRole struct {
-	GroupID types.ID `json:"groupId"`
-	Role    string   `json:"role"`
+	ProjectID types.ID `json:"projectId"`
+	Role      string   `json:"role"`
 
-	GroupName       string `json:"groupName"`
-	GroupIdentifier string `json:"groupIdentifier"`
+	ProjectName       string `json:"projectName"`
+	ProjectIdentifier string `json:"projectIdentifier"`
 }

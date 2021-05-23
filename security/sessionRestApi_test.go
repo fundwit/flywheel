@@ -6,13 +6,14 @@ import (
 	"flywheel/persistence"
 	"flywheel/security"
 	"flywheel/testinfra"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/patrickmn/go-cache"
-	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
 )
 
 var _ = Describe("SessionRestApi", func() {
@@ -54,7 +55,7 @@ var _ = Describe("SessionRestApi", func() {
 					break
 				}
 				Expect(body).To(MatchJSON(`{"identity":{"id":"2","name":"ann"}, "token":"` + token +
-					`", "perms":[], "groupRoles":[]}`))
+					`", "perms":[], "projectRoles":[]}`))
 				Expect(resp.Cookies()[0].Name).To(Equal(security.KeySecToken))
 				Expect(resp.Cookies()[0].Value).ToNot(BeEmpty())
 

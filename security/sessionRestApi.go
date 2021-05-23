@@ -3,13 +3,14 @@ package security
 import (
 	"flywheel/common"
 	"flywheel/persistence"
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/patrickmn/go-cache"
-	"net/http"
-	"time"
 )
 
 func RegisterSessionHandler(r *gin.Engine) {
@@ -43,8 +44,8 @@ func SimpleLoginHandler(c *gin.Context) {
 		return
 	}
 	token := uuid.New().String()
-	perms, groupRoles := LoadPerms(identity.ID)
-	securityContext := Context{Token: token, Identity: identity, Perms: perms, ProjectRoles: groupRoles}
+	perms, projectRoles := LoadPerms(identity.ID)
+	securityContext := Context{Token: token, Identity: identity, Perms: perms, ProjectRoles: projectRoles}
 	TokenCache.Set(token, &securityContext, cache.DefaultExpiration)
 
 	c.SetCookie(KeySecToken, token, int(TokenExpiration/time.Second), "/", "", false, false)

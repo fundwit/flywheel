@@ -5,10 +5,11 @@ import (
 	"flywheel/persistence"
 	"flywheel/security"
 	"flywheel/testinfra"
+	"time"
+
 	"github.com/fundwit/go-commons/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"time"
 )
 
 var _ = Describe("AuthorityManage", func() {
@@ -90,9 +91,9 @@ var _ = Describe("AuthorityManage", func() {
 			now := time.Now()
 			Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.ProjectMember{}, &domain.Project{}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.Project{ID: 1, Name: "group1", Identifier: "1", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
+				&domain.Project{ID: 1, Name: "project1", Identifier: "1", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.Project{ID: 20, Name: "group20", Identifier: "20", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
+				&domain.Project{ID: 20, Name: "project20", Identifier: "20", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
 
 			Expect(testDatabase.DS.GormDB().Create(
 				&domain.ProjectMember{ProjectId: 1, MemberId: 3, Role: "owner", CreateTime: now}).Error).To(BeNil())
@@ -104,8 +105,8 @@ var _ = Describe("AuthorityManage", func() {
 			s, gr := security.LoadPerms(3)
 			Expect(len(s)).To(Equal(2))
 			Expect(s).To(Equal([]string{"owner_1", "viewer_20"}))
-			Expect(gr).To(Equal([]domain.ProjectRole{{GroupID: 1, GroupName: "group1", Role: "owner", GroupIdentifier: "1"},
-				{GroupID: 20, GroupName: "group20", GroupIdentifier: "20", Role: "viewer"}}))
+			Expect(gr).To(Equal([]domain.ProjectRole{{ProjectID: 1, ProjectName: "project1", Role: "owner", ProjectIdentifier: "1"},
+				{ProjectID: 20, ProjectName: "project20", ProjectIdentifier: "20", Role: "viewer"}}))
 
 			s, gr = security.LoadPerms(100)
 			Expect(len(s)).To(Equal(0))
@@ -119,9 +120,9 @@ var _ = Describe("AuthorityManage", func() {
 			now := time.Now()
 			Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.ProjectMember{}, &domain.Project{}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.Project{ID: 1, Name: "group1", Identifier: "1", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
+				&domain.Project{ID: 1, Name: "project1", Identifier: "1", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.Project{ID: 20, Name: "group20", Identifier: "20", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
+				&domain.Project{ID: 20, Name: "project20", Identifier: "20", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
 
 			Expect(testDatabase.DS.GormDB().Create(
 				&domain.ProjectMember{ProjectId: 1, MemberId: 3, Role: "owner", CreateTime: now}).Error).To(BeNil())
@@ -133,8 +134,8 @@ var _ = Describe("AuthorityManage", func() {
 			s, gr := security.LoadPerms(3)
 			Expect(len(s)).To(Equal(3))
 			Expect(s).To(Equal([]string{"system:admin", "owner_1", "viewer_20"}))
-			Expect(gr).To(Equal([]domain.ProjectRole{{GroupID: 1, GroupName: "group1", Role: "owner", GroupIdentifier: "1"},
-				{GroupID: 20, GroupName: "group20", GroupIdentifier: "20", Role: "viewer"}}))
+			Expect(gr).To(Equal([]domain.ProjectRole{{ProjectID: 1, ProjectName: "project1", Role: "owner", ProjectIdentifier: "1"},
+				{ProjectID: 20, ProjectName: "project20", ProjectIdentifier: "20", Role: "viewer"}}))
 
 			s, gr = security.LoadPerms(1)
 			Expect(len(s)).To(Equal(1))

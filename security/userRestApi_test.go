@@ -6,14 +6,15 @@ import (
 	"flywheel/domain"
 	"flywheel/security"
 	"flywheel/testinfra"
+	"net/http"
+	"net/http/httptest"
+
 	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/patrickmn/go-cache"
-	"net/http"
-	"net/http/httptest"
 )
 
 var _ = Describe("UserRestApi", func() {
@@ -38,7 +39,7 @@ var _ = Describe("UserRestApi", func() {
 			token := uuid.New().String()
 			security.TokenCache.Set(token, &security.Context{Token: token, Identity: security.Identity{Name: "ann", ID: 1},
 				Perms: []string{"owner_1"}, ProjectRoles: []domain.ProjectRole{{
-					Role: "owner", GroupName: "group1", GroupIdentifier: "TES", GroupID: types.ID(1),
+					Role: "owner", ProjectName: "project1", ProjectIdentifier: "TES", ProjectID: types.ID(1),
 				}}}, cache.DefaultExpiration)
 
 			req := httptest.NewRequest(http.MethodGet, "/me", nil)
@@ -46,7 +47,7 @@ var _ = Describe("UserRestApi", func() {
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"identity":{"id":"1","name":"ann"}, "token":"` + token +
-				`", "perms":["owner_1"], "groupRoles":[{"groupId":"1", "groupName":"group1", "groupIdentifier":"TES", "role":"owner"}]}`))
+				`", "perms":["owner_1"], "projectRoles":[{"projectId":"1", "projectName":"project1", "projectIdentifier":"TES", "role":"owner"}]}`))
 		})
 
 		It("should failed when token is missing", func() {

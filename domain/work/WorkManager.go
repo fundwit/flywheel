@@ -47,7 +47,7 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 	var works []domain.Work
 	db := m.dataSource.GormDB()
 
-	q := db.Where(domain.Work{GroupID: query.GroupID})
+	q := db.Where(domain.Work{ProjectID: query.ProjectID})
 	if query.Name != "" {
 		q = q.Where("name like ?", "%"+query.Name+"%")
 	}
@@ -63,11 +63,11 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 		q = q.Where("archive_time IS NULL")
 	}
 
-	visibleGroups := sec.VisibleProjects()
-	if len(visibleGroups) == 0 {
+	visibleProjects := sec.VisibleProjects()
+	if len(visibleProjects) == 0 {
 		return &[]domain.Work{}, nil
 	}
-	q = q.Where("group_id in (?)", visibleGroups).Order("order_in_state ASC")
+	q = q.Where("project_id in (?)", visibleProjects).Order("order_in_state ASC")
 	if err := q.Find(&works).Error; err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func (m *WorkManager) WorkDetail(identifier string, sec *security.Context) (*dom
 		return nil, err
 	}
 
-	if !sec.HasRoleSuffix("_" + workDetail.GroupID.String()) {
+	if !sec.HasRoleSuffix("_" + workDetail.ProjectID.String()) {
 		return nil, bizerror.ErrForbidden
 	}
 
@@ -123,7 +123,7 @@ func (m *WorkManager) WorkDetail(identifier string, sec *security.Context) (*dom
 }
 
 func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {
-	if !sec.HasRoleSuffix("_" + c.GroupID.String()) {
+	if !sec.HasRoleSuffix("_" + c.ProjectID.String()) {
 		return nil, bizerror.ErrForbidden
 	}
 
@@ -144,7 +144,7 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 		workDetail = BuildWorkDetail(common.NextId(m.idWorker), c, workflowDetail, initialState)
 		if c.PriorityLevel < 0 {
 			var highestPriorityWork domain.Work
-			err := tx.Model(&domain.Work{}).Where(&domain.Work{GroupID: c.GroupID, StateName: initialState.Name}).
+			err := tx.Model(&domain.Work{}).Where(&domain.Work{ProjectID: c.ProjectID, StateName: initialState.Name}).
 				Select("order_in_state").
 				Order("order_in_state ASC").Limit(1).First(&highestPriorityWork).Error
 			if err == nil {
@@ -154,7 +154,7 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 			}
 		}
 
-		identifier, err := namespace.NextWorkIdentifier(c.GroupID, tx)
+		identifier, err := namespace.NextWorkIdentifier(c.ProjectID, tx)
 		if err != nil {
 			return err
 		}
@@ -297,7 +297,7 @@ func (m *WorkManager) findWorkAndCheckPerms(db *gorm.DB, id types.ID, sec *secur
 	if err := db.Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
 		return nil, err
 	}
-	if sec == nil || !sec.HasRoleSuffix("_"+work.GroupID.String()) {
+	if sec == nil || !sec.HasRoleSuffix("_"+work.ProjectID.String()) {
 		return nil, bizerror.ErrForbidden
 	}
 	return &work, nil
@@ -309,7 +309,7 @@ func BuildWorkDetail(id types.ID, c *domain.WorkCreation, workflow *domain.Workf
 		Work: domain.Work{
 			ID:         id,
 			Name:       c.Name,
-			GroupID:    c.GroupID,
+			ProjectID:  c.ProjectID,
 			CreateTime: now,
 
 			FlowID:         workflow.ID,

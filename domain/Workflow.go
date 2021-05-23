@@ -2,8 +2,9 @@ package domain
 
 import (
 	"flywheel/domain/state"
-	"github.com/fundwit/go-commons/types"
 	"time"
+
+	"github.com/fundwit/go-commons/types"
 )
 
 type Workflow struct {
@@ -12,7 +13,7 @@ type Workflow struct {
 	ThemeColor string   `json:"themeColor"`
 	ThemeIcon  string   `json:"themeIcon"`
 
-	GroupID    types.ID  `json:"groupId"`
+	ProjectID  types.ID  `json:"projectId"`
 	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
 }
 

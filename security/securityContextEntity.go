@@ -2,15 +2,16 @@ package security
 
 import (
 	"flywheel/domain"
-	"github.com/fundwit/go-commons/types"
 	"strings"
+
+	"github.com/fundwit/go-commons/types"
 )
 
 type Context struct {
 	Token        string               `json:"token"`
 	Identity     Identity             `json:"identity"`
 	Perms        []string             `json:"perms"`
-	ProjectRoles []domain.ProjectRole `json:"groupRoles"`
+	ProjectRoles []domain.ProjectRole `json:"projectRoles"`
 }
 
 type Identity struct {

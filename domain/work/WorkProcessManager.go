@@ -10,10 +10,11 @@ import (
 	"flywheel/persistence"
 	"flywheel/security"
 	"fmt"
-	"github.com/jinzhu/gorm"
-	"github.com/sony/sonyflake"
 	"strconv"
 	"time"
+
+	"github.com/jinzhu/gorm"
+	"github.com/sony/sonyflake"
 )
 
 type WorkProcessManagerTraits interface {
@@ -38,14 +39,14 @@ func NewWorkProcessManager(ds *persistence.DataSourceManager, workflowManger flo
 func (m *WorkProcessManager) QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *security.Context) (*[]domain.WorkProcessStep, error) {
 	db := m.dataSource.GormDB()
 	work := domain.Work{}
-	if err := db.Where(&domain.Work{ID: query.WorkID}).Select("group_id").First(&work).Error; err != nil {
+	if err := db.Where(&domain.Work{ID: query.WorkID}).Select("project_id").First(&work).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return &[]domain.WorkProcessStep{}, nil
 		} else {
 			return nil, err
 		}
 	}
-	if !sec.HasRoleSuffix("_" + work.GroupID.String()) {
+	if !sec.HasRoleSuffix("_" + work.ProjectID.String()) {
 		return &[]domain.WorkProcessStep{}, nil
 	}
 
@@ -87,7 +88,7 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkStateTransi
 		if err := tx.Where(&work).First(&work).Error; err != nil {
 			return err
 		}
-		if !sec.HasRole(fmt.Sprintf("%s_%d", domain.RoleOwner, work.GroupID)) {
+		if !sec.HasRole(fmt.Sprintf("%s_%d", domain.RoleOwner, work.ProjectID)) {
 			return bizerror.ErrForbidden
 		}
 		if work.ArchiveTime != nil {

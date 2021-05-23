@@ -12,7 +12,7 @@ import (
 
 // BuildSecCtx build security context
 func BuildSecCtx(uid types.ID, perms ...string) *security.Context {
-	visiableGroups := []domain.ProjectRole{}
+	visiableProjects := []domain.ProjectRole{}
 	for _, perm := range perms {
 		idx := strings.Index(perm, "_")
 		if idx > 0 {
@@ -21,18 +21,18 @@ func BuildSecCtx(uid types.ID, perms ...string) *security.Context {
 			if err != nil {
 				continue
 			}
-			visiableGroups = append(visiableGroups, domain.ProjectRole{GroupID: projectId, Role: role})
+			visiableProjects = append(visiableProjects, domain.ProjectRole{ProjectID: projectId, Role: role})
 		}
 	}
 
-	return &security.Context{Identity: security.Identity{ID: uid}, Perms: perms, ProjectRoles: visiableGroups}
+	return &security.Context{Identity: security.Identity{ID: uid}, Perms: perms, ProjectRoles: visiableProjects}
 }
 
 // BuildWorker build work deital
 func BuildWorker(m work.WorkManagerTraits, workName string, flowId, gid types.ID, secCtx *security.Context) *domain.WorkDetail {
 	workCreation := &domain.WorkCreation{
 		Name:             workName,
-		GroupID:          gid,
+		ProjectID:        gid,
 		FlowID:           flowId,
 		InitialStateName: domain.StatePending.Name,
 	}

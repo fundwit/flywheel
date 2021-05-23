@@ -15,7 +15,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var creationDemo = &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), ThemeColor: "blue", ThemeIcon: "some-icon", StateMachine: state.StateMachine{
+var creationDemo = &flow.WorkflowCreation{Name: "test workflow", ProjectID: types.ID(1), ThemeColor: "blue", ThemeIcon: "some-icon", StateMachine: state.StateMachine{
 	States: []state.State{{Name: "OPEN", Category: state.InProcess}, {Name: "CLOSED", Category: state.Done}},
 	Transitions: []state.Transition{
 		{Name: "done", From: "OPEN", To: "CLOSED"},
@@ -44,11 +44,11 @@ var _ = Describe("WorkflowManager", func() {
 	Describe("QueryWorkflows", func() {
 		It("should query all workflows successfully", func() {
 			_, err := manager.CreateWorkflow(
-				&flow.WorkflowCreation{Name: "test workflow1", GroupID: types.ID(1), ThemeColor: "blue", ThemeIcon: "foo", StateMachine: creationDemo.StateMachine},
+				&flow.WorkflowCreation{Name: "test workflow1", ProjectID: types.ID(1), ThemeColor: "blue", ThemeIcon: "foo", StateMachine: creationDemo.StateMachine},
 				testinfra.BuildSecCtx(1, "owner_1"))
 			Expect(err).To(BeZero())
 			_, err = manager.CreateWorkflow(
-				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(2), ThemeColor: "blue", ThemeIcon: "bar", StateMachine: creationDemo.StateMachine},
+				&flow.WorkflowCreation{Name: "test workflow2", ProjectID: types.ID(2), ThemeColor: "blue", ThemeIcon: "bar", StateMachine: creationDemo.StateMachine},
 				testinfra.BuildSecCtx(2, "owner_2"))
 			Expect(err).To(BeZero())
 
@@ -70,27 +70,27 @@ var _ = Describe("WorkflowManager", func() {
 			workflow1 := (*workflows)[0]
 			Expect(workflow1.ID).ToNot(BeZero())
 			Expect(workflow1.Name).To(Equal("test workflow1"))
-			Expect(workflow1.GroupID).To(Equal(types.ID(1)))
+			Expect(workflow1.ProjectID).To(Equal(types.ID(1)))
 			Expect(workflow1.ThemeColor).To(Equal("blue"))
 			Expect(workflow1.ThemeIcon).To(Equal("foo"))
 			Expect(workflow1.CreateTime).ToNot(BeZero())
 		})
-		It("should query by name and group id", func() {
+		It("should query by name and project id", func() {
 			_, err := manager.CreateWorkflow(
-				&flow.WorkflowCreation{Name: "test workflow1", GroupID: types.ID(1), ThemeColor: "blue", ThemeIcon: "icon", StateMachine: creationDemo.StateMachine},
+				&flow.WorkflowCreation{Name: "test workflow1", ProjectID: types.ID(1), ThemeColor: "blue", ThemeIcon: "icon", StateMachine: creationDemo.StateMachine},
 				testinfra.BuildSecCtx(1, "owner_1"))
 			Expect(err).To(BeZero())
 			_, err = manager.CreateWorkflow(
-				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(1), ThemeColor: "blue", ThemeIcon: "icon", StateMachine: creationDemo.StateMachine},
+				&flow.WorkflowCreation{Name: "test workflow2", ProjectID: types.ID(1), ThemeColor: "blue", ThemeIcon: "icon", StateMachine: creationDemo.StateMachine},
 				testinfra.BuildSecCtx(1, "owner_1"))
 			Expect(err).To(BeZero())
 			_, err = manager.CreateWorkflow(
-				&flow.WorkflowCreation{Name: "test workflow2", GroupID: types.ID(2), ThemeColor: "blue", ThemeIcon: "icon", StateMachine: creationDemo.StateMachine},
+				&flow.WorkflowCreation{Name: "test workflow2", ProjectID: types.ID(2), ThemeColor: "blue", ThemeIcon: "icon", StateMachine: creationDemo.StateMachine},
 				testinfra.BuildSecCtx(2, "owner_2"))
 			Expect(err).To(BeZero())
 
 			workflows, err := manager.QueryWorkflows(
-				&domain.WorkflowQuery{Name: "workflow2", GroupID: types.ID(1)}, testinfra.BuildSecCtx(1, "owner_1"))
+				&domain.WorkflowQuery{Name: "workflow2", ProjectID: types.ID(1)}, testinfra.BuildSecCtx(1, "owner_1"))
 			Expect(err).To(BeNil())
 			Expect(workflows).ToNot(BeNil())
 			Expect(len(*workflows)).To(Equal(1))
@@ -100,14 +100,14 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(workflow1.Name).To(Equal("test workflow2"))
 			Expect(workflow1.ThemeColor).To(Equal("blue"))
 			Expect(workflow1.ThemeIcon).To(Equal("icon"))
-			Expect(workflow1.GroupID).To(Equal(types.ID(1)))
+			Expect(workflow1.ProjectID).To(Equal(types.ID(1)))
 			Expect(workflow1.CreateTime).ToNot(BeZero())
 		})
 	})
 
 	Describe("CreateWorkflow", func() {
-		It("should forbid to create to other group", func() {
-			creation := &flow.WorkflowCreation{Name: "test workflow", GroupID: types.ID(1), StateMachine: creationDemo.StateMachine}
+		It("should forbid to create to other project", func() {
+			creation := &flow.WorkflowCreation{Name: "test workflow", ProjectID: types.ID(1), StateMachine: creationDemo.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_2"))
 			Expect(workflow).To(BeNil())
 			Expect(err).To(Equal(bizerror.ErrForbidden))
@@ -136,7 +136,7 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(workflow.Name).To(Equal(creationDemo.Name))
 			Expect(workflow.ThemeColor).To(Equal("blue"))
 			Expect(workflow.ThemeIcon).To(Equal("some-icon"))
-			Expect(workflow.GroupID).To(Equal(creationDemo.GroupID))
+			Expect(workflow.ProjectID).To(Equal(creationDemo.ProjectID))
 			Expect(workflow.StateMachine).To(Equal(creationDemo.StateMachine))
 			Expect(workflow.ID).ToNot(BeNil())
 			Expect(workflow.CreateTime).ToNot(BeNil())
@@ -179,7 +179,7 @@ var _ = Describe("WorkflowManager", func() {
 
 	Describe("DetailWorkflow", func() {
 		It("should forbid to get workflow detail with permissions", func() {
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 
@@ -196,7 +196,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to return workflow detail if everything is ok", func() {
-			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_333"))
 			Expect(err).To(BeNil())
@@ -207,7 +207,7 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(detail.Name).To(Equal("test work"))
 			Expect(detail.ThemeColor).To(Equal("blue"))
 			Expect(detail.ThemeIcon).To(Equal("foo"))
-			Expect(detail.GroupID).To(Equal(types.ID(333)))
+			Expect(detail.ProjectID).To(Equal(types.ID(333)))
 			Expect(detail.CreateTime).ToNot(BeNil())
 			Expect(detail.StateMachine.States).To(Equal(domain.GenericWorkflowTemplate.StateMachine.States))
 			Expect(state.SortTransitions(detail.StateMachine.Transitions)).To(
@@ -216,7 +216,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should be able to catch database error", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_333")
-			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
@@ -249,7 +249,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should forbid to update workflow basic info without correct permissions", func() {
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 
@@ -267,12 +267,12 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to update workflow if everything is ok", func() {
-			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_333"))
 			Expect(err).To(BeNil())
 
-			creationCG := &flow.WorkflowCreation{Name: "test work CG", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+			creationCG := &flow.WorkflowCreation{Name: "test work CG", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflowCG, err := manager.CreateWorkflow(creationCG, testinfra.BuildSecCtx(100, "owner_333"))
 			Expect(err).To(BeNil())
@@ -285,7 +285,7 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(wf.ThemeColor).To(Equal("red"))
 			Expect(wf.ThemeIcon).To(Equal("bar"))
 			Expect(wf.CreateTime).To(Equal(workflow.CreateTime))
-			Expect(wf.GroupID).To(Equal(workflow.GroupID))
+			Expect(wf.ProjectID).To(Equal(workflow.ProjectID))
 			Expect(wf.ID).To(Equal(workflow.ID))
 
 			var workflowInDB domain.Workflow
@@ -294,7 +294,7 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(workflowInDB.ThemeColor).To(Equal("red"))
 			Expect(workflowInDB.ThemeIcon).To(Equal("bar"))
 			Expect(workflowInDB.CreateTime).To(Equal(workflow.CreateTime))
-			Expect(workflowInDB.GroupID).To(Equal(workflow.GroupID))
+			Expect(workflowInDB.ProjectID).To(Equal(workflow.ProjectID))
 			Expect(workflowInDB.ID).To(Equal(workflow.ID))
 
 			var workflowInDBCG domain.Workflow
@@ -303,13 +303,13 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(workflowInDBCG.ThemeColor).To(Equal("blue"))
 			Expect(workflowInDBCG.ThemeIcon).To(Equal("foo"))
 			Expect(workflowInDBCG.CreateTime).To(Equal(workflowCG.CreateTime))
-			Expect(workflowInDBCG.GroupID).To(Equal(workflowCG.GroupID))
+			Expect(workflowInDBCG.ProjectID).To(Equal(workflowCG.ProjectID))
 			Expect(workflowInDBCG.ID).To(Equal(workflowCG.ID))
 		})
 
 		It("should be able to catch database error", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_333")
-			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
@@ -327,7 +327,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should forbid to delete workflow without correct permissions", func() {
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 
@@ -343,11 +343,11 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should forbid to delete workflow if it still be referenced by work", func() {
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 
-			testDatabase.DS.GormDB().Save(&domain.Work{ID: 1, Name: "test", GroupID: 100, CreateTime: time.Now(), FlowID: workflow.ID,
+			testDatabase.DS.GormDB().Save(&domain.Work{ID: 1, Name: "test", ProjectID: 100, CreateTime: time.Now(), FlowID: workflow.ID,
 				OrderInState: 1, StateName: "PENDING", StateCategory: 0, State: domain.StatePending,
 				StateBeginTime: nil, ProcessBeginTime: nil, ProcessEndTime: nil})
 
@@ -355,7 +355,7 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(err).To(Equal(bizerror.ErrWorkflowIsReferenced))
 		})
 		It("should forbid to delete workflow if it still be referenced by workProcessStep", func() {
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 
@@ -365,7 +365,7 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(err).To(Equal(bizerror.ErrWorkflowIsReferenced))
 		})
 		It("should forbid to delete workflow if it still be referenced by workStateTransition", func() {
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 
@@ -380,7 +380,7 @@ var _ = Describe("WorkflowManager", func() {
 		})
 
 		It("should be able to delete workflow if everything is ok", func() {
-			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_333"))
 			Expect(err).To(BeNil())
@@ -419,7 +419,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should be able to catch database error", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_333")
-			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
@@ -459,7 +459,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should be forbidden without correct permissions", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_1")
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
@@ -476,7 +476,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should be failed when from state or to state not exist", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_1")
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
@@ -497,7 +497,7 @@ var _ = Describe("WorkflowManager", func() {
 				{Name: "begin", From: domain.StatePending.Name, To: domain.StateDoing.Name},
 			})
 
-			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 				StateMachine: *sm}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
@@ -523,7 +523,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should be able to catch database error", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_333")
-			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
@@ -556,7 +556,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should be forbidden without correct permissions", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_1")
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
@@ -578,7 +578,7 @@ var _ = Describe("WorkflowManager", func() {
 				{Name: "reset", From: domain.StateDoing.Name, To: domain.StatePending.Name},
 			})
 
-			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 				StateMachine: *sm}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
@@ -606,7 +606,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should be able to catch database error", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_333")
-			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
@@ -635,7 +635,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should be forbidden without correct permissions", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_1")
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
@@ -652,7 +652,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should failed when origin state not exist", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_1")
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
@@ -663,7 +663,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should failed when new state exist", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_1")
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
@@ -684,14 +684,14 @@ var _ = Describe("WorkflowManager", func() {
 				{Name: "reset", From: domain.StateDoing.Name, To: domain.StatePending.Name},
 				{Name: "done", From: domain.StateDoing.Name, To: domain.StateDone.Name},
 			})
-			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333), StateMachine: *sm}
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333), StateMachine: *sm}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
 			// create work
 			now := time.Now()
 			Expect(testDatabase.DS.GormDB().Create(domain.Work{
-				ID: 1, Name: "test work", GroupID: 100, CreateTime: now,
+				ID: 1, Name: "test work", ProjectID: 100, CreateTime: now,
 				FlowID: workflow.ID, OrderInState: 1, StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category,
 				State: domain.StatePending, StateBeginTime: &now}).Error).To(BeNil())
 			// create work_state_transitions
@@ -753,7 +753,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should be able to catch database error", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_333")
-			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
@@ -795,7 +795,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should be forbidden without correct permissions", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_333")
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(333), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(333), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
@@ -814,7 +814,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should failed when origin state not exist", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_1")
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
@@ -825,7 +825,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should success if changes is empty or nil", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_1")
-			creation := &flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
+			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
@@ -843,7 +843,7 @@ var _ = Describe("WorkflowManager", func() {
 				{Name: "PENDING", Category: state.InBacklog},
 				{Name: "DONE", Category: state.Done},
 			}, []state.Transition{})
-			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333), StateMachine: *sm}
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333), StateMachine: *sm}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
 
@@ -870,7 +870,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should be able to catch database error", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_333")
-			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+			creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := manager.CreateWorkflow(creation, sec)
 			Expect(err).To(BeNil())
@@ -894,7 +894,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should be forbidden without correct permissions when creating state", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_333")
-			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", GroupID: types.ID(333),
+			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}, sec)
 			Expect(err).To(BeNil())
 
@@ -912,7 +912,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should failed when state in transitions not exist", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_1")
-			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1),
+			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}, sec)
 			Expect(err).To(BeNil())
 
@@ -929,7 +929,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should success if everything is ok when creating state", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_1")
-			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", GroupID: types.ID(1),
+			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}, sec)
 			Expect(err).To(BeNil())
 
@@ -961,7 +961,7 @@ var _ = Describe("WorkflowManager", func() {
 
 		It("should be able to catch database error when creating state", func() {
 			sec := testinfra.BuildSecCtx(100, "owner_333")
-			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", GroupID: types.ID(333),
+			workflow, err := manager.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 				StateMachine: domain.GenericWorkflowTemplate.StateMachine}, sec)
 			Expect(err).To(BeNil())
 

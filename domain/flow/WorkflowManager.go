@@ -8,11 +8,12 @@ import (
 	"flywheel/domain/state"
 	"flywheel/persistence"
 	"flywheel/security"
+	"strconv"
+	"time"
+
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
-	"strconv"
-	"time"
 )
 
 type WorkflowManagerTraits interface {
@@ -38,7 +39,7 @@ type WorkflowManager struct {
 
 type WorkflowCreation struct {
 	Name       string   `json:"name"       binding:"required"`
-	GroupID    types.ID `json:"groupId"    binding:"required"`
+	ProjectID  types.ID `json:"projectId"    binding:"required"`
 	ThemeColor string   `json:"themeColor" binding:"required"`
 	ThemeIcon  string   `json:"themeIcon"  binding:"required"`
 
@@ -78,7 +79,7 @@ func NewWorkflowManager(ds *persistence.DataSourceManager) *WorkflowManager {
 }
 
 func (m *WorkflowManager) CreateWorkflow(c *WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error) {
-	if !sec.HasRoleSuffix("_" + c.GroupID.String()) {
+	if !sec.HasRoleSuffix("_" + c.ProjectID.String()) {
 		return nil, bizerror.ErrForbidden
 	}
 
@@ -86,7 +87,7 @@ func (m *WorkflowManager) CreateWorkflow(c *WorkflowCreation, sec *security.Cont
 		Workflow: domain.Workflow{
 			ID:         common.NextId(m.idWorker),
 			Name:       c.Name,
-			GroupID:    c.GroupID,
+			ProjectID:  c.ProjectID,
 			ThemeColor: c.ThemeColor,
 			ThemeIcon:  c.ThemeIcon,
 			CreateTime: time.Now().Round(time.Millisecond),
@@ -136,7 +137,7 @@ func (m *WorkflowManager) DetailWorkflow(id types.ID, sec *security.Context) (*d
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&(workflowDetail.Workflow)).Error; err != nil {
 			return err
 		}
-		if !sec.HasRoleSuffix("_" + workflowDetail.GroupID.String()) {
+		if !sec.HasRoleSuffix("_" + workflowDetail.ProjectID.String()) {
 			return bizerror.ErrForbidden
 		}
 
@@ -176,15 +177,15 @@ func (m *WorkflowManager) QueryWorkflows(query *domain.WorkflowQuery, sec *secur
 	var workflows []domain.Workflow
 	db := m.dataSource.GormDB()
 
-	q := db.Where(domain.Workflow{GroupID: query.GroupID})
+	q := db.Where(domain.Workflow{ProjectID: query.ProjectID})
 	if query.Name != "" {
 		q = q.Where("name like ?", "%"+query.Name+"%")
 	}
-	visibleGroups := sec.VisibleProjects()
-	if len(visibleGroups) == 0 {
+	visibleProjects := sec.VisibleProjects()
+	if len(visibleProjects) == 0 {
 		return &[]domain.Workflow{}, nil
 	}
-	q = q.Where("group_id in (?)", visibleGroups)
+	q = q.Where("project_id in (?)", visibleProjects)
 	if err := q.Find(&workflows).Error; err != nil {
 		return nil, err
 	}
@@ -199,7 +200,7 @@ func (m *WorkflowManager) UpdateWorkflowBase(id types.ID, c *WorkflowBaseUpdatio
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&wf).Error; err != nil {
 			return err
 		}
-		if !sec.HasRoleSuffix("owner_" + wf.GroupID.String()) {
+		if !sec.HasRoleSuffix("owner_" + wf.ProjectID.String()) {
 			return bizerror.ErrForbidden
 		}
 		if err := tx.Model(&domain.Workflow{}).Where(&domain.Workflow{ID: id}).
@@ -225,7 +226,7 @@ func (m *WorkflowManager) DeleteWorkflow(id types.ID, sec *security.Context) err
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&wf).Error; err != nil {
 			return err
 		}
-		if !sec.HasRoleSuffix("owner_" + wf.GroupID.String()) {
+		if !sec.HasRoleSuffix("owner_" + wf.ProjectID.String()) {
 			return bizerror.ErrForbidden
 		}
 
@@ -256,7 +257,7 @@ func (m *WorkflowManager) CreateWorkflowStateTransitions(id types.ID, transition
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&workflow).Error; err != nil {
 			return err
 		}
-		if !sec.HasRoleSuffix("owner_" + workflow.GroupID.String()) {
+		if !sec.HasRoleSuffix("owner_" + workflow.ProjectID.String()) {
 			return bizerror.ErrForbidden
 		}
 
@@ -294,7 +295,7 @@ func (m *WorkflowManager) DeleteWorkflowStateTransitions(id types.ID, transition
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&wf).Error; err != nil {
 			return err
 		}
-		if !sec.HasRoleSuffix("owner_" + wf.GroupID.String()) {
+		if !sec.HasRoleSuffix("owner_" + wf.ProjectID.String()) {
 			return bizerror.ErrForbidden
 		}
 
@@ -318,7 +319,7 @@ func (m *WorkflowManager) UpdateWorkflowState(id types.ID, updating WorkflowStat
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&workflow).Error; err != nil {
 			return err
 		}
-		if !sec.HasRoleSuffix("owner_" + workflow.GroupID.String()) {
+		if !sec.HasRoleSuffix("owner_" + workflow.ProjectID.String()) {
 			return bizerror.ErrForbidden
 		}
 
@@ -472,7 +473,7 @@ func (m *WorkflowManager) checkPerms(id types.ID, sec *security.Context) error {
 	if err := m.dataSource.GormDB().Where(&domain.Workflow{ID: id}).First(&workflow).Error; err != nil {
 		return err
 	}
-	if sec == nil || !sec.HasRoleSuffix("_"+workflow.GroupID.String()) {
+	if sec == nil || !sec.HasRoleSuffix("_"+workflow.ProjectID.String()) {
 		return bizerror.ErrForbidden
 	}
 	return nil

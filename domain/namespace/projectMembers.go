@@ -25,6 +25,11 @@ func CreateProjectMember(d *domain.ProjectMemberCreation, sec *security.Context)
 			return bizerror.ErrForbidden
 		}
 
+		// non system administrators can not grant for themselfs
+		if !sec.HasRole(security.SystemAdminPermission.ID) && sec.Identity.ID == d.MemberId {
+			return bizerror.ErrProjectMemberSelfGrant
+		}
+
 		project := domain.Project{ID: d.ProjectID}
 		if err := tx.Model(&domain.Project{}).Where(&project).First(&project).Error; err != nil {
 			return err

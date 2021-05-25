@@ -33,12 +33,13 @@ var _ = Describe("ProjectMembers", func() {
 
 	Describe("CreateProjectMember", func() {
 		It("should be able to create project member", func() {
+			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 111, Name: "user111", Secret: "xxxx"}).Error).To(BeNil())
 			sec := testinfra.BuildSecCtx(types.ID(111), security.SystemAdminPermission.ID)
 			g, err := namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 222, Name: "test", Secret: "xxxx"}).Error).To(BeNil())
 
-			// system admin can create project member: 222-guest
+			// system administrators can create project member: 222-guest
 			Expect(namespace.CreateProjectMember(
 				&domain.ProjectMemberCreation{ProjectID: g.ID, MemberId: 222, Role: "guest"}, sec)).To(BeNil())
 
@@ -74,10 +75,24 @@ var _ = Describe("ProjectMembers", func() {
 			Expect(q[1].CreateTime.Before(time.Now()) && q[1].CreateTime.After(g.CreateTime)).To(BeTrue())
 
 			// project owner can create project member: 333-guest
-			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 333, Name: "test1", Secret: "xxxx"}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 333, Name: "test333", Secret: "xxxx"}).Error).To(BeNil())
 			Expect(namespace.CreateProjectMember(
-				&domain.ProjectMemberCreation{ProjectID: g.ID, MemberId: 333, Role: "guest"},
+				&domain.ProjectMemberCreation{ProjectID: g.ID, MemberId: 333, Role: "owner"},
 				testinfra.BuildSecCtx(444, "owner_"+g.ID.String()))).To(BeNil())
+
+			// system administrators can grant themselfs
+			Expect(namespace.CreateProjectMember(
+				&domain.ProjectMemberCreation{ProjectID: g.ID, MemberId: sec.Identity.ID, Role: "guest"}, sec)).To(BeNil())
+			q = []domain.ProjectMember{}
+			Expect(testDatabase.DS.GormDB().Where(domain.ProjectMember{MemberId: sec.Identity.ID}).Find(&q).Error).To(BeNil())
+			Expect(q).ToNot(BeNil())
+			Expect(len(q)).To(Equal(1))
+			Expect(q[0].Role).To(Equal("guest"))
+
+			// non system administrators can not grant themselfs
+			Expect(namespace.CreateProjectMember(
+				&domain.ProjectMemberCreation{ProjectID: g.ID, MemberId: 444, Role: "guest"},
+				testinfra.BuildSecCtx(444, "owner_"+g.ID.String()))).To(Equal(bizerror.ErrProjectMemberSelfGrant))
 		})
 
 		It("one project can only has one owner", func() {

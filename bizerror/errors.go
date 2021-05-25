@@ -16,6 +16,7 @@ var ErrArchiveStatusInvalid = errors.New("archive status is invalid")
 var ErrInvalidPassword = errors.New("invalid password")
 
 var ErrProjectOwnerDelete = errors.New("project owner delete")
+var ErrProjectMemberSelfGrant = errors.New("project member self grant")
 
 type BizError interface {
 	Respond() *BizErrorDetail

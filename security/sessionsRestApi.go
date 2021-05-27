@@ -13,7 +13,11 @@ import (
 	"github.com/patrickmn/go-cache"
 )
 
-func RegisterSessionHandler(r *gin.Engine) {
+var (
+	LoadPermFunc = LoadPerms
+)
+
+func RegisterSessionsHandler(r *gin.Engine) {
 	g := r.Group("/v1/sessions")
 	g.POST("", SimpleLoginHandler)
 	g.DELETE("", SimpleLogoutHandler)
@@ -44,7 +48,7 @@ func SimpleLoginHandler(c *gin.Context) {
 		return
 	}
 	token := uuid.New().String()
-	perms, projectRoles := LoadPerms(identity.ID)
+	perms, projectRoles := LoadPermFunc(identity.ID)
 	securityContext := Context{Token: token, Identity: identity, Perms: perms, ProjectRoles: projectRoles}
 	TokenCache.Set(token, &securityContext, cache.DefaultExpiration)
 

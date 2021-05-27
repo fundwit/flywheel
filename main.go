@@ -58,7 +58,7 @@ func main() {
 		c.String(http.StatusOK, "flywheel")
 	})
 
-	security.RegisterSessionHandler(engine)
+	security.RegisterSessionsHandler(engine)
 
 	securityMiddle := security.SimpleAuthFilter()
 

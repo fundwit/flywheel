@@ -3,6 +3,7 @@ package security
 import (
 	"flywheel/domain"
 	"strings"
+	"time"
 
 	"github.com/fundwit/go-commons/types"
 )
@@ -12,6 +13,8 @@ type Context struct {
 	Identity     Identity             `json:"identity"`
 	Perms        []string             `json:"perms"`
 	ProjectRoles []domain.ProjectRole `json:"projectRoles"`
+
+	SigningTime time.Time `json:"-"`
 }
 
 type Identity struct {

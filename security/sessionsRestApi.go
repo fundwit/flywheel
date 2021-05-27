@@ -1,6 +1,7 @@
 package security
 
 import (
+	"flywheel/bizerror"
 	"flywheel/common"
 	"flywheel/persistence"
 	"net/http"
@@ -41,15 +42,14 @@ func SimpleLoginHandler(c *gin.Context) {
 	identity := Identity{}
 	if err := persistence.ActiveDataSourceManager.GormDB().Model(&User{}).Where(&User{Name: login.Name, Secret: HashSha256(login.Password)}).Scan(&identity).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusUnauthorized, &common.ErrorBody{Code: "common.unauthenticated", Message: "unauthenticated"})
-			return
+			panic(bizerror.ErrUnauthenticated)
 		}
 		c.JSON(http.StatusInternalServerError, &common.ErrorBody{Code: "common.internal_server_error", Message: err.Error()})
 		return
 	}
 	token := uuid.New().String()
 	perms, projectRoles := LoadPermFunc(identity.ID)
-	securityContext := Context{Token: token, Identity: identity, Perms: perms, ProjectRoles: projectRoles}
+	securityContext := Context{Token: token, Identity: identity, Perms: perms, ProjectRoles: projectRoles, SigningTime: time.Now()}
 	TokenCache.Set(token, &securityContext, cache.DefaultExpiration)
 
 	c.SetCookie(KeySecToken, token, int(TokenExpiration/time.Second), "/", "", false, false)

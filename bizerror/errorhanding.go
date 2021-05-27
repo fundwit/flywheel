@@ -7,13 +7,14 @@ import (
 	"flywheel/domain"
 	"flywheel/i18n"
 	"fmt"
+	"io"
+	"net/http"
+	"runtime/debug"
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
-	"io"
-	"net/http"
-	"runtime/debug"
 )
 
 func ErrorHandling() gin.HandlerFunc {
@@ -73,6 +74,11 @@ func HandleError(c *gin.Context, err error) {
 		return
 	}
 
+	if errors.Is(genericErr, ErrUnauthenticated) {
+		c.JSON(http.StatusUnauthorized, &common.ErrorBody{Code: "common.unauthenticated", Message: "unauthenticated"})
+		c.Abort()
+		return
+	}
 	if errors.Is(genericErr, ErrForbidden) {
 		c.JSON(http.StatusForbidden, &common.ErrorBody{Code: "security.forbidden", Message: "access forbidden"})
 		c.Abort()

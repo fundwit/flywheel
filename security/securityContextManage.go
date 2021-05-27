@@ -1,12 +1,12 @@
 package security
 
 import (
-	"flywheel/common"
+	"flywheel/bizerror"
+	"time"
+
 	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
 	"github.com/patrickmn/go-cache"
-	"net/http"
-	"time"
 )
 
 const TokenExpiration = 24 * time.Hour
@@ -54,21 +54,15 @@ func SimpleAuthFilter() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		token, err := ctx.Cookie(KeySecToken)
 		if err != nil {
-			ctx.JSON(http.StatusUnauthorized, &common.ErrorBody{Code: "common.unauthenticated", Message: "unauthenticated"})
-			ctx.Abort()
-			return
+			panic(bizerror.ErrUnauthenticated)
 		}
 		securityContextValue, found := TokenCache.Get(token)
 		if !found {
-			ctx.JSON(http.StatusUnauthorized, &common.ErrorBody{Code: "common.unauthenticated", Message: "unauthenticated"})
-			ctx.Abort()
-			return
+			panic(bizerror.ErrUnauthenticated)
 		}
 		secCtx, ok := securityContextValue.(*Context)
 		if !ok {
-			ctx.JSON(http.StatusUnauthorized, &common.ErrorBody{Code: "common.unauthenticated", Message: "unauthenticated"})
-			ctx.Abort()
-			return
+			panic(bizerror.ErrUnauthenticated)
 		}
 		SaveSecurityContext(ctx, secCtx)
 		ctx.Next()

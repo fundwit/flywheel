@@ -33,6 +33,7 @@ var _ = Describe("UserRestApi", func() {
 		)
 		BeforeEach(func() {
 			router = gin.Default()
+			router.Use(bizerror.ErrorHandling())
 			router.GET("/me", security.SimpleAuthFilter(), security.UserInfoQueryHandler)
 		})
 		It("should success when token is valid", func() {

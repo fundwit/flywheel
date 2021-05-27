@@ -2,10 +2,10 @@ package security
 
 import (
 	"flywheel/bizerror"
-	"flywheel/common"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"net/http"
 )
 
 var (
@@ -29,8 +29,7 @@ func RegisterUsersHandler(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 func UserInfoQueryHandler(c *gin.Context) {
 	secCtx := FindSecurityContext(c)
 	if secCtx == nil {
-		c.JSON(http.StatusUnauthorized, &common.ErrorBody{Code: "common.unauthenticated", Message: "login failed"})
-		return
+		panic(bizerror.ErrUnauthenticated)
 	}
 	c.JSON(http.StatusOK, &secCtx)
 }

@@ -65,6 +65,7 @@ func main() {
 	namespace.RegisterProjectsRestApis(engine, securityMiddle)
 	namespace.RegisterProjectMembersRestApis(engine, securityMiddle)
 	security.RegisterUsersHandler(engine, securityMiddle)
+	security.RegisterSessionHandler(engine, securityMiddle)
 
 	workflowManager := flow.NewWorkflowManager(ds)
 	workProcessManager := work.NewWorkProcessManager(ds, workflowManager)

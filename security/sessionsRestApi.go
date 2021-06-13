@@ -14,10 +14,6 @@ import (
 	"github.com/patrickmn/go-cache"
 )
 
-var (
-	LoadPermFunc = LoadPerms
-)
-
 func RegisterSessionsHandler(r *gin.Engine) {
 	g := r.Group("/v1/sessions")
 	g.POST("", SimpleLoginHandler)

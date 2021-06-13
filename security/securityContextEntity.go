@@ -1,7 +1,6 @@
 package security
 
 import (
-	"flywheel/domain"
 	"strings"
 	"time"
 
@@ -9,10 +8,10 @@ import (
 )
 
 type Context struct {
-	Token        string               `json:"token"`
-	Identity     Identity             `json:"identity"`
-	Perms        []string             `json:"perms"`
-	ProjectRoles []domain.ProjectRole `json:"projectRoles"`
+	Token        string           `json:"token"`
+	Identity     Identity         `json:"identity"`
+	Perms        Permissions      `json:"perms"`
+	ProjectRoles VisiableProjects `json:"projectRoles"`
 
 	SigningTime time.Time `json:"-"`
 }
@@ -23,12 +22,7 @@ type Identity struct {
 }
 
 func (c *Context) HasRole(role string) bool {
-	for _, v := range c.Perms {
-		if strings.EqualFold(v, role) {
-			return true
-		}
-	}
-	return false
+	return c.Perms.HasRole(role)
 }
 
 func (c *Context) HasRolePrefix(prefix string) bool {
@@ -49,6 +43,7 @@ func (c *Context) HasRoleSuffix(suffix string) bool {
 	return false
 }
 
+// VisibleProjects  parse visible project ids from Context.Perms
 func (c *Context) VisibleProjects() []types.ID {
 	var projectIds []types.ID
 	for _, v := range c.Perms {

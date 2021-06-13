@@ -3,6 +3,7 @@ package work_test
 import (
 	"errors"
 	"flywheel/bizerror"
+	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/namespace"
@@ -11,6 +12,7 @@ import (
 	"flywheel/persistence"
 	"flywheel/security"
 	"flywheel/testinfra"
+	"fmt"
 	"log"
 	"time"
 
@@ -101,12 +103,12 @@ var _ = Describe("WorkManager", func() {
 			Expect(work.Identifier).ToNot(BeZero())
 			Expect(work.Name).To(Equal(creation.Name))
 			Expect(work.ProjectID).To(Equal(creation.ProjectID))
-			Expect(work.CreateTime.Sub(time.Now()) < time.Minute).To(BeTrue())
+			Expect(work.CreateTime.Time().Sub(time.Now()) < time.Minute).To(BeTrue())
 			Expect(work.FlowID).To(Equal(flowDetail.ID))
-			Expect(work.OrderInState).To(Equal(work.CreateTime.UnixNano() / 1e6))
+			Expect(work.OrderInState).To(Equal(work.CreateTime.Time().UnixNano() / 1e6))
 			Expect(work.Type).To(Equal(flowDetail.Workflow))
 			Expect(work.State).To(Equal(flowDetail.StateMachine.States[0]))
-			Expect(work.StateBeginTime).To(Equal(&work.CreateTime))
+			Expect(work.StateBeginTime).To(Equal(work.CreateTime))
 			Expect(work.StateCategory).To(Equal(flowDetail.StateMachine.States[0].Category))
 
 			detail, err := workManager.WorkDetail(work.ID.String(), testinfra.BuildSecCtx(100, "owner_"+project1.ID.String()))
@@ -116,11 +118,11 @@ var _ = Describe("WorkManager", func() {
 			Expect(detail.Name).To(Equal(creation.Name))
 			Expect(detail.Identifier).To(Equal(work.Identifier))
 			Expect(detail.ProjectID).To(Equal(creation.ProjectID))
-			Expect(detail.CreateTime.Sub(time.Now()) < time.Minute).To(BeTrue())
+			Expect(detail.CreateTime.Time().Sub(time.Now()) < time.Minute).To(BeTrue())
 			Expect(detail.Type).To(Equal(flowDetail.Workflow))
 			Expect(detail.State).To(Equal(flowDetail.StateMachine.States[0]))
 			Expect(detail.FlowID).To(Equal(flowDetail.ID))
-			Expect(detail.OrderInState).To(Equal(work.CreateTime.UnixNano() / 1e6))
+			Expect(detail.OrderInState).To(Equal(work.CreateTime.Time().UnixNano() / 1e6))
 			Expect(detail.StateName).To(Equal(flowDetail.StateMachine.States[0].Name))
 			Expect(work.StateCategory).To(Equal(flowDetail.StateMachine.States[0].Category))
 			//Expect(len(work.Properties)).To(Equal(0))
@@ -130,8 +132,9 @@ var _ = Describe("WorkManager", func() {
 			Expect(testDatabase.DS.GormDB().Model(&domain.WorkProcessStep{}).Scan(&initProcessStep).Error).To(BeNil())
 			Expect(initProcessStep).ToNot(BeNil())
 			Expect(len(initProcessStep)).To(Equal(1))
+			fmt.Println(initProcessStep[0].BeginTime, "detail:", detail.CreateTime, detail.StateBeginTime, "work:", work.CreateTime, work.StateBeginTime)
 			Expect(initProcessStep[0]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
-				StateName: detail.StateName, StateCategory: detail.State.Category, BeginTime: detail.CreateTime, EndTime: nil}))
+				StateName: detail.StateName, StateCategory: detail.State.Category, BeginTime: detail.CreateTime}))
 
 			detail, err = workManager.WorkDetail(work.Identifier, testinfra.BuildSecCtx(100, "owner_"+project1.ID.String()))
 			Expect(err).To(BeNil())
@@ -350,13 +353,13 @@ var _ = Describe("WorkManager", func() {
 		})
 
 		It("works should be ordered by orderInState asc and id asc", func() {
-			now := time.Now()
+			now := common.CurrentTimestamp()
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", Identifier: "W-1", ProjectID: project1.ID,
-				CreateTime: time.Now(), FlowID: flowDetail.ID, OrderInState: 2, StateName: "PENDING", StateBeginTime: &now}).Error).To(BeNil())
+				CreateTime: now, FlowID: flowDetail.ID, OrderInState: 2, StateName: "PENDING", StateBeginTime: now}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 1, Name: "w2", Identifier: "W-2", ProjectID: project1.ID,
-				CreateTime: time.Now(), FlowID: flowDetail.ID, OrderInState: 2, StateName: "PENDING", StateBeginTime: &now}).Error).To(BeNil())
+				CreateTime: now, FlowID: flowDetail.ID, OrderInState: 2, StateName: "PENDING", StateBeginTime: now}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 3, Name: "w3", Identifier: "W-3", ProjectID: project1.ID,
-				CreateTime: time.Now(), FlowID: flowDetail.ID, OrderInState: 1, StateName: "PENDING", StateBeginTime: &now}).Error).To(BeNil())
+				CreateTime: now, FlowID: flowDetail.ID, OrderInState: 1, StateName: "PENDING", StateBeginTime: now}).Error).To(BeNil())
 
 			// order by orderInState:    w3(1) > w2(2) = w1(2)
 			// order by id (default):         w2(1) > w1(2)
@@ -370,9 +373,9 @@ var _ = Describe("WorkManager", func() {
 		})
 
 		It("should return error if failed to find state", func() {
-			now := time.Now()
+			now := common.CurrentTimestamp()
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", ProjectID: project1.ID,
-				CreateTime: time.Now(), FlowID: flowDetail.ID, OrderInState: 2, StateName: "UNKNOWN", StateBeginTime: &now}).Error).To(BeNil())
+				CreateTime: now, FlowID: flowDetail.ID, OrderInState: 2, StateName: "UNKNOWN", StateBeginTime: now}).Error).To(BeNil())
 			works, err := workManager.QueryWork(&domain.WorkQuery{ProjectID: project1.ID},
 				testinfra.BuildSecCtx(1, "owner_"+project1.ID.String()))
 			Expect(err).ToNot(BeNil())
@@ -443,9 +446,9 @@ var _ = Describe("WorkManager", func() {
 		})
 
 		It("should return error if failed to find state", func() {
-			now := time.Now()
+			now := common.CurrentTimestamp()
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", ProjectID: project1.ID,
-				CreateTime: time.Now(), FlowID: flowDetail.ID, OrderInState: 2, StateName: "UNKNOWN", StateBeginTime: &now}).Error).To(BeNil())
+				CreateTime: now, FlowID: flowDetail.ID, OrderInState: 2, StateName: "UNKNOWN", StateBeginTime: now}).Error).To(BeNil())
 			updatedWork, err := workManager.UpdateWork(2,
 				&domain.WorkUpdating{Name: "test work1 new"},
 				testinfra.BuildSecCtx(1, "owner_"+project1.ID.String()))
@@ -455,10 +458,10 @@ var _ = Describe("WorkManager", func() {
 		})
 
 		It("should failed when work is archived when update work", func() {
-			now := time.Now()
+			now := common.CurrentTimestamp()
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", ProjectID: project1.ID,
-				CreateTime: time.Now(), FlowID: flowDetail.ID, OrderInState: 2,
-				StateName: domain.StateDone.Name, StateCategory: domain.StateDone.Category, StateBeginTime: &now}).Error).To(BeNil())
+				CreateTime: now, FlowID: flowDetail.ID, OrderInState: 2,
+				StateName: domain.StateDone.Name, StateCategory: domain.StateDone.Category, StateBeginTime: now}).Error).To(BeNil())
 			Expect(workManager.ArchiveWorks([]types.ID{2}, testinfra.BuildSecCtx(1, "owner_"+project1.ID.String()))).To(BeNil())
 
 			updatedWork, err := workManager.UpdateWork(2,
@@ -487,10 +490,10 @@ var _ = Describe("WorkManager", func() {
 			Expect(len(*works)).To(Equal(2))
 
 			testDatabase.DS.GormDB().AutoMigrate(&domain.WorkStateTransition{})
-			err = testDatabase.DS.GormDB().Create(&domain.WorkStateTransition{ID: 1, CreateTime: time.Now(), Creator: 1,
+			err = testDatabase.DS.GormDB().Create(&domain.WorkStateTransition{ID: 1, CreateTime: common.CurrentTimestamp(), Creator: 1,
 				WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FlowID: 1, WorkID: (*works)[0].ID, FromState: "PENDING", ToState: "DOING"}}).Error
 			Expect(err).To(BeNil())
-			err = testDatabase.DS.GormDB().Create(&domain.WorkStateTransition{ID: 2, CreateTime: time.Now(), Creator: 1,
+			err = testDatabase.DS.GormDB().Create(&domain.WorkStateTransition{ID: 2, CreateTime: common.CurrentTimestamp(), Creator: 1,
 				WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FlowID: 1, WorkID: 2, FromState: "PENDING", ToState: "DOING"}}).Error
 			Expect(err).To(BeNil())
 			transition := domain.WorkStateTransition{}
@@ -599,7 +602,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(err).To(BeNil())
 			Expect(works).ToNot(BeNil())
 			Expect(len(*works)).To(Equal(1))
-			Expect((*works)[0].ArchiveTime).To(BeNil())
+			Expect((*works)[0].ArchiveTime.IsZero()).To(BeTrue())
 
 			// do archive work
 			workIdToArchive := (*works)[0].ID

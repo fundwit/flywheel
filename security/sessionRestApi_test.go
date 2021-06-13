@@ -50,7 +50,7 @@ var _ = Describe("SessionRestApi", func() {
 					Role: "owner", ProjectName: "project1", ProjectIdentifier: "TES", ProjectID: types.ID(1),
 				}}, SigningTime: time.Now()}, cache.DefaultExpiration)
 
-			security.LoadPermFunc = func(uid types.ID) ([]string, []domain.ProjectRole) {
+			security.LoadPermFunc = func(uid types.ID) (security.Permissions, security.VisiableProjects) {
 				return []string{"manager_1"}, []domain.ProjectRole{{ProjectID: 1, ProjectName: "project1new", ProjectIdentifier: "TES", Role: "manager"}}
 			}
 			req := httptest.NewRequest(http.MethodGet, "/v1/session", nil)

@@ -6,6 +6,7 @@ import (
 	"flywheel/domain/flow"
 	"flywheel/domain/namespace"
 	"flywheel/domain/work"
+	"flywheel/domain/workcontribution"
 	"flywheel/persistence"
 	"flywheel/security"
 	"flywheel/servehttp"
@@ -41,6 +42,7 @@ func main() {
 	// database migration (race condition)
 	err = ds.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkStateTransition{}, &domain.WorkProcessStep{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{},
+		&workcontribution.WorkContributionRecord{},
 		&security.User{}, &domain.Project{}, &domain.ProjectMember{},
 		&security.Role{}, &security.Permission{},
 		&security.UserRoleBinding{}, &security.RolePermissionBinding{}).Error
@@ -75,6 +77,7 @@ func main() {
 
 	servehttp.RegisterWorkStateTransitionHandler(engine, workProcessManager, securityMiddle)
 	servehttp.RegisterWorkProcessStepHandler(engine, workProcessManager, securityMiddle)
+	workcontribution.RegisterWorkContributionsHandlers(engine, securityMiddle)
 
 	err = engine.Run(":80")
 	if err != nil {

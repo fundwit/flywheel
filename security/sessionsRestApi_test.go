@@ -32,7 +32,7 @@ var _ = Describe("SessionsRestApi", func() {
 		persistence.ActiveDataSourceManager = testDatabase.DS
 		Expect(testDatabase.DS.GormDB().AutoMigrate(&security.User{}, &domain.ProjectMember{},
 			&security.Role{}, &security.Permission{}, &security.UserRoleBinding{}, &security.RolePermissionBinding{}).Error).To(BeNil())
-		security.LoadPermFunc = security.LoadPerms
+		security.LoadPermFuncReset()
 	})
 	AfterEach(func() {
 		testinfra.StopMysqlTestDatabase(testDatabase)

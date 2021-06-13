@@ -2,11 +2,12 @@ package persistence
 
 import (
 	"errors"
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"log"
 	"os"
 	"strings"
+
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
 )
 
 func PrepareMysqlDatabase(mysqlDriverArgs string) error {

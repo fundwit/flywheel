@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flywheel/bizerror"
+	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/state"
 	"flywheel/security"
@@ -27,7 +28,7 @@ var _ = Describe("WorkHandler", func() {
 		router      *gin.Engine
 		workManager *workManagerMock
 
-		demoTime         time.Time
+		demoTime         common.Timestamp
 		timeString       string
 		demoWorkflow     domain.WorkflowDetail
 		demoWorkflowJson string
@@ -39,12 +40,12 @@ var _ = Describe("WorkHandler", func() {
 		workManager = &workManagerMock{}
 		servehttp.RegisterWorkHandler(router, workManager)
 
-		demoTime = time.Date(2020, 1, 1, 1, 0, 0, 0, time.Now().Location())
-		timeBytes, err := demoTime.MarshalJSON()
+		demoTime = common.TimestampOfDate(2020, 1, 1, 1, 0, 0, 0, time.Now().Location())
+		timeBytes, err := demoTime.Time().MarshalJSON()
 		Expect(err).To(BeNil())
 		timeString = strings.Trim(string(timeBytes), `"`)
 		demoWorkflow = domain.WorkflowDetail{
-			Workflow:            domain.Workflow{ID: 100, Name: "demo workflow", ThemeColor: "orange", ThemeIcon: "el-icon-star-on", ProjectID: 1000, CreateTime: demoTime},
+			Workflow:            domain.Workflow{ID: 100, Name: "demo workflow", ThemeColor: "orange", ThemeIcon: "el-icon-star-on", ProjectID: 1000, CreateTime: demoTime.Time()},
 			PropertyDefinitions: []domain.PropertyDefinition{{Name: "desc"}},
 			StateMachine:        domain.GenericWorkflowTemplate.StateMachine,
 		}
@@ -63,7 +64,7 @@ var _ = Describe("WorkHandler", func() {
 						Identifier:    "TEST-1",
 						ProjectID:     creation.ProjectID,
 						FlowID:        demoWorkflow.ID,
-						OrderInState:  demoTime.UnixNano() / 1e6,
+						OrderInState:  demoTime.Time().UnixNano() / 1e6,
 						CreateTime:    demoTime,
 						StateName:     demoWorkflow.StateMachine.States[0].Name,
 						StateCategory: demoWorkflow.StateMachine.States[0].Category,
@@ -81,7 +82,7 @@ var _ = Describe("WorkHandler", func() {
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusCreated))
 			Expect(body).To(MatchJSON(`{"id":"123","name":"test work", "identifier":"TEST-1","projectId":"333","flowId":"` + demoWorkflow.ID.String() + `", "orderInState": ` +
-				strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `, "createTime":"` + timeString + `",
+				strconv.FormatInt(demoTime.Time().UnixNano()/1e6, 10) + `, "createTime":"` + timeString + `",
 				"stateName":"PENDING", "stateCategory": 1, "type": ` + demoWorkflowJson + `,"state":{"name": "PENDING", "category": 1, "order": 1},
 				"stateBeginTime": null,"processBeginTime":null, "processEndTime":null, "archivedTime": null}`))
 		})
@@ -122,9 +123,9 @@ var _ = Describe("WorkHandler", func() {
 		It("should be able to serve query request", func() {
 			workManager.QueryWorkFunc = func(q *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
 				works := []domain.Work{
-					{ID: 1, Name: "work1", Identifier: "W-1", ProjectID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.UnixNano() / 1e6,
+					{ID: 1, Name: "work1", Identifier: "W-1", ProjectID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.Time().UnixNano() / 1e6,
 						StateName: "PENDING", State: domain.StatePending, StateCategory: state.InBacklog},
-					{ID: 2, Name: "work2", Identifier: "W-2", ProjectID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.UnixNano() / 1e6,
+					{ID: 2, Name: "work2", Identifier: "W-2", ProjectID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.Time().UnixNano() / 1e6,
 						StateName: "DONE", State: domain.StateDone, StateCategory: state.Done},
 				}
 				return &works, nil
@@ -134,10 +135,10 @@ var _ = Describe("WorkHandler", func() {
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"data":[{"id":"1","name":"work1","identifier":"W-1","projectId":"333","flowId":"1",
-				"createTime":"` + timeString + `","orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + ` ,
+				"createTime":"` + timeString + `","orderInState": ` + strconv.FormatInt(demoTime.Time().UnixNano()/1e6, 10) + ` ,
 				"stateName":"PENDING", "stateCategory": 1, "state":{"name":"PENDING", "category":1, "order": 1},
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null}, 
-				{"id":"2","name":"work2","identifier":"W-2","projectId":"333","flowId":"1", "orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `,
+				{"id":"2","name":"work2","identifier":"W-2","projectId":"333","flowId":"1", "orderInState": ` + strconv.FormatInt(demoTime.Time().UnixNano()/1e6, 10) + `,
 				"createTime":"` + timeString + `","stateName":"DONE", "stateCategory": 3, "state":{"name":"DONE", "category":3, "order": 3},
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null
 				}],"total": 2}`))
@@ -187,7 +188,7 @@ var _ = Describe("WorkHandler", func() {
 					Work: domain.Work{
 						ID: 123, Name: "test work", Identifier: "W-1", ProjectID: 100, CreateTime: demoTime, FlowID: demoWorkflow.ID, OrderInState: 999,
 						StateName: "DOING", StateCategory: demoWorkflow.StateMachine.States[1].Category, State: demoWorkflow.StateMachine.States[1],
-						StateBeginTime: &demoTime, ProcessBeginTime: &demoTime, ProcessEndTime: &demoTime,
+						StateBeginTime: demoTime, ProcessBeginTime: demoTime, ProcessEndTime: demoTime,
 					},
 					Type: demoWorkflow.Workflow,
 				}, nil
@@ -229,7 +230,7 @@ var _ = Describe("WorkHandler", func() {
 		It("should be able to update work successfully", func() {
 			workManager.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error) {
 				return &domain.Work{ID: 100, Name: "new-name", Identifier: "W-1", ProjectID: types.ID(333), CreateTime: demoTime,
-					FlowID: 1, OrderInState: demoTime.UnixNano() / 1e6,
+					FlowID: 1, OrderInState: demoTime.Time().UnixNano() / 1e6,
 					StateName: "PENDING", StateCategory: domain.StatePending.Category, State: domain.StatePending}, nil
 			}
 			req := httptest.NewRequest(http.MethodPut, "/v1/works/100", bytes.NewReader([]byte(
@@ -239,7 +240,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","identifier":"W-1","stateName":"PENDING", "stateCategory": 1,
 				"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null,
 				"state":{"name":"PENDING", "category":1, "order": 1},"projectId":"333","flowId":"1","createTime":"` +
-				timeString + `", "orderInState": ` + strconv.FormatInt(demoTime.UnixNano()/1e6, 10) + `}`))
+				timeString + `", "orderInState": ` + strconv.FormatInt(demoTime.Time().UnixNano()/1e6, 10) + `}`))
 		})
 	})
 

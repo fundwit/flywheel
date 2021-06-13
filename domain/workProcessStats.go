@@ -1,9 +1,11 @@
 package domain
 
 import (
+	"flywheel/common"
 	"flywheel/domain/state"
-	"github.com/fundwit/go-commons/types"
 	"time"
+
+	"github.com/fundwit/go-commons/types"
 )
 
 type WorkProcessStep struct {
@@ -12,8 +14,8 @@ type WorkProcessStep struct {
 	StateName     string         `json:"stateName"`
 	StateCategory state.Category `json:"stateCategory"`
 
-	BeginTime time.Time  `json:"beginTime" sql:"type:DATETIME(3) NOT NULL"`
-	EndTime   *time.Time `json:"endTime" sql:"type:DATETIME(3)"`
+	BeginTime common.Timestamp `json:"beginTime" sql:"type:DATETIME(6) NOT NULL"`
+	EndTime   common.Timestamp `json:"endTime" sql:"type:DATETIME(6)"`
 }
 
 type WorkProcessStepQuery struct {

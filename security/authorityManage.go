@@ -5,6 +5,8 @@ import (
 	"flywheel/domain"
 	"flywheel/persistence"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
@@ -14,7 +16,40 @@ var (
 	systemAdminRole        = Role{ID: "system-admin", Title: "System Administrator"}
 	SystemAdminPermission  = Permission{ID: "system:admin", Title: "System Administration"}
 	systemAdminRoleBinding = RolePermissionBinding{ID: 1, RoleID: systemAdminRole.ID, PermissionID: SystemAdminPermission.ID}
+
+	projectAdminRole               = Role{ID: "project-admin", Title: "project-admin"}
+	projectAdminPermissionTemplate = Permission{ID: "project_%d:admin", Title: "Project %d Administration"}
 )
+
+var (
+	LoadPermFunc = loadPerms
+)
+
+func LoadPermFuncReset() {
+	LoadPermFunc = loadPerms
+}
+
+type Permissions []string
+
+func (c *Permissions) HasRole(role string) bool {
+	for _, v := range *c {
+		if strings.EqualFold(v, role) {
+			return true
+		}
+	}
+	return false
+}
+
+type VisiableProjects []domain.ProjectRole
+
+func (c *VisiableProjects) HasProject(projectId types.ID) bool {
+	for _, v := range *c {
+		if v.ProjectID == projectId {
+			return true
+		}
+	}
+	return false
+}
 
 func DefaultSecurityConfiguration() error {
 	db := persistence.ActiveDataSourceManager.GormDB()
@@ -32,7 +67,11 @@ func DefaultSecurityConfiguration() error {
 		admin := User{}
 		err := tx.Model(&User{}).Where(&User{ID: 1}).First(&admin).Error
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-			if err := tx.Save(&User{ID: 1, Name: "admin", Secret: HashSha256("admin123")}).Error; err != nil {
+			initialAdminPassword := os.ExpandEnv("${INITIAL_ADMIN_PASSWORD}")
+			if initialAdminPassword == "" {
+				initialAdminPassword = "admin123"
+			}
+			if err := tx.Save(&User{ID: 1, Name: "admin", Secret: HashSha256(initialAdminPassword)}).Error; err != nil {
 				return err
 			}
 		}
@@ -49,7 +88,7 @@ func DefaultSecurityConfiguration() error {
 }
 
 // as a simple initial solution, we use project member relationship as the metadata of permissions
-func LoadPerms(uid types.ID) ([]string, []domain.ProjectRole) {
+func loadPerms(uid types.ID) (Permissions, VisiableProjects) {
 	var roles []string
 	db := persistence.ActiveDataSourceManager.GormDB()
 

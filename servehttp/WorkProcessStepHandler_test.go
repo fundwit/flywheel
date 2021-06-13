@@ -3,17 +3,19 @@ package servehttp_test
 import (
 	"errors"
 	"flywheel/bizerror"
+	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/security"
 	"flywheel/servehttp"
 	"flywheel/testinfra"
-	"github.com/gin-gonic/gin"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("WorkProcessStepHandler", func() {
@@ -63,8 +65,8 @@ var _ = Describe("WorkProcessStepHandler", func() {
 			workProcessManager.QueryProcessStepsFunc =
 				func(query *domain.WorkProcessStepQuery, sec *security.Context) (*[]domain.WorkProcessStep, error) {
 					return &[]domain.WorkProcessStep{
-						{WorkID: 100, FlowID: 1, StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category, BeginTime: t, EndTime: &t},
-						{WorkID: 100, FlowID: 1, StateName: domain.StateDoing.Name, StateCategory: domain.StateDoing.Category, BeginTime: t},
+						{WorkID: 100, FlowID: 1, StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category, BeginTime: common.Timestamp(t), EndTime: common.Timestamp(t)},
+						{WorkID: 100, FlowID: 1, StateName: domain.StateDoing.Name, StateCategory: domain.StateDoing.Category, BeginTime: common.Timestamp(t)},
 					}, nil
 				}
 

@@ -19,5 +19,5 @@ type WorkflowTemplate struct {
 	Name string   `json:"name"`
 
 	ProjectID  types.ID  `json:"projectId"`
-	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
+	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(6) NOT NULL"`
 }

@@ -21,6 +21,7 @@ var _ = Describe("AuthorityManage", func() {
 		persistence.ActiveDataSourceManager = testDatabase.DS
 		Expect(testDatabase.DS.GormDB().AutoMigrate(&security.User{}, &security.Role{}, &security.Permission{},
 			&security.UserRoleBinding{}, &security.RolePermissionBinding{}).Error).To(BeNil())
+		security.LoadPermFuncReset()
 	})
 	AfterEach(func() {
 		testinfra.StopMysqlTestDatabase(testDatabase)
@@ -102,14 +103,13 @@ var _ = Describe("AuthorityManage", func() {
 			Expect(testDatabase.DS.GormDB().Create(
 				&domain.ProjectMember{ProjectId: 20, MemberId: 3, Role: "viewer", CreateTime: now}).Error).To(BeNil())
 
-			s, gr := security.LoadPerms(3)
-			Expect(len(s)).To(Equal(2))
-			Expect(s).To(Equal([]string{"owner_1", "viewer_20"}))
-			Expect(gr).To(Equal([]domain.ProjectRole{{ProjectID: 1, ProjectName: "project1", Role: "owner", ProjectIdentifier: "1"},
+			s, gr := security.LoadPermFunc(3)
+			Expect(s).To(Equal(security.Permissions{"owner_1", "viewer_20"}))
+			Expect(gr).To(Equal(security.VisiableProjects{{ProjectID: 1, ProjectName: "project1", Role: "owner", ProjectIdentifier: "1"},
 				{ProjectID: 20, ProjectName: "project20", ProjectIdentifier: "20", Role: "viewer"}}))
 
-			s, gr = security.LoadPerms(100)
-			Expect(len(s)).To(Equal(0))
+			s, gr = security.LoadPermFunc(100)
+			Expect(s).To(Equal(security.Permissions{}))
 			Expect(len(gr)).To(Equal(0))
 		})
 
@@ -131,19 +131,17 @@ var _ = Describe("AuthorityManage", func() {
 			Expect(testDatabase.DS.GormDB().Create(
 				&domain.ProjectMember{ProjectId: 20, MemberId: 3, Role: "viewer", CreateTime: now}).Error).To(BeNil())
 
-			s, gr := security.LoadPerms(3)
-			Expect(len(s)).To(Equal(3))
-			Expect(s).To(Equal([]string{"system:admin", "owner_1", "viewer_20"}))
-			Expect(gr).To(Equal([]domain.ProjectRole{{ProjectID: 1, ProjectName: "project1", Role: "owner", ProjectIdentifier: "1"},
+			s, gr := security.LoadPermFunc(3)
+			Expect(s).To(Equal(security.Permissions{"system:admin", "owner_1", "viewer_20"}))
+			Expect(gr).To(Equal(security.VisiableProjects{{ProjectID: 1, ProjectName: "project1", Role: "owner", ProjectIdentifier: "1"},
 				{ProjectID: 20, ProjectName: "project20", ProjectIdentifier: "20", Role: "viewer"}}))
 
-			s, gr = security.LoadPerms(1)
-			Expect(len(s)).To(Equal(1))
-			Expect(s).To(Equal([]string{"system:admin"}))
+			s, gr = security.LoadPermFunc(1)
+			Expect(s).To(Equal(security.Permissions{"system:admin"}))
 			Expect(len(gr)).To(Equal(0))
 
-			s, gr = security.LoadPerms(100)
-			Expect(len(s)).To(Equal(0))
+			s, gr = security.LoadPermFunc(100)
+			Expect(s).To(Equal(security.Permissions{}))
 			Expect(len(gr)).To(Equal(0))
 		})
 	})

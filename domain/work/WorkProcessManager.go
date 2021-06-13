@@ -9,9 +9,7 @@ import (
 	"flywheel/domain/state"
 	"flywheel/persistence"
 	"flywheel/security"
-	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
@@ -68,9 +66,9 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkStateTransi
 		return nil, errors.New("transition from " + c.FromState + " to " + c.ToState + " is not invalid")
 	}
 
-	now := time.Now()
+	now := common.CurrentTimestamp()
 	newId := common.NextId(m.idWorker)
-	transition := &domain.WorkStateTransition{ID: newId, CreateTime: now, Creator: sec.Identity.ID, WorkStateTransitionBrief: *c}
+	transition := &domain.WorkStateTransition{ID: newId, CreateTime: common.Timestamp(now), Creator: sec.Identity.ID, WorkStateTransitionBrief: *c}
 
 	fromState, found := workflow.FindState(c.FromState)
 	if !found {
@@ -88,15 +86,15 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkStateTransi
 		if err := tx.Where(&work).First(&work).Error; err != nil {
 			return err
 		}
-		if !sec.HasRole(fmt.Sprintf("%s_%d", domain.RoleOwner, work.ProjectID)) {
+		if !sec.HasRoleSuffix("_" + work.ProjectID.String()) {
 			return bizerror.ErrForbidden
 		}
-		if work.ArchiveTime != nil {
+		if !work.ArchiveTime.IsZero() {
 			return bizerror.ErrArchiveStatusInvalid
 		}
 
 		query := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID, StateName: c.FromState}).
-			Update(&domain.Work{StateName: c.ToState, StateCategory: toState.Category, StateBeginTime: &now})
+			Update(&domain.Work{StateName: c.ToState, StateCategory: toState.Category, StateBeginTime: now})
 		if err := query.Error; err != nil {
 			return err
 		}
@@ -105,16 +103,16 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkStateTransi
 		}
 
 		// update beginProcessTime and endProcessTime
-		if work.ProcessBeginTime == nil && toState.Category != state.InBacklog {
+		if work.ProcessBeginTime.IsZero() && toState.Category != state.InBacklog {
 			if err := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID}).Update("process_begin_time", &now).Error; err != nil {
 				return err
 			}
 		}
-		if work.ProcessEndTime == nil && toState.Category == state.Done {
+		if work.ProcessEndTime.IsZero() && toState.Category == state.Done {
 			if err := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID}).Update("process_end_time", &now).Error; err != nil {
 				return err
 			}
-		} else if work.ProcessEndTime != nil && toState.Category != state.Done {
+		} else if !work.ProcessEndTime.IsZero() && toState.Category != state.Done {
 			if err := tx.Model(&domain.Work{}).Where(&domain.Work{ID: c.WorkID}).Update("process_end_time", nil).Error; err != nil {
 				return err
 			}
@@ -127,14 +125,14 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkStateTransi
 
 		// update process step
 		if fromState.Category != state.Done {
-			if err := tx.Model(&domain.WorkProcessStep{}).Where(&domain.WorkProcessStep{WorkID: c.WorkID, FlowID: workflow.ID, StateName: fromState.Name}).
-				Where("end_time is null").Update(&domain.WorkProcessStep{EndTime: &now}).Error; err != nil {
+			if err := tx.Model(&domain.WorkProcessStep{}).LogMode(true).Where(&domain.WorkProcessStep{WorkID: c.WorkID, FlowID: workflow.ID, StateName: fromState.Name}).
+				Where("end_time = ?", common.Timestamp{}).Update(&domain.WorkProcessStep{EndTime: common.Timestamp(now)}).Error; err != nil {
 				return err
 			}
 		}
 		if toState.Category != state.Done {
 			nextProcessStep := domain.WorkProcessStep{WorkID: work.ID, FlowID: work.FlowID,
-				StateName: toState.Name, StateCategory: toState.Category, BeginTime: now}
+				StateName: toState.Name, StateCategory: toState.Category, BeginTime: common.Timestamp(now)}
 			if err := tx.Create(nextProcessStep).Error; err != nil {
 				return err
 			}

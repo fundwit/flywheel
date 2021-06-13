@@ -10,8 +10,8 @@ import (
 	"flywheel/domain/state"
 	"flywheel/persistence"
 	"flywheel/security"
+	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
@@ -56,11 +56,11 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 	}
 
 	if query.ArchiveState == domain.StatusOn {
-		q = q.Where("archive_time IS NOT NULL")
+		q = q.Where("archive_time != ?", common.Timestamp{})
 	} else if query.ArchiveState == domain.StatusAll {
 		// archive_time not in where clause
 	} else {
-		q = q.Where("archive_time IS NULL")
+		q = q.Where("archive_time = ?", common.Timestamp{})
 	}
 
 	visibleProjects := sec.VisibleProjects()
@@ -169,6 +169,7 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 		if err := tx.Create(initProcessStep).Error; err != nil {
 			return err
 		}
+		fmt.Println("work.createTime", workDetail.CreateTime, "work.StateBeginTime", workDetail.StateBeginTime, "initProcessStep.beginTime", initProcessStep.BeginTime)
 		return nil
 	})
 	if err != nil {
@@ -186,7 +187,7 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *secur
 			return err
 		}
 
-		if originWork.ArchiveTime != nil {
+		if !originWork.ArchiveTime.IsZero() {
 			return bizerror.ErrArchiveStatusInvalid
 		}
 
@@ -267,7 +268,7 @@ func (m *WorkManager) DeleteWork(id types.ID, sec *security.Context) error {
 }
 
 func (m *WorkManager) ArchiveWorks(ids []types.ID, sec *security.Context) error {
-	now := time.Now()
+	now := common.CurrentTimestamp()
 	err := m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
 		for _, id := range ids {
 			work, err := m.findWorkAndCheckPerms(tx, id, sec)
@@ -277,11 +278,11 @@ func (m *WorkManager) ArchiveWorks(ids []types.ID, sec *security.Context) error 
 			if work.StateCategory != state.Done && work.StateCategory != state.Rejected {
 				return bizerror.ErrStateCategoryInvalid
 			}
-			if work.ArchiveTime != nil {
+			if !work.ArchiveTime.IsZero() {
 				return nil
 			}
 
-			db := tx.Model(&domain.Work{ID: id}).Updates(&domain.Work{ArchiveTime: &now})
+			db := tx.Model(&domain.Work{ID: id}).Updates(&domain.Work{ArchiveTime: now})
 			if err := db.Error; err != nil {
 				return err
 			}
@@ -304,7 +305,7 @@ func (m *WorkManager) findWorkAndCheckPerms(db *gorm.DB, id types.ID, sec *secur
 }
 
 func BuildWorkDetail(id types.ID, c *domain.WorkCreation, workflow *domain.WorkflowDetail, initState state.State) *domain.WorkDetail {
-	now := time.Now()
+	now := common.CurrentTimestamp()
 	return &domain.WorkDetail{
 		Work: domain.Work{
 			ID:         id,
@@ -313,10 +314,10 @@ func BuildWorkDetail(id types.ID, c *domain.WorkCreation, workflow *domain.Workf
 			CreateTime: now,
 
 			FlowID:         workflow.ID,
-			OrderInState:   now.UnixNano() / 1e6,
+			OrderInState:   now.Time().UnixNano() / 1e6,
 			StateName:      initState.Name,
 			StateCategory:  initState.Category,
-			StateBeginTime: &now,
+			StateBeginTime: now,
 			State:          initState,
 		},
 		Type: workflow.Workflow,

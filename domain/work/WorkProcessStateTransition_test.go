@@ -2,6 +2,7 @@ package work_test
 
 import (
 	"flywheel/bizerror"
+	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/namespace"
@@ -10,6 +11,7 @@ import (
 	"flywheel/persistence"
 	"flywheel/security"
 	"flywheel/testinfra"
+	"fmt"
 
 	"github.com/fundwit/go-commons/types"
 	. "github.com/onsi/ginkgo"
@@ -176,7 +178,7 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			Expect(err).To(BeNil())
 			Expect(detail.StateName).To(Equal("DOING"))
 			Expect(detail.StateCategory).To(Equal(state.InProcess))
-			Expect(detail.StateBeginTime.UnixNano() >= detail.CreateTime.UnixNano()).To(BeTrue())
+			Expect(detail.StateBeginTime.Time().UnixNano() >= detail.CreateTime.Time().UnixNano()).To(BeTrue())
 
 			// record is created
 			var records []domain.WorkStateTransition
@@ -191,10 +193,12 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			Expect(records[0].ToState).To(Equal(creation.ToState))
 			Expect(records[0].Creator).To(Equal(sec.Identity.ID))
 
-			handleTime := records[0].CreateTime
-			Expect(detail.StateBeginTime).To(Equal(&handleTime))
-			Expect(detail.ProcessBeginTime).To(Equal(&handleTime))
-			Expect(detail.ProcessEndTime).To(BeNil())
+			handleTimestamp := records[0].CreateTime
+
+			fmt.Println("time diff:", detail.StateBeginTime, handleTimestamp)
+			Expect(detail.StateBeginTime).To(Equal(handleTimestamp))
+			Expect(detail.ProcessBeginTime).To(Equal(handleTimestamp))
+			Expect(detail.ProcessEndTime.IsZero()).To(BeTrue())
 
 			// should handle process step
 			var processSteps []domain.WorkProcessStep
@@ -202,9 +206,9 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			Expect(processSteps).ToNot(BeNil())
 			Expect(len(processSteps)).To(Equal(2))
 			Expect(processSteps[0]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
-				StateName: creation.FromState, StateCategory: 1, BeginTime: detail.CreateTime, EndTime: &handleTime}))
+				StateName: creation.FromState, StateCategory: 1, BeginTime: detail.CreateTime, EndTime: handleTimestamp}))
 			Expect(processSteps[1]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
-				StateName: creation.ToState, StateCategory: 2, BeginTime: handleTime, EndTime: nil}))
+				StateName: creation.ToState, StateCategory: 2, BeginTime: handleTimestamp, EndTime: common.Timestamp{}}))
 
 			// transit to done state: processEndTime should be set
 			creation = domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DOING", ToState: "DONE"}
@@ -212,9 +216,9 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			Expect(err).To(BeNil())
 			detail, err = workManager.WorkDetail(detail.Identifier, sec)
 			Expect(err).To(BeNil())
-			Expect(detail.StateBeginTime).ToNot(BeNil())
-			Expect(detail.ProcessBeginTime).ToNot(BeNil())
-			Expect(detail.ProcessEndTime).ToNot(BeNil())
+			Expect(detail.StateBeginTime.IsZero()).To(BeFalse())
+			Expect(detail.ProcessBeginTime.IsZero()).To(BeFalse())
+			Expect(detail.ProcessEndTime.IsZero()).To(BeFalse())
 
 			// transit back to process state: processEndTime should be reset to nil
 			creation = domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DONE", ToState: "PENDING"}
@@ -222,9 +226,9 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			Expect(err).To(BeNil())
 			detail, err = workManager.WorkDetail(detail.Identifier, sec)
 			Expect(err).To(BeNil())
-			Expect(detail.StateBeginTime).ToNot(BeNil())
-			Expect(detail.ProcessBeginTime).ToNot(BeNil())
-			Expect(detail.ProcessEndTime).To(BeNil())
+			Expect(detail.StateBeginTime.IsZero()).To(BeFalse())
+			Expect(detail.ProcessBeginTime.IsZero()).To(BeFalse())
+			Expect(detail.ProcessEndTime.IsZero()).To(BeTrue())
 		})
 	})
 })

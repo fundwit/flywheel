@@ -2,6 +2,7 @@ package flow_test
 
 import (
 	"flywheel/bizerror"
+	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/state"
@@ -347,9 +348,9 @@ var _ = Describe("WorkflowManager", func() {
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 
-			testDatabase.DS.GormDB().Save(&domain.Work{ID: 1, Name: "test", ProjectID: 100, CreateTime: time.Now(), FlowID: workflow.ID,
+			testDatabase.DS.GormDB().Save(&domain.Work{ID: 1, Name: "test", ProjectID: 100, CreateTime: common.CurrentTimestamp(), FlowID: workflow.ID,
 				OrderInState: 1, StateName: "PENDING", StateCategory: 0, State: domain.StatePending,
-				StateBeginTime: nil, ProcessBeginTime: nil, ProcessEndTime: nil})
+				StateBeginTime: common.Timestamp{}, ProcessBeginTime: common.Timestamp{}, ProcessEndTime: common.Timestamp{}})
 
 			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, "owner_1"))
 			Expect(err).To(Equal(bizerror.ErrWorkflowIsReferenced))
@@ -359,7 +360,7 @@ var _ = Describe("WorkflowManager", func() {
 			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, "owner_1"))
 			Expect(err).To(BeNil())
 
-			testDatabase.DS.GormDB().Save(&domain.WorkProcessStep{WorkID: 1, FlowID: workflow.ID, StateName: "PENDING", StateCategory: 0, BeginTime: time.Now()})
+			testDatabase.DS.GormDB().Save(&domain.WorkProcessStep{WorkID: 1, FlowID: workflow.ID, StateName: "PENDING", StateCategory: 0, BeginTime: common.Timestamp(time.Now())})
 
 			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, "owner_1"))
 			Expect(err).To(Equal(bizerror.ErrWorkflowIsReferenced))
@@ -370,7 +371,7 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(err).To(BeNil())
 
 			testDatabase.DS.GormDB().Save(&domain.WorkStateTransition{
-				ID: 1, CreateTime: time.Now(), Creator: 1,
+				ID: 1, CreateTime: common.CurrentTimestamp(), Creator: 1,
 				WorkStateTransitionBrief: domain.WorkStateTransitionBrief{
 					FlowID: workflow.ID, WorkID: 1, FromState: "PENDING", ToState: "DOING"},
 			})
@@ -689,18 +690,18 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(err).To(BeNil())
 
 			// create work
-			now := time.Now()
+			now := common.CurrentTimestamp()
 			Expect(testDatabase.DS.GormDB().Create(domain.Work{
-				ID: 1, Name: "test work", ProjectID: 100, CreateTime: now,
+				ID: 1, Name: "test work", ProjectID: 100, CreateTime: common.Timestamp(now),
 				FlowID: workflow.ID, OrderInState: 1, StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category,
-				State: domain.StatePending, StateBeginTime: &now}).Error).To(BeNil())
+				State: domain.StatePending, StateBeginTime: now}).Error).To(BeNil())
 			// create work_state_transitions
-			Expect(testDatabase.DS.GormDB().Create(domain.WorkStateTransition{ID: 1, CreateTime: now, Creator: 100, WorkStateTransitionBrief: domain.WorkStateTransitionBrief{
+			Expect(testDatabase.DS.GormDB().Create(domain.WorkStateTransition{ID: 1, CreateTime: common.Timestamp(now), Creator: 100, WorkStateTransitionBrief: domain.WorkStateTransitionBrief{
 				FlowID: workflow.ID, WorkID: 1, FromState: domain.StatePending.Name, ToState: domain.StatePending.Name,
 			}}).Error).To(BeNil())
 			// create work_process_steps
 			Expect(testDatabase.DS.GormDB().Create(domain.WorkProcessStep{WorkID: 1, FlowID: workflow.ID,
-				StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category, BeginTime: now}).Error).To(BeNil())
+				StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category, BeginTime: common.Timestamp(now)}).Error).To(BeNil())
 
 			// do action
 			updating := flow.WorkflowStateUpdating{OriginName: domain.StatePending.Name, Name: "QUEUED", Order: 2000}

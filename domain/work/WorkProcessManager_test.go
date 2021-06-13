@@ -1,6 +1,7 @@
 package work_test
 
 import (
+	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/namespace"
@@ -100,9 +101,9 @@ var _ = Describe("WorkProcessManager", func() {
 			Expect(err).To(BeNil())
 
 			// add a record should not be query out
-			now := time.Now()
+			now := common.CurrentTimestamp()
 			Expect(testDatabase.DS.GormDB().Create(&domain.WorkProcessStep{WorkID: 3, FlowID: 2,
-				StateName: "DOING", StateCategory: state.InProcess, BeginTime: now, EndTime: &now}).Error).To(BeNil())
+				StateName: "DOING", StateCategory: state.InProcess, BeginTime: now, EndTime: now}).Error).To(BeNil())
 
 			results, err := workProcessManager.QueryProcessSteps(&domain.WorkProcessStepQuery{WorkID: work1.ID}, secCtx)
 			Expect(err).To(BeNil())
@@ -112,16 +113,16 @@ var _ = Describe("WorkProcessManager", func() {
 			Expect(step1.FlowID).To(Equal(work1.FlowID))
 			Expect(step1.StateName).To(Equal(domain.StatePending.Name))
 			Expect(step1.StateCategory).To(Equal(domain.StatePending.Category))
-			Expect(step1.BeginTime.Unix()).To(Equal(work1.CreateTime.Unix()))
-			Expect(step1.EndTime.Unix()-step1.BeginTime.Unix() >= 0).To(BeTrue())
+			Expect(step1.BeginTime.Time().Round(time.Microsecond)).To(Equal(work1.CreateTime.Time().Round(time.Microsecond)))
+			Expect(step1.EndTime.Time().Unix()-step1.BeginTime.Time().Unix() >= 0).To(BeTrue())
 
 			step2 := (*results)[1]
 			Expect(step2.WorkID).To(Equal(work1.ID))
 			Expect(step2.FlowID).To(Equal(work1.FlowID))
 			Expect(step2.StateName).To(Equal(domain.StateDoing.Name))
 			Expect(step2.StateCategory).To(Equal(domain.StateDoing.Category))
-			Expect(step2.BeginTime.Unix()).To(Equal(step1.EndTime.Unix()))
-			Expect(step2.EndTime).To(BeNil())
+			Expect(step2.BeginTime).To(Equal(step1.EndTime))
+			Expect(step2.EndTime).To(Equal(common.Timestamp{}))
 
 			_, err = workProcessManager.CreateWorkStateTransition(
 				&domain.WorkStateTransitionBrief{FlowID: workflowDetail.ID, WorkID: work1.ID, FromState: domain.StateDoing.Name, ToState: domain.StateDone.Name}, secCtx)
@@ -135,8 +136,8 @@ var _ = Describe("WorkProcessManager", func() {
 			Expect(step2Finished.FlowID).To(Equal(work1.FlowID))
 			Expect(step2Finished.StateName).To(Equal(domain.StateDoing.Name))
 			Expect(step2Finished.StateCategory).To(Equal(domain.StateDoing.Category))
-			Expect(step2Finished.BeginTime.Unix()).To(Equal(step1.EndTime.Unix()))
-			Expect(step2Finished.EndTime.Unix()-step2Finished.BeginTime.Unix() >= 0).To(BeTrue())
+			Expect(step2Finished.BeginTime).To(Equal(step1.EndTime))
+			Expect(step2Finished.EndTime.Time().Unix()-step2Finished.BeginTime.Time().Unix() >= 0).To(BeTrue())
 		})
 	})
 })

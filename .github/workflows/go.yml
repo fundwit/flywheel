@@ -23,7 +23,7 @@ jobs:
 
     - name: Test
       run: |
-        docker run -d -e MYSQL_ROOT_PASSWORD=root -p 3306:3306 mysql:5.7
+        docker run -d -e MYSQL_ROOT_PASSWORD=root -p 3306:3306 mysql:8.0.23
 
         go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
         bash <(curl -s https://codecov.io/bash)

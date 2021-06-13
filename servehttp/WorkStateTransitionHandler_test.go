@@ -4,18 +4,20 @@ import (
 	"bytes"
 	"errors"
 	"flywheel/bizerror"
+	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/security"
 	"flywheel/servehttp"
 	"flywheel/testinfra"
-	"github.com/fundwit/go-commons/types"
-	"github.com/gin-gonic/gin"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"time"
+
+	"github.com/fundwit/go-commons/types"
+	"github.com/gin-gonic/gin"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("WorkStateTransitionHandler", func() {
@@ -63,7 +65,7 @@ var _ = Describe("WorkStateTransitionHandler", func() {
 			Expect(err).To(BeNil())
 			workProcessManager.CreateWorkStateTransitionFunc =
 				func(c *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error) {
-					return &domain.WorkStateTransition{ID: 123, Creator: types.ID(123), CreateTime: t, WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FlowID: 1, WorkID: 100, FromState: "PENDING", ToState: "DOING"}}, nil
+					return &domain.WorkStateTransition{ID: 123, Creator: types.ID(123), CreateTime: common.Timestamp(t), WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FlowID: 1, WorkID: 100, FromState: "PENDING", ToState: "DOING"}}, nil
 				}
 
 			req := httptest.NewRequest(http.MethodPost, "/v1/transitions", bytes.NewReader([]byte(

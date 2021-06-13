@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
 )
@@ -96,6 +97,11 @@ func HandleError(c *gin.Context, err error) {
 	}
 	if errors.Is(genericErr, gorm.ErrRecordNotFound) || errors.Is(genericErr, domain.ErrNotFound) {
 		c.JSON(http.StatusNotFound, &common.ErrorBody{Code: "common.record_not_found", Message: "record not found"})
+		c.Abort()
+		return
+	}
+	if errors.Is(genericErr, mysql.ErrInvalidConn) {
+		c.JSON(http.StatusServiceUnavailable, &common.ErrorBody{Code: i18n.CommonInternalServerError, Message: err.Error()})
 		c.Abort()
 		return
 	}

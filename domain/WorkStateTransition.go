@@ -1,14 +1,15 @@
 package domain
 
 import (
+	"flywheel/common"
+
 	"github.com/fundwit/go-commons/types"
-	"time"
 )
 
 type WorkStateTransition struct {
-	ID         types.ID  `json:"id"`
-	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
-	Creator    types.ID  `json:"creator"`
+	ID         types.ID         `json:"id"`
+	CreateTime common.Timestamp `json:"createTime" sql:"type:DATETIME(6) NOT NULL"`
+	Creator    types.ID         `json:"creator"`
 
 	WorkStateTransitionBrief
 }

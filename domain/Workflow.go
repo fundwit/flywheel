@@ -14,7 +14,7 @@ type Workflow struct {
 	ThemeIcon  string   `json:"themeIcon"`
 
 	ProjectID  types.ID  `json:"projectId"`
-	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
+	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(6) NOT NULL"`
 }
 
 type WorkflowDetail struct {
@@ -30,7 +30,7 @@ type WorkflowState struct {
 	Order      int      `json:"order"`
 
 	Category   state.Category `json:"category"`
-	CreateTime time.Time      `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
+	CreateTime time.Time      `json:"createTime" sql:"type:DATETIME(6) NOT NULL"`
 }
 
 type WorkflowStateTransition struct {
@@ -39,7 +39,7 @@ type WorkflowStateTransition struct {
 	ToState    string   `json:"toState"     gorm:"primary_key"`
 
 	Name       string    `json:"name"`
-	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(3) NOT NULL"`
+	CreateTime time.Time `json:"createTime" sql:"type:DATETIME(6) NOT NULL"`
 }
 
 func (f *WorkflowDetail) FindState(stateName string) (state.State, bool) {

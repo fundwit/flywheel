@@ -6,6 +6,7 @@ import (
 	"flywheel/bizerror"
 	"flywheel/common"
 	"flywheel/persistence"
+
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
@@ -45,10 +46,6 @@ func UpdateBasicAuthSecret(u *BasicAuthUpdating, sec *Context) error {
 }
 
 func QueryUsers(sec *Context) (*[]UserInfo, error) {
-	if !sec.HasRole(SystemAdminPermission.ID) {
-		return nil, bizerror.ErrForbidden
-	}
-
 	var users []UserInfo
 	if err := persistence.ActiveDataSourceManager.GormDB().Model(&User{}).Scan(&users).Error; err != nil {
 		return nil, err
@@ -68,8 +65,7 @@ func CreateUser(c *UserCreation, sec *Context) (*UserInfo, error) {
 	return &UserInfo{ID: user.ID, Name: user.Name}, nil
 }
 
-
-func QueryAccountNames (ids []types.ID) (map[types.ID]string, error) {
+func QueryAccountNames(ids []types.ID) (map[types.ID]string, error) {
 	if len(ids) == 0 {
 		return map[types.ID]string{}, nil
 	}

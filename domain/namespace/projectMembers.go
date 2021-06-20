@@ -40,13 +40,6 @@ func CreateProjectMember(d *domain.ProjectMemberCreation, sec *security.Context)
 			return err
 		}
 
-		// only allow one manager in one project, create new manager will delete the old one
-		if d.Role == domain.ProjectRoleManager {
-			if err := tx.Where("project_id = ? AND `role` LIKE ?", d.ProjectID, domain.ProjectRoleManager).Delete(&domain.ProjectMember{}).Error; err != nil {
-				return err
-			}
-		}
-
 		// update when exist
 		record := domain.ProjectMember{ProjectId: d.ProjectID, MemberId: d.MemberId, Role: d.Role, CreateTime: time.Now()}
 		if err := tx.Save(&record).Error; err != nil {

@@ -5,6 +5,7 @@ import (
 	"flywheel/persistence"
 	"flywheel/security"
 	"flywheel/testinfra"
+
 	"github.com/fundwit/go-commons/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -37,15 +38,6 @@ var _ = Describe("userManage", func() {
 	})
 
 	Describe("QueryUsers", func() {
-		It("should be blocked when user lack of permission", func() {
-			sec := security.Context{Identity: security.Identity{ID: 1}}
-			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 1, Name: "aaa", Secret: security.HashSha256("123456")}).Error).To(BeNil())
-
-			users, err := security.QueryUsers(&sec)
-			Expect(err).To(Equal(bizerror.ErrForbidden))
-			Expect(users).To(BeNil())
-		})
-
 		It("should be able to query users correctly", func() {
 			sec := security.Context{Identity: security.Identity{ID: 1}, Perms: []string{security.SystemAdminPermission.ID}}
 			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 1, Name: "aaa", Secret: security.HashSha256("123456")}).Error).To(BeNil())
@@ -97,7 +89,7 @@ var _ = Describe("userManage", func() {
 			ret, err = security.QueryAccountNames([]types.ID{1, 2, 4})
 			Expect(err).To(BeNil())
 			Expect(len(ret)).To(Equal(2))
-			Expect(ret).To(Equal(map[types.ID]string{1: "u1", 2:"u2"}))
+			Expect(ret).To(Equal(map[types.ID]string{1: "u1", 2: "u2"}))
 		})
 	})
 })

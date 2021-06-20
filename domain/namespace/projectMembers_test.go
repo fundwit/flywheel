@@ -95,27 +95,6 @@ var _ = Describe("ProjectMembers", func() {
 				testinfra.BuildSecCtx(444, domain.ProjectRoleManager+"_"+g.ID.String()))).To(Equal(bizerror.ErrProjectMemberSelfGrant))
 		})
 
-		It("one project can only has one manager", func() {
-			sec := testinfra.BuildSecCtx(types.ID(111), security.SystemAdminPermission.ID)
-			// 111-manager
-			g, err := namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
-			Expect(err).To(BeNil())
-			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 222, Name: "test", Secret: "xxxx"}).Error).To(BeNil())
-
-			// system admin can create project member: 222-manager
-			Expect(namespace.CreateProjectMember(
-				&domain.ProjectMemberCreation{ProjectID: g.ID, MemberId: 222, Role: domain.ProjectRoleManager}, sec)).To(BeNil())
-
-			q := []domain.ProjectMember{}
-			Expect(testDatabase.DS.GormDB().Find(&q).Error).To(BeNil())
-			Expect(q).ToNot(BeNil())
-			Expect(len(q)).To(Equal(1))
-
-			Expect(q[0].MemberId).To(Equal(types.ID(222)))
-			Expect(q[0].ProjectId).To(Equal(g.ID))
-			Expect(q[0].Role).To(Equal(domain.ProjectRoleManager))
-		})
-
 		It("non non-administrator nor non-project manager can create project member", func() {
 			sec := testinfra.BuildSecCtx(types.ID(1), security.SystemAdminPermission.ID)
 			g, err := namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)

@@ -21,7 +21,7 @@ var (
 
 func CreateProjectMember(d *domain.ProjectMemberCreation, sec *security.Context) error {
 	return persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
-		if !sec.HasRole(security.SystemAdminPermission.ID) && !sec.HasRole(fmt.Sprintf("%s_%d", domain.RoleOwner, d.ProjectID)) {
+		if !sec.HasRole(security.SystemAdminPermission.ID) && !sec.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, d.ProjectID)) {
 			return bizerror.ErrForbidden
 		}
 
@@ -40,9 +40,9 @@ func CreateProjectMember(d *domain.ProjectMemberCreation, sec *security.Context)
 			return err
 		}
 
-		// only allow one owner in one project, create new owner will delete the old one
-		if d.Role == domain.RoleOwner {
-			if err := tx.Where("project_id = ? AND `role` LIKE ?", d.ProjectID, domain.RoleOwner).Delete(&domain.ProjectMember{}).Error; err != nil {
+		// only allow one manager in one project, create new manager will delete the old one
+		if d.Role == domain.ProjectRoleManager {
+			if err := tx.Where("project_id = ? AND `role` LIKE ?", d.ProjectID, domain.ProjectRoleManager).Delete(&domain.ProjectMember{}).Error; err != nil {
 				return err
 			}
 		}
@@ -123,7 +123,7 @@ func DetailProjectMembers(pms *[]domain.ProjectMember) (*[]domain.ProjectMemberD
 }
 
 func DeleteProjectMember(d *domain.ProjectMemberDeletion, sec *security.Context) error {
-	if !sec.HasRole(security.SystemAdminPermission.ID) && !sec.HasRole(fmt.Sprintf("%s_%d", domain.RoleOwner, d.ProjectID)) {
+	if !sec.HasRole(security.SystemAdminPermission.ID) && !sec.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, d.ProjectID)) {
 		return bizerror.ErrForbidden
 	}
 
@@ -136,8 +136,17 @@ func DeleteProjectMember(d *domain.ProjectMemberDeletion, sec *security.Context)
 			return err
 		}
 
-		if record.Role == domain.RoleOwner {
-			return bizerror.ErrProjectOwnerDelete
+		// must have at least one manager for a project
+		if record.Role == domain.ProjectRoleManager {
+			var otherManagerCount int
+			if err := tx.Model(&domain.ProjectMember{}).
+				Where("project_id = ? AND member_id != ? AND role = ?", d.ProjectID, d.MemberID, domain.ProjectRoleManager).
+				Count(&otherManagerCount).Error; err != nil {
+				return err
+			}
+			if otherManagerCount == 0 {
+				return bizerror.ErrLastProjectManagerDelete
+			}
 		}
 
 		return tx.Where("project_id = ? AND member_id = ?", d.ProjectID, d.MemberID).Delete(&domain.ProjectMember{}).Error

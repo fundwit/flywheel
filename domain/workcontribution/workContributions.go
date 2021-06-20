@@ -65,7 +65,7 @@ func CheckContributorWorkPermission(workKey string, contributorId types.ID, sec 
 	}
 
 	if sec.Identity.ID != contributorId {
-		if !sec.HasRole(security.SystemAdminPermission.ID) && !sec.HasRole(fmt.Sprintf("%s_%d", domain.RoleOwner, work.ProjectID)) {
+		if !sec.HasRole(security.SystemAdminPermission.ID) && !sec.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, work.ProjectID)) {
 			return nil, nil, bizerror.ErrForbidden // only system admin and project manager can assign work to other member
 		}
 

@@ -200,7 +200,7 @@ func (m *WorkflowManager) UpdateWorkflowBase(id types.ID, c *WorkflowBaseUpdatio
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&wf).Error; err != nil {
 			return err
 		}
-		if !sec.HasRoleSuffix("owner_" + wf.ProjectID.String()) {
+		if !sec.HasRoleSuffix(domain.ProjectRoleManager + "_" + wf.ProjectID.String()) {
 			return bizerror.ErrForbidden
 		}
 		if err := tx.Model(&domain.Workflow{}).Where(&domain.Workflow{ID: id}).
@@ -226,7 +226,7 @@ func (m *WorkflowManager) DeleteWorkflow(id types.ID, sec *security.Context) err
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&wf).Error; err != nil {
 			return err
 		}
-		if !sec.HasRoleSuffix("owner_" + wf.ProjectID.String()) {
+		if !sec.HasRoleSuffix(domain.ProjectRoleManager + "_" + wf.ProjectID.String()) {
 			return bizerror.ErrForbidden
 		}
 
@@ -257,7 +257,7 @@ func (m *WorkflowManager) CreateWorkflowStateTransitions(id types.ID, transition
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&workflow).Error; err != nil {
 			return err
 		}
-		if !sec.HasRoleSuffix("owner_" + workflow.ProjectID.String()) {
+		if !sec.HasRoleSuffix(domain.ProjectRoleManager + "_" + workflow.ProjectID.String()) {
 			return bizerror.ErrForbidden
 		}
 
@@ -295,7 +295,7 @@ func (m *WorkflowManager) DeleteWorkflowStateTransitions(id types.ID, transition
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&wf).Error; err != nil {
 			return err
 		}
-		if !sec.HasRoleSuffix("owner_" + wf.ProjectID.String()) {
+		if !sec.HasRoleSuffix(domain.ProjectRoleManager + "_" + wf.ProjectID.String()) {
 			return bizerror.ErrForbidden
 		}
 
@@ -319,7 +319,7 @@ func (m *WorkflowManager) UpdateWorkflowState(id types.ID, updating WorkflowStat
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&workflow).Error; err != nil {
 			return err
 		}
-		if !sec.HasRoleSuffix("owner_" + workflow.ProjectID.String()) {
+		if !sec.HasRoleSuffix(domain.ProjectRoleManager + "_" + workflow.ProjectID.String()) {
 			return bizerror.ErrForbidden
 		}
 

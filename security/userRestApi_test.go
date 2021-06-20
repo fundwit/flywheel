@@ -39,8 +39,8 @@ var _ = Describe("UserRestApi", func() {
 		It("should success when token is valid", func() {
 			token := uuid.New().String()
 			security.TokenCache.Set(token, &security.Context{Token: token, Identity: security.Identity{Name: "ann", ID: 1},
-				Perms: []string{"owner_1"}, ProjectRoles: []domain.ProjectRole{{
-					Role: "owner", ProjectName: "project1", ProjectIdentifier: "TES", ProjectID: types.ID(1),
+				Perms: []string{domain.ProjectRoleManager + "_1"}, ProjectRoles: []domain.ProjectRole{{
+					Role: domain.ProjectRoleManager, ProjectName: "project1", ProjectIdentifier: "TES", ProjectID: types.ID(1),
 				}}}, cache.DefaultExpiration)
 
 			req := httptest.NewRequest(http.MethodGet, "/me", nil)
@@ -48,7 +48,7 @@ var _ = Describe("UserRestApi", func() {
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"identity":{"id":"1","name":"ann"}, "token":"` + token +
-				`", "perms":["owner_1"], "projectRoles":[{"projectId":"1", "projectName":"project1", "projectIdentifier":"TES", "role":"owner"}]}`))
+				`", "perms":["` + domain.ProjectRoleManager + `_1"], "projectRoles":[{"projectId":"1", "projectName":"project1", "projectIdentifier":"TES", "role":"` + domain.ProjectRoleManager + `"}]}`))
 		})
 
 		It("should failed when token is missing", func() {

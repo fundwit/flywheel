@@ -46,8 +46,8 @@ var _ = Describe("SessionRestApi", func() {
 			time.Sleep(1 * time.Millisecond)
 			token := uuid.New().String()
 			security.TokenCache.Set(token, &security.Context{Token: token, Identity: security.Identity{Name: "ann", ID: 1},
-				Perms: []string{"owner_1"}, ProjectRoles: []domain.ProjectRole{{
-					Role: "owner", ProjectName: "project1", ProjectIdentifier: "TES", ProjectID: types.ID(1),
+				Perms: []string{domain.ProjectRoleManager + "_1"}, ProjectRoles: []domain.ProjectRole{{
+					Role: domain.ProjectRoleManager, ProjectName: "project1", ProjectIdentifier: "TES", ProjectID: types.ID(1),
 				}}, SigningTime: time.Now()}, cache.DefaultExpiration)
 
 			security.LoadPermFunc = func(uid types.ID) (security.Permissions, security.VisiableProjects) {
@@ -86,8 +86,8 @@ var _ = Describe("SessionRestApi", func() {
 			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 2, Name: "ann", Secret: security.HashSha256("abc123")}).Error).To(BeNil())
 			token := uuid.New().String()
 			security.TokenCache.Set(token, &security.Context{Token: token, Identity: security.Identity{Name: "ann", ID: 1},
-				Perms: []string{"owner_1"}, ProjectRoles: []domain.ProjectRole{{
-					Role: "owner", ProjectName: "project1", ProjectIdentifier: "TES", ProjectID: types.ID(1),
+				Perms: []string{domain.ProjectRoleManager + "_1"}, ProjectRoles: []domain.ProjectRole{{
+					Role: domain.ProjectRoleManager + "", ProjectName: "project1", ProjectIdentifier: "TES", ProjectID: types.ID(1),
 				}}, SigningTime: time.Now().AddDate(0, 0, -1)}, cache.DefaultExpiration)
 
 			req := httptest.NewRequest(http.MethodGet, "/v1/session", nil)

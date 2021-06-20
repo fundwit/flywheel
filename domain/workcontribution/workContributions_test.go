@@ -56,7 +56,7 @@ var _ = Describe("WorkContributions", func() {
 
 	Describe("CheckContributorWorkPermission", func() {
 		It("should return error when contributor is not found or when work is not found", func() {
-			sec := &security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{"owner_" + givenWork.ProjectID.String()}}
+			sec := &security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}}
 
 			// work not exist
 			work, user, err := workcontribution.CheckContributorWorkPermission("TES-404", grantedUser.ID, sec)
@@ -80,7 +80,7 @@ var _ = Describe("WorkContributions", func() {
 			Expect(work).To(BeNil())
 			Expect(user).To(BeNil())
 
-			// session user: neither admin nor owner of work's project     => Forbidden
+			// session user: neither admin nor manager of work's project     => Forbidden
 			// contributor : -
 			work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, ungrantedUser.ID,
 				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{"guest_" + givenWork.ProjectID.String()}})
@@ -96,10 +96,10 @@ var _ = Describe("WorkContributions", func() {
 			Expect(work).To(BeNil())
 			Expect(user).To(BeNil())
 
-			// session user: owner of work's project        => OK
+			// session user: manager of work's project        => OK
 			// contributor : not member of work's project   => NoContent
 			work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, ungrantedUser.ID,
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{"owner_" + givenWork.ProjectID.String()}})
+				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}})
 			Expect(err).To(Equal(bizerror.ErrNoContent))
 			Expect(work).To(BeNil())
 			Expect(user).To(BeNil())
@@ -108,7 +108,7 @@ var _ = Describe("WorkContributions", func() {
 			// contributor : member of work's project            => OK
 			security.LoadPermFunc = func(uid types.ID) (security.Permissions, security.VisiableProjects) {
 				return []string{"guest_" + givenWork.ProjectID.String()},
-					[]domain.ProjectRole{{ProjectID: givenWork.ProjectID, ProjectName: "demo project", ProjectIdentifier: "TES", Role: "owner"}}
+					[]domain.ProjectRole{{ProjectID: givenWork.ProjectID, ProjectName: "demo project", ProjectIdentifier: "TES", Role: domain.ProjectRoleManager + ""}}
 			}
 			work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, grantedUser.ID,
 				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{security.SystemAdminPermission.ID}})
@@ -116,10 +116,10 @@ var _ = Describe("WorkContributions", func() {
 			Expect(*work).To(Equal(*givenWork))
 			Expect(*user).To(Equal(*grantedUser))
 
-			// session user: owner of work's project             => OK
+			// session user: manager of work's project             => OK
 			// contributor : member of work's project            => OK
 			work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, grantedUser.ID,
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{"owner_" + givenWork.ProjectID.String()}})
+				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}})
 			Expect(err).To(BeNil())
 			Expect(*work).To(Equal(*givenWork))
 			Expect(*user).To(Equal(*grantedUser))

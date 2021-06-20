@@ -38,7 +38,7 @@ func CreateProject(c *domain.ProjectCreating, sec *security.Context) (*domain.Pr
 
 	now := time.Now()
 	g := domain.Project{ID: common.NextId(idWorker), Name: c.Name, Identifier: c.Identifier, NextWorkId: 1, CreateTime: now, Creator: sec.Identity.ID}
-	r := domain.ProjectMember{ProjectId: g.ID, MemberId: sec.Identity.ID, Role: domain.RoleOwner, CreateTime: now}
+	r := domain.ProjectMember{ProjectId: g.ID, MemberId: sec.Identity.ID, Role: domain.ProjectRoleManager, CreateTime: now}
 	err := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(g).Error; err != nil {
 			return err

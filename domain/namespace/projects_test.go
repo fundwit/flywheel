@@ -28,7 +28,7 @@ var _ = Describe("Projects", func() {
 	})
 
 	Describe("CreateProject", func() {
-		It("should be able to create project with a default owner member", func() {
+		It("should be able to create project with a default manager member", func() {
 			sec := testinfra.BuildSecCtx(types.ID(1), security.SystemAdminPermission.ID)
 			g, err := namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).To(BeNil())
@@ -46,7 +46,7 @@ var _ = Describe("Projects", func() {
 			Expect(len(r)).To(Equal(1))
 			Expect(r[0].ProjectId).To(Equal(g.ID))
 			Expect(r[0].MemberId).To(Equal(types.ID(1)))
-			Expect(r[0].Role).To(Equal("owner"))
+			Expect(r[0].Role).To(Equal(domain.ProjectRoleManager))
 			Expect(r[0].CreateTime).ToNot(BeNil())
 
 			var q []domain.Project
@@ -135,15 +135,15 @@ var _ = Describe("Projects", func() {
 	Describe("QueryProjectRole", func() {
 		It("should return actual role if project is accessible for user", func() {
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.ProjectMember{ProjectId: 1, MemberId: 2, Role: domain.RoleOwner, CreateTime: time.Now()}).Error).To(BeNil())
+				&domain.ProjectMember{ProjectId: 1, MemberId: 2, Role: domain.ProjectRoleManager, CreateTime: time.Now()}).Error).To(BeNil())
 
 			b, err := namespace.QueryProjectRole(1, testinfra.BuildSecCtx(types.ID(2)))
-			Expect(b).To(Equal("owner"))
+			Expect(b).To(Equal(domain.ProjectRoleManager))
 			Expect(err).To(BeNil())
 		})
 		It("should return empty if project is not accessible for user", func() {
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.ProjectMember{ProjectId: 1, MemberId: 3, Role: "owner", CreateTime: time.Now()}).Error).To(BeNil())
+				&domain.ProjectMember{ProjectId: 1, MemberId: 3, Role: domain.ProjectRoleManager, CreateTime: time.Now()}).Error).To(BeNil())
 
 			b, err := namespace.QueryProjectRole(1, testinfra.BuildSecCtx(types.ID(2)))
 			Expect(b).To(BeEmpty())

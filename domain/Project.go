@@ -1,8 +1,9 @@
 package domain
 
 import (
-	"github.com/fundwit/go-commons/types"
 	"time"
+
+	"github.com/fundwit/go-commons/types"
 )
 
 type Project struct {
@@ -26,4 +27,5 @@ type ProjectUpdating struct {
 	Name string `json:"name" binding:"required,lte=60"`
 }
 
-const RoleOwner = "owner"
+const ProjectRoleManager = "manager"
+const ProjectRoleCommon = "common"

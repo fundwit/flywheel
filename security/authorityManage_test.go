@@ -88,7 +88,7 @@ var _ = Describe("AuthorityManage", func() {
 	})
 
 	Describe("LoadPerms", func() {
-		It("should return actual permissions when matched", func() {
+		It("should return actual project permissions for non system role user", func() {
 			now := time.Now()
 			Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.ProjectMember{}, &domain.Project{}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
@@ -113,7 +113,7 @@ var _ = Describe("AuthorityManage", func() {
 			Expect(len(gr)).To(Equal(0))
 		})
 
-		It("should return actual permissions with system permissions", func() {
+		It("should return aggregated permissions for system role user", func() {
 			Expect(security.DefaultSecurityConfiguration()).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Save(&security.UserRoleBinding{UserID: 3, RoleID: "system-admin"}).Error).To(BeNil())
 
@@ -125,20 +125,19 @@ var _ = Describe("AuthorityManage", func() {
 				&domain.Project{ID: 20, Name: "project20", Identifier: "20", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
 
 			Expect(testDatabase.DS.GormDB().Create(
-				&domain.ProjectMember{ProjectId: 1, MemberId: 3, Role: domain.ProjectRoleManager + "", CreateTime: now}).Error).To(BeNil())
-			Expect(testDatabase.DS.GormDB().Create(
 				&domain.ProjectMember{ProjectId: 10, MemberId: 30, Role: "viewer", CreateTime: now}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(
 				&domain.ProjectMember{ProjectId: 20, MemberId: 3, Role: "viewer", CreateTime: now}).Error).To(BeNil())
 
 			s, gr := security.LoadPermFunc(3)
-			Expect(s).To(Equal(security.Permissions{"system:admin", domain.ProjectRoleManager + "_1", "viewer_20"}))
+			Expect(s).To(Equal(security.Permissions{"system:admin", domain.ProjectRoleManager + "_1", "manager_20"}))
 			Expect(gr).To(Equal(security.VisiableProjects{{ProjectID: 1, ProjectName: "project1", Role: domain.ProjectRoleManager + "", ProjectIdentifier: "1"},
-				{ProjectID: 20, ProjectName: "project20", ProjectIdentifier: "20", Role: "viewer"}}))
+				{ProjectID: 20, ProjectName: "project20", ProjectIdentifier: "20", Role: "manager"}}))
 
 			s, gr = security.LoadPermFunc(1)
-			Expect(s).To(Equal(security.Permissions{"system:admin"}))
-			Expect(len(gr)).To(Equal(0))
+			Expect(s).To(Equal(security.Permissions{"system:admin", domain.ProjectRoleManager + "_1", "manager_20"}))
+			Expect(gr).To(Equal(security.VisiableProjects{{ProjectID: 1, ProjectName: "project1", Role: domain.ProjectRoleManager + "", ProjectIdentifier: "1"},
+				{ProjectID: 20, ProjectName: "project20", ProjectIdentifier: "20", Role: "manager"}}))
 
 			s, gr = security.LoadPermFunc(100)
 			Expect(s).To(Equal(security.Permissions{}))

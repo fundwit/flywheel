@@ -90,6 +90,7 @@ func DefaultSecurityConfiguration() error {
 // as a simple initial solution, we use project member relationship as the metadata of permissions
 func loadPerms(uid types.ID) (Permissions, VisiableProjects) {
 	var roles []string
+	var projectRoles []domain.ProjectRole
 	db := persistence.ActiveDataSourceManager.GormDB()
 
 	// system perms
@@ -97,53 +98,63 @@ func loadPerms(uid types.ID) (Permissions, VisiableProjects) {
 	if err := db.Model(&UserRoleBinding{}).Where(&UserRoleBinding{UserID: uid}).Pluck("role_id", &systemRoles).Error; err != nil {
 		panic(err)
 	}
+
 	if len(systemRoles) > 0 {
 		var systemPerms []string
 		if err := db.Model(&RolePermissionBinding{}).Where("role_id IN (?)", systemRoles).Pluck("permission_id", &systemPerms).Error; err != nil {
 			panic(err)
 		}
-		for _, perm := range systemPerms {
-			roles = append(roles, perm)
-		}
+		roles = append(roles, systemPerms...)
 	}
 
-	// project role
-	var gms []domain.ProjectMember
-	if err := db.Model(&domain.ProjectMember{}).Where(&domain.ProjectMember{MemberId: uid}).Scan(&gms).Error; err != nil {
-		panic(err)
-	}
-
-	var projectRoles []domain.ProjectRole
-	var projectIds []types.ID
-	for _, gm := range gms {
-		roles = append(roles, fmt.Sprintf("%s_%d", gm.Role, gm.ProjectId))
-		projectRoles = append(projectRoles, domain.ProjectRole{Role: gm.Role, ProjectID: gm.ProjectId})
-		projectIds = append(projectIds, gm.ProjectId)
-	}
-
-	m := map[types.ID]domain.Project{}
-	if len(projectIds) > 0 {
+	if len(systemRoles) > 0 {
+		// system role: all project is visiabble
 		var projects []domain.Project
-		if err := persistence.ActiveDataSourceManager.GormDB().Model(&domain.Project{}).Where("id in (?)", projectIds).Scan(&projects).Error; err != nil {
+		if err := db.Model(&domain.Project{}).Scan(&projects).Error; err != nil {
 			panic(err)
 		}
 		for _, project := range projects {
-			m[project.ID] = project
+			roles = append(roles, fmt.Sprintf("%s_%d", domain.ProjectRoleManager, project.ID))
+			projectRoles = append(projectRoles, domain.ProjectRole{
+				ProjectID: project.ID, ProjectName: project.Name, ProjectIdentifier: project.Identifier, Role: domain.ProjectRoleManager,
+			})
 		}
-	}
-
-	for i := 0; i < len(projectRoles); i++ {
-		projectRole := projectRoles[i]
-
-		project := m[projectRole.ProjectID]
-		if (project == domain.Project{}) {
-			panic(errors.New("project " + projectRole.ProjectID.String() + " is not exist"))
+	} else {
+		var gms []domain.ProjectMember
+		var visiableProjectIds []types.ID
+		if err := db.Model(&domain.ProjectMember{}).Where(&domain.ProjectMember{MemberId: uid}).Scan(&gms).Error; err != nil {
+			panic(err)
 		}
 
-		projectRole.ProjectName = project.Name
-		projectRole.ProjectIdentifier = project.Identifier
+		for _, gm := range gms {
+			roles = append(roles, fmt.Sprintf("%s_%d", gm.Role, gm.ProjectId))
+			projectRoles = append(projectRoles, domain.ProjectRole{Role: gm.Role, ProjectID: gm.ProjectId})
+			visiableProjectIds = append(visiableProjectIds, gm.ProjectId)
+		}
 
-		projectRoles[i] = projectRole
+		m := map[types.ID]domain.Project{}
+		if len(visiableProjectIds) > 0 {
+			var visiableProjects []domain.Project
+			if err := db.Model(&domain.Project{}).Where("id in (?)", visiableProjectIds).Scan(&visiableProjects).Error; err != nil {
+				panic(err)
+			}
+			for _, project := range visiableProjects {
+				m[project.ID] = project
+			}
+		}
+		for i := 0; i < len(projectRoles); i++ {
+			projectRole := projectRoles[i]
+
+			project := m[projectRole.ProjectID]
+			if (project == domain.Project{}) {
+				panic(errors.New("project " + projectRole.ProjectID.String() + " is not exist"))
+			}
+
+			projectRole.ProjectName = project.Name
+			projectRole.ProjectIdentifier = project.Identifier
+
+			projectRoles[i] = projectRole
+		}
 	}
 
 	if roles == nil {
@@ -152,5 +163,6 @@ func loadPerms(uid types.ID) (Permissions, VisiableProjects) {
 	if projectRoles == nil {
 		projectRoles = []domain.ProjectRole{}
 	}
+
 	return roles, projectRoles
 }

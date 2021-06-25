@@ -170,7 +170,7 @@ var _ = Describe("WorkflowHandler", func() {
 
 		It("should return 404 when workflow is not exist", func() {
 			workflowManager.DetailWorkflowFunc = func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
-				return nil, domain.ErrNotFound
+				return nil, bizerror.ErrNotFound
 			}
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/2", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
@@ -219,7 +219,7 @@ var _ = Describe("WorkflowHandler", func() {
 
 		It("should return 404 when workflow is not exist", func() {
 			workflowManager.UpdateWorkflowBaseFunc = func(ID types.ID, updating *flow.WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error) {
-				return nil, domain.ErrNotFound
+				return nil, bizerror.ErrNotFound
 			}
 
 			reqBody, err := json.Marshal(&flow.WorkflowBaseUpdation{Name: "updated works", ThemeColor: "yellow", ThemeIcon: "arrow"})
@@ -341,7 +341,7 @@ var _ = Describe("WorkflowHandler", func() {
 
 		It("should return 404 when workflow is not exists", func() {
 			workflowManager.DetailWorkflowFunc = func(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
-				return nil, domain.ErrNotFound
+				return nil, bizerror.ErrNotFound
 			}
 
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/2/transitions?fromState=PENDING", nil)
@@ -409,7 +409,7 @@ var _ = Describe("WorkflowHandler", func() {
 
 		It("should return 404 when workflow is not exist", func() {
 			workflowManager.CreateWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *security.Context) error {
-				return domain.ErrNotFound
+				return bizerror.ErrNotFound
 			}
 
 			reqBody, err := json.Marshal(&[]state.Transition{{Name: "test", From: "PENDING", To: "DOING"}})
@@ -499,7 +499,7 @@ var _ = Describe("WorkflowHandler", func() {
 
 		It("should return 404 when workflow is not exist", func() {
 			workflowManager.DeleteWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *security.Context) error {
-				return domain.ErrNotFound
+				return bizerror.ErrNotFound
 			}
 
 			reqBody, err := json.Marshal(&[]state.Transition{{Name: "test", From: "PENDING", To: "DOING"}})
@@ -564,7 +564,7 @@ var _ = Describe("WorkflowHandler", func() {
 
 		It("should return 404 when workflow is not exist", func() {
 			workflowManager.UpdateWorkflowStateFunc = func(id types.ID, updating flow.WorkflowStateUpdating, sec *security.Context) error {
-				return domain.ErrNotFound
+				return bizerror.ErrNotFound
 			}
 
 			reqBody, err := json.Marshal(&flow.WorkflowStateUpdating{OriginName: "PENDING", Name: "QUEUED", Order: 2000})
@@ -653,7 +653,7 @@ var _ = Describe("WorkflowHandler", func() {
 
 		It("should return 404 when workflow is not exist", func() {
 			workflowManager.UpdateStateRangeOrdersFunc = func(workflowID types.ID, wantedOrders *[]flow.StateOrderRangeUpdating, sec *security.Context) error {
-				return domain.ErrNotFound
+				return bizerror.ErrNotFound
 			}
 
 			reqBody, err := json.Marshal(&[]flow.StateOrderRangeUpdating{})
@@ -732,7 +732,7 @@ var _ = Describe("WorkflowHandler", func() {
 
 		It("should return 404 when workflow is not exist when creating state", func() {
 			workflowManager.CreateStateFunc = func(workflowID types.ID, creating *flow.StateCreating, sec *security.Context) error {
-				return domain.ErrNotFound
+				return bizerror.ErrNotFound
 			}
 
 			reqBody, err := json.Marshal(&flow.StateCreating{Name: "test", Category: 1, Order: 20001})

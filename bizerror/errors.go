@@ -14,6 +14,7 @@ var ErrStateInvalid = errors.New("state is invalid")
 var ErrStateCategoryInvalid = errors.New("state category is invalid")
 var ErrArchiveStatusInvalid = errors.New("archive status is invalid")
 
+var ErrNotFound = errors.New("not found")
 var ErrNoContent = errors.New("no content")
 var ErrInvalidPassword = errors.New("invalid password")
 

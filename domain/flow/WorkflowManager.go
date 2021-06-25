@@ -157,7 +157,7 @@ func (m *WorkflowManager) DetailWorkflow(id types.ID, sec *security.Context) (*d
 			from, fromStateFound := stateMachine.FindState(record.FromState)
 			to, toStateFound := stateMachine.FindState(record.ToState)
 			if !fromStateFound || !toStateFound {
-				return domain.ErrInvalidState
+				return bizerror.ErrStateInvalid
 			}
 			stateMachine.Transitions = append(stateMachine.Transitions, state.Transition{Name: record.Name, From: from.Name, To: to.Name})
 		}

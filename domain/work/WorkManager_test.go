@@ -380,7 +380,7 @@ var _ = Describe("WorkManager", func() {
 				testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 			Expect(err).ToNot(BeNil())
 			Expect(works).To(BeNil())
-			Expect(err.Error()).To(Equal("invalid state"))
+			Expect(err).To(Equal(bizerror.ErrStateInvalid))
 		})
 	})
 
@@ -454,7 +454,7 @@ var _ = Describe("WorkManager", func() {
 				testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 			Expect(err).ToNot(BeNil())
 			Expect(updatedWork).To(BeNil())
-			Expect(err.Error()).To(Equal("invalid state"))
+			Expect(err).To(Equal(bizerror.ErrStateInvalid))
 		})
 
 		It("should failed when work is archived when update work", func() {

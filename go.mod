@@ -3,6 +3,8 @@ module flywheel
 go 1.14
 
 require (
+	github.com/aliyun/aliyun-oss-go-sdk v2.1.8+incompatible
+	github.com/baiyubin/aliyun-sts-go-sdk v0.0.0-20180326062324-cfa1a18b161f // indirect
 	github.com/fundwit/go-chars v0.1.0
 	github.com/fundwit/go-commons v0.1.2
 	github.com/gin-gonic/gin v1.6.3
@@ -13,6 +15,8 @@ require (
 	github.com/onsi/ginkgo v1.14.2
 	github.com/onsi/gomega v1.10.4
 	github.com/patrickmn/go-cache v2.1.0+incompatible
+	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.7.0
 	github.com/sony/sonyflake v1.0.0
+	golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6 // indirect
 )

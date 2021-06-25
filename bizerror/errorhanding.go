@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"flywheel/common"
-	"flywheel/domain"
 	"flywheel/i18n"
 	"fmt"
 	"io"
@@ -95,7 +94,7 @@ func HandleError(c *gin.Context, err error) {
 		c.Abort()
 		return
 	}
-	if errors.Is(genericErr, gorm.ErrRecordNotFound) || errors.Is(genericErr, domain.ErrNotFound) {
+	if errors.Is(genericErr, gorm.ErrRecordNotFound) || errors.Is(genericErr, ErrNotFound) {
 		c.JSON(http.StatusNotFound, &common.ErrorBody{Code: "common.record_not_found", Message: "record not found"})
 		c.Abort()
 		return

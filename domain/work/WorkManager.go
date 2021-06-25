@@ -88,7 +88,7 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 
 		stateFound, found := workflow.FindState(work.StateName)
 		if !found {
-			return nil, domain.ErrInvalidState
+			return nil, bizerror.ErrStateInvalid
 		}
 		works[i].State = stateFound
 	}
@@ -115,7 +115,7 @@ func (m *WorkManager) WorkDetail(identifier string, sec *security.Context) (*dom
 	workDetail.Type = workflowDetail.Workflow
 	stateFound, found := workflowDetail.FindState(workDetail.StateName)
 	if !found {
-		return nil, domain.ErrInvalidState
+		return nil, bizerror.ErrStateInvalid
 	}
 	workDetail.State = stateFound
 
@@ -208,7 +208,7 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *secur
 		}
 		stateFound, found := workflowDetail.FindState(updatedWork.StateName)
 		if !found {
-			return domain.ErrInvalidState
+			return bizerror.ErrStateInvalid
 		}
 		updatedWork.State = stateFound
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flywheel/app/avatar"
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/flow"
@@ -78,6 +79,9 @@ func main() {
 	servehttp.RegisterWorkStateTransitionHandler(engine, workProcessManager, securityMiddle)
 	servehttp.RegisterWorkProcessStepHandler(engine, workProcessManager, securityMiddle)
 	workcontribution.RegisterWorkContributionsHandlers(engine, securityMiddle)
+
+	avatar.RegisterAvatarAPI(engine, securityMiddle)
+	avatar.Bootstrap()
 
 	err = engine.Run(":80")
 	if err != nil {

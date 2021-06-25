@@ -7,12 +7,13 @@ import (
 	"flywheel/domain/flow"
 	"flywheel/domain/state"
 	"flywheel/security"
+	"net/http"
+	"strconv"
+
 	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"net/http"
-	"strconv"
 )
 
 type TransitionQuery struct {

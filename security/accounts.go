@@ -58,11 +58,28 @@ func CreateUser(c *UserCreation, sec *Context) (*UserInfo, error) {
 		return nil, bizerror.ErrForbidden
 	}
 
-	user := User{ID: common.NextId(userIdWorker), Name: c.Name, Secret: HashSha256(c.Secret)}
+	user := User{ID: common.NextId(userIdWorker), Name: c.Name, Nickname: c.Nickname, Secret: HashSha256(c.Secret)}
 	if err := persistence.ActiveDataSourceManager.GormDB().Save(&user).Error; err != nil {
 		return nil, err
 	}
-	return &UserInfo{ID: user.ID, Name: user.Name}, nil
+	return &UserInfo{ID: user.ID, Name: user.Name, Nickname: user.Nickname}, nil
+}
+
+func UpdateUser(userId types.ID, c *UserUpdation, sec *Context) error {
+	if !sec.HasRole(SystemAdminPermission.ID) && userId != sec.Identity.ID {
+		return bizerror.ErrForbidden
+	}
+
+	return persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+		user := User{ID: userId}
+		if err := tx.Where(&user).First(&user).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&user).Update(&User{Nickname: c.Nickname}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 func QueryAccountNames(ids []types.ID) (map[types.ID]string, error) {
@@ -76,7 +93,7 @@ func QueryAccountNames(ids []types.ID) (map[types.ID]string, error) {
 	}
 	result := map[types.ID]string{}
 	for _, r := range records {
-		result[r.ID] = r.Name
+		result[r.ID] = r.DisplayName()
 	}
 	return result, nil
 }

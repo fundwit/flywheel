@@ -45,7 +45,7 @@ var _ = Describe("SessionRestApi", func() {
 			begin := time.Now()
 			time.Sleep(1 * time.Millisecond)
 			token := uuid.New().String()
-			security.TokenCache.Set(token, &security.Context{Token: token, Identity: security.Identity{Name: "ann", ID: 1},
+			security.TokenCache.Set(token, &security.Context{Token: token, Identity: security.Identity{Name: "ann", Nickname: "Ann", ID: 1},
 				Perms: []string{domain.ProjectRoleManager + "_1"}, ProjectRoles: []domain.ProjectRole{{
 					Role: domain.ProjectRoleManager, ProjectName: "project1", ProjectIdentifier: "TES", ProjectID: types.ID(1),
 				}}, SigningTime: time.Now()}, cache.DefaultExpiration)
@@ -57,7 +57,7 @@ var _ = Describe("SessionRestApi", func() {
 			req.AddCookie(&http.Cookie{Name: security.KeySecToken, Value: token})
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(body).To(MatchJSON(`{"identity":{"id":"1","name":"ann"}, "token":"` + token +
+			Expect(body).To(MatchJSON(`{"identity":{"id":"1","name":"ann", "nickname":"Ann"}, "token":"` + token +
 				`", "perms":["manager_1"], "projectRoles":[{"projectId":"1", "projectName":"project1new", "projectIdentifier":"TES", "role":"manager"}]}`))
 
 			// existed in token cache
@@ -69,7 +69,7 @@ var _ = Describe("SessionRestApi", func() {
 			Expect((*secCtx).SigningTime.After(begin) && (*secCtx).SigningTime.Before(time.Now()))
 			Expect(*secCtx).To(Equal(security.Context{
 				Token:        token,
-				Identity:     security.Identity{ID: 1, Name: "ann"},
+				Identity:     security.Identity{ID: 1, Name: "ann", Nickname: "Ann"},
 				Perms:        []string{"manager_1"},
 				ProjectRoles: []domain.ProjectRole{{ProjectID: 1, ProjectName: "project1new", ProjectIdentifier: "TES", Role: "manager"}},
 				SigningTime:  (*secCtx).SigningTime}))

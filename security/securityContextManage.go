@@ -22,15 +22,34 @@ type User struct {
 	ID     types.ID `json:"id"`
 	Name   string   `json:"name"`
 	Secret string   `json:"secret"`
+
+	Nickname string `json:"nickname"`
 }
 
 type UserInfo struct {
-	ID   types.ID `json:"id"`
-	Name string   `json:"name"`
+	ID       types.ID `json:"id"`
+	Name     string   `json:"name"`
+	Nickname string   `json:"nickname"`
 }
 
 const KeySecCtx = "SecCtx"
 const KeySecToken = "sec_token"
+
+func (u User) DisplayName() string {
+	if u.Nickname != "" {
+		return u.Nickname
+	} else {
+		return u.Name
+	}
+}
+
+func (u UserInfo) DisplayName() string {
+	if u.Nickname != "" {
+		return u.Nickname
+	} else {
+		return u.Name
+	}
+}
 
 func FindSecurityContext(ctx *gin.Context) *Context {
 	value, found := ctx.Get(KeySecCtx)

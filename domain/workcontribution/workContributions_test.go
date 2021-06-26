@@ -39,8 +39,9 @@ var _ = Describe("WorkContributions", func() {
 			return security.Permissions{}, security.VisiableProjects{}
 		}
 		// given a work and a user
-		grantedUser = &security.User{ID: 10, Name: "test user", Secret: "123"}
+		grantedUser = &security.User{ID: 10, Name: "testUser", Nickname: "Test User", Secret: "123"}
 		Expect(db.Save(grantedUser).Error).To(BeNil())
+
 		ungrantedUser = &security.User{ID: 11, Name: "test user 11", Secret: "123"}
 		Expect(db.Save(ungrantedUser).Error).To(BeNil())
 
@@ -182,7 +183,7 @@ var _ = Describe("WorkContributions", func() {
 			Expect(record.ID).To(Equal(id))
 			Expect(record.WorkKey).To(Equal(givenWork.Identifier))
 			Expect(record.ContributorId).To(Equal(grantedUser.ID))
-			Expect(record.ContributorName).To(Equal(grantedUser.Name))
+			Expect(record.ContributorName).To(Equal(grantedUser.Nickname))
 			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID))
 			Expect(record.BeginTime.Time().Unix() >= begin.Round(time.Microsecond).Unix() && record.BeginTime.Time().Unix() <= time.Now().Round(time.Microsecond).Unix()).To(BeTrue())
 			Expect(record.EndTime).To(BeZero())
@@ -210,9 +211,9 @@ var _ = Describe("WorkContributions", func() {
 			Expect(record.ID).To(Equal(givenReocrd.ID))
 			Expect(record.WorkKey).To(Equal(givenReocrd.WorkKey))
 			Expect(record.ContributorId).To(Equal(givenReocrd.ContributorId))
-			Expect(record.ContributorName).To(Equal(grantedUser.Name))  // updated
-			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID)) // updated
-			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))   // not change any more
+			Expect(record.ContributorName).To(Equal(grantedUser.Nickname)) // updated
+			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID))    // updated
+			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))      // not change any more
 			Expect(record.EndTime).To(BeZero())
 			Expect(record.Effective).To(BeTrue())
 		})
@@ -239,10 +240,10 @@ var _ = Describe("WorkContributions", func() {
 			Expect(record.ID).To(Equal(givenReocrd.ID))
 			Expect(record.WorkKey).To(Equal(givenReocrd.WorkKey))
 			Expect(record.ContributorId).To(Equal(givenReocrd.ContributorId))
-			Expect(record.ContributorName).To(Equal(grantedUser.Name))  // updated
-			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID)) // updated
-			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))   // not change any more
-			Expect(record.EndTime).To(BeZero())                         // end time is reseted
+			Expect(record.ContributorName).To(Equal(grantedUser.Nickname)) // updated
+			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID))    // updated
+			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))      // not change any more
+			Expect(record.EndTime).To(BeZero())                            // end time is reseted
 			Expect(record.Effective).To(BeTrue())
 		})
 
@@ -268,11 +269,11 @@ var _ = Describe("WorkContributions", func() {
 			Expect(record.ID).To(Equal(givenReocrd.ID))
 			Expect(record.WorkKey).To(Equal(givenReocrd.WorkKey))
 			Expect(record.ContributorId).To(Equal(givenReocrd.ContributorId))
-			Expect(record.ContributorName).To(Equal(grantedUser.Name))  // updated
-			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID)) // updated
-			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))   // begin time not change any more
-			Expect(record.EndTime).To(BeZero())                         // end time update to zero
-			Expect(record.Effective).To(BeTrue())                       // effective update to true
+			Expect(record.ContributorName).To(Equal(grantedUser.Nickname)) // updated
+			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID))    // updated
+			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))      // begin time not change any more
+			Expect(record.EndTime).To(BeZero())                            // end time update to zero
+			Expect(record.Effective).To(BeTrue())                          // effective update to true
 		})
 	})
 
@@ -316,9 +317,9 @@ var _ = Describe("WorkContributions", func() {
 			Expect(record.ID).To(Equal(givenReocrd.ID))
 			Expect(record.WorkKey).To(Equal(givenReocrd.WorkKey))
 			Expect(record.ContributorId).To(Equal(givenReocrd.ContributorId))
-			Expect(record.ContributorName).To(Equal(grantedUser.Name))  // updated
-			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID)) // updated
-			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))   // begin time not change any more
+			Expect(record.ContributorName).To(Equal(grantedUser.Nickname)) // updated
+			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID))    // updated
+			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))      // begin time not change any more
 			Expect(record.EndTime.Time().Unix() >= begin.Round(time.Microsecond).Unix() && record.EndTime.Time().Unix() <= time.Now().Round(time.Microsecond).Unix()).To(BeTrue())
 			Expect(record.Effective).To(BeTrue()) // effective update to true
 		})
@@ -340,11 +341,11 @@ var _ = Describe("WorkContributions", func() {
 			Expect(record.ID).To(Equal(givenReocrd.ID))
 			Expect(record.WorkKey).To(Equal(givenReocrd.WorkKey))
 			Expect(record.ContributorId).To(Equal(givenReocrd.ContributorId))
-			Expect(record.ContributorName).To(Equal(grantedUser.Name))  // updated
-			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID)) // updated
-			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))   // begin time not change any more
-			Expect(record.EndTime).To(Equal(givenReocrd.EndTime))       // end time not change any more
-			Expect(record.Effective).To(BeTrue())                       // effective not change any more
+			Expect(record.ContributorName).To(Equal(grantedUser.Nickname)) // updated
+			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID))    // updated
+			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))      // begin time not change any more
+			Expect(record.EndTime).To(Equal(givenReocrd.EndTime))          // end time not change any more
+			Expect(record.Effective).To(BeTrue())                          // effective not change any more
 		})
 
 		It("should be able to finish work contribution when work contribution is discarded", func() {
@@ -364,11 +365,11 @@ var _ = Describe("WorkContributions", func() {
 			Expect(record.ID).To(Equal(givenReocrd.ID))
 			Expect(record.WorkKey).To(Equal(givenReocrd.WorkKey))
 			Expect(record.ContributorId).To(Equal(givenReocrd.ContributorId))
-			Expect(record.ContributorName).To(Equal(grantedUser.Name))  // updated
-			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID)) // updated
-			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))   // begin time not change any more
-			Expect(record.EndTime).To(Equal(givenReocrd.EndTime))       // end time not change any more
-			Expect(record.Effective).To(BeTrue())                       // effective update to true
+			Expect(record.ContributorName).To(Equal(grantedUser.Nickname)) // updated
+			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID))    // updated
+			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))      // begin time not change any more
+			Expect(record.EndTime).To(Equal(givenReocrd.EndTime))          // end time not change any more
+			Expect(record.Effective).To(BeTrue())                          // effective update to true
 		})
 	})
 
@@ -412,9 +413,9 @@ var _ = Describe("WorkContributions", func() {
 			Expect(record.ID).To(Equal(givenReocrd.ID))
 			Expect(record.WorkKey).To(Equal(givenReocrd.WorkKey))
 			Expect(record.ContributorId).To(Equal(givenReocrd.ContributorId))
-			Expect(record.ContributorName).To(Equal(grantedUser.Name))  // updated
-			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID)) // updated
-			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))   // begin time not change any more
+			Expect(record.ContributorName).To(Equal(grantedUser.Nickname)) // updated
+			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID))    // updated
+			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))      // begin time not change any more
 			Expect(record.EndTime.Time().Unix() >= begin.Round(time.Microsecond).Unix() && record.EndTime.Time().Unix() <= time.Now().Round(time.Microsecond).Unix()).To(BeTrue())
 			Expect(record.Effective).To(BeFalse()) // effective update to false
 		})
@@ -436,11 +437,11 @@ var _ = Describe("WorkContributions", func() {
 			Expect(record.ID).To(Equal(givenReocrd.ID))
 			Expect(record.WorkKey).To(Equal(givenReocrd.WorkKey))
 			Expect(record.ContributorId).To(Equal(givenReocrd.ContributorId))
-			Expect(record.ContributorName).To(Equal(grantedUser.Name))  // updated
-			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID)) // updated
-			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))   // begin time not change any more
-			Expect(record.EndTime).To(Equal(givenReocrd.EndTime))       // end time not change any more
-			Expect(record.Effective).To(BeFalse())                      // effective udpate to false
+			Expect(record.ContributorName).To(Equal(grantedUser.Nickname)) // updated
+			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID))    // updated
+			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))      // begin time not change any more
+			Expect(record.EndTime).To(Equal(givenReocrd.EndTime))          // end time not change any more
+			Expect(record.Effective).To(BeFalse())                         // effective udpate to false
 		})
 
 		It("should be able to discard work contribution when work contribution is discarded", func() {
@@ -460,11 +461,11 @@ var _ = Describe("WorkContributions", func() {
 			Expect(record.ID).To(Equal(givenReocrd.ID))
 			Expect(record.WorkKey).To(Equal(givenReocrd.WorkKey))
 			Expect(record.ContributorId).To(Equal(givenReocrd.ContributorId))
-			Expect(record.ContributorName).To(Equal(grantedUser.Name))  // updated
-			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID)) // updated
-			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))   // begin time not change any more
-			Expect(record.EndTime).To(Equal(givenReocrd.EndTime))       // end time not change any more
-			Expect(record.Effective).To(BeFalse())                      // effective not change any more
+			Expect(record.ContributorName).To(Equal(grantedUser.Nickname)) // updated
+			Expect(record.WorkProjectId).To(Equal(givenWork.ProjectID))    // updated
+			Expect(record.BeginTime).To(Equal(givenReocrd.BeginTime))      // begin time not change any more
+			Expect(record.EndTime).To(Equal(givenReocrd.EndTime))          // end time not change any more
+			Expect(record.Effective).To(BeFalse())                         // effective not change any more
 		})
 	})
 

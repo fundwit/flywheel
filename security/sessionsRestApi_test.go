@@ -40,7 +40,7 @@ var _ = Describe("SessionsRestApi", func() {
 
 	Describe("SimpleLoginHandler", func() {
 		It("should be able to login successfully", func() {
-			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 2, Name: "ann", Secret: security.HashSha256("abc123")}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 2, Name: "ann", Nickname: "Ann", Secret: security.HashSha256("abc123")}).Error).To(BeNil())
 
 			begin := time.Now()
 			time.Sleep(1 * time.Millisecond)
@@ -59,7 +59,7 @@ var _ = Describe("SessionsRestApi", func() {
 				token = k
 				break
 			}
-			Expect(body).To(MatchJSON(`{"identity":{"id":"2","name":"ann"}, "token":"` + token +
+			Expect(body).To(MatchJSON(`{"identity":{"id":"2","name":"ann", "nickname":"Ann"}, "token":"` + token +
 				`", "perms":[], "projectRoles":[]}`))
 			Expect(resp.Cookies()[0].Name).To(Equal(security.KeySecToken))
 			Expect(resp.Cookies()[0].Value).ToNot(BeEmpty())
@@ -71,7 +71,7 @@ var _ = Describe("SessionsRestApi", func() {
 			secCtx, ok := securityContextValue.(*security.Context)
 			Expect(ok).To(BeTrue())
 			Expect((*secCtx).SigningTime.After(begin) && (*secCtx).SigningTime.Before(time.Now()))
-			Expect(*secCtx).To(Equal(security.Context{Token: resp.Cookies()[0].Value, Identity: security.Identity{ID: 2, Name: "ann"},
+			Expect(*secCtx).To(Equal(security.Context{Token: resp.Cookies()[0].Value, Identity: security.Identity{ID: 2, Name: "ann", Nickname: "Ann"},
 				Perms: []string{}, ProjectRoles: []domain.ProjectRole{}, SigningTime: (*secCtx).SigningTime}))
 		})
 

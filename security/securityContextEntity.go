@@ -17,8 +17,9 @@ type Context struct {
 }
 
 type Identity struct {
-	ID   types.ID `json:"id"`
-	Name string   `json:"name"`
+	ID       types.ID `json:"id"`
+	Name     string   `json:"name"`
+	Nickname string   `json:"nickname"`
 }
 
 func (c *Context) HasRole(role string) bool {

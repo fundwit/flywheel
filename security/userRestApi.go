@@ -2,6 +2,7 @@ package security
 
 import (
 	"flywheel/bizerror"
+	"flywheel/common"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -12,12 +13,14 @@ var (
 	UpdateBasicAuthSecretFunc = UpdateBasicAuthSecret
 	QueryUsersFunc            = QueryUsers
 	CreateUserFunc            = CreateUser
+	UpdateUserFunc            = UpdateUser
 )
 
 func RegisterUsersHandler(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 	users := r.Group("/v1/users", middleWares...)
 	users.GET("", HandleQueryUsers)
 	users.POST("", HandleCreateUser)
+	users.PUT(":id", HandleUpdateUser)
 
 	me := r.Group("/me", middleWares...)
 	me.GET("", UserInfoQueryHandler)
@@ -68,4 +71,23 @@ func HandleCreateUser(c *gin.Context) {
 		panic(err)
 	}
 	c.JSON(http.StatusOK, u)
+}
+
+func HandleUpdateUser(c *gin.Context) {
+	id, err := common.BindingPathID(c)
+	if err != nil {
+		panic(err)
+	}
+
+	payload := UserUpdation{}
+	err = c.ShouldBindBodyWith(&payload, binding.JSON)
+	if err != nil {
+		panic(&bizerror.ErrBadParam{Cause: err})
+	}
+
+	err = UpdateUserFunc(id, &payload, FindSecurityContext(c))
+	if err != nil {
+		panic(err)
+	}
+	c.Status(http.StatusOK)
 }

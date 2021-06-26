@@ -96,13 +96,13 @@ func BeginWorkContribution(d *WorkContribution, sec *security.Context) (types.ID
 				BeginTime:        common.CurrentTimestamp(),
 				Effective:        true,
 				WorkContribution: *d,
-				ContributorName:  user.Name,
+				ContributorName:  user.DisplayName(),
 				WorkProjectId:    work.ProjectID,
 			}
 		} else if err != nil {
 			return err
 		} else {
-			record.ContributorName = user.Name
+			record.ContributorName = user.DisplayName()
 			record.WorkProjectId = work.ProjectID
 			record.EndTime = common.Timestamp{}
 			record.Effective = true
@@ -134,7 +134,7 @@ func FinishWorkContribution(d *WorkContribuitonFinishBody, sec *security.Context
 			record.EndTime = common.CurrentTimestamp()
 		}
 		record.WorkProjectId = work.ProjectID
-		record.ContributorName = user.Name
+		record.ContributorName = user.DisplayName()
 		record.Effective = d.Effective
 
 		return tx.Save(&record).Error

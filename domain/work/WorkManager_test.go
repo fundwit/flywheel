@@ -2,6 +2,7 @@ package work_test
 
 import (
 	"errors"
+	"flywheel/app/event"
 	"flywheel/bizerror"
 	"flywheel/common"
 	"flywheel/domain"
@@ -14,6 +15,7 @@ import (
 	"flywheel/testinfra"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/fundwit/go-commons/types"
@@ -31,6 +33,7 @@ var _ = Describe("WorkManager", func() {
 		flowDetail2  *domain.WorkflowDetail
 		project1     *domain.Project
 		project2     *domain.Project
+		lastEvents   []event.EventRecord
 	)
 	BeforeSuite(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
@@ -63,6 +66,12 @@ var _ = Describe("WorkManager", func() {
 		flowDetail2.CreateTime = flowDetail2.CreateTime.Round(time.Millisecond)
 
 		workManager = work.NewWorkManager(testDatabase.DS, flowManager)
+
+		lastEvents = []event.EventRecord{}
+		event.EventPersistCreateFunc = func(record *event.EventRecord, db *gorm.DB) error {
+			lastEvents = append(lastEvents, *record)
+			return nil
+		}
 	})
 	AfterEach(func() {
 		err := testDatabase.DS.GormDB().DropTable(&domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
@@ -81,6 +90,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(work).To(BeNil())
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
+			Expect(len(lastEvents)).To(BeZero())
 		})
 
 		It("should failed when initial state is unknown", func() {
@@ -91,11 +101,13 @@ var _ = Describe("WorkManager", func() {
 			Expect(work).To(BeNil())
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal(bizerror.ErrUnknownState.Error()))
+			Expect(len(lastEvents)).To(BeZero())
 		})
 
 		It("should create new work successfully", func() {
 			creation := &domain.WorkCreation{Name: "test work", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name}
-			work, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
+			sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String())
+			work, err := workManager.CreateWork(creation, sec)
 
 			Expect(err).To(BeZero())
 			Expect(work).ToNot(BeZero())
@@ -110,6 +122,11 @@ var _ = Describe("WorkManager", func() {
 			Expect(work.State).To(Equal(flowDetail.StateMachine.States[0]))
 			Expect(work.StateBeginTime).To(Equal(work.CreateTime))
 			Expect(work.StateCategory).To(Equal(flowDetail.StateMachine.States[0].Category))
+
+			Expect(len(lastEvents)).To(Equal(1))
+			Expect(lastEvents[0].Event).To(Equal(event.Event{SourceId: work.ID, SourceType: "WORK", SourceDesc: work.Identifier,
+				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryCreated}))
+			Expect(time.Now().Sub(lastEvents[0].Timestamp.Time()) < time.Second).To(BeTrue())
 
 			detail, err := workManager.WorkDetail(work.ID.String(), testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
 			Expect(err).To(BeNil())
@@ -145,33 +162,53 @@ var _ = Describe("WorkManager", func() {
 		It("should create new work with highest priority successfully", func() {
 			creation := &domain.WorkCreation{Name: "test work", ProjectID: project2.ID, FlowID: flowDetail2.ID,
 				InitialStateName: domain.StatePending.Name, PriorityLevel: -2}
-			ignoreWork1, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project2.ID.String()))
+			sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project2.ID.String())
+			ignoreWork1, err := workManager.CreateWork(creation, sec)
 			Expect(err).To(BeZero())
 			Expect(ignoreWork1).ToNot(BeZero())
+			Expect(len(lastEvents)).To(Equal(1))
+			Expect(lastEvents[0].Event).To(Equal(event.Event{SourceId: ignoreWork1.ID, SourceType: "WORK", SourceDesc: ignoreWork1.Identifier,
+				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryCreated}))
+			Expect(time.Now().Sub(lastEvents[0].Timestamp.Time()) < time.Second).To(BeTrue())
 
 			creation = &domain.WorkCreation{Name: "test work", ProjectID: project1.ID, FlowID: flowDetail.ID,
 				InitialStateName: domain.StateDoing.Name}
-			ignoreWork2, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
+			sec = testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String())
+			ignoreWork2, err := workManager.CreateWork(creation, sec)
 			Expect(err).To(BeZero())
 			Expect(ignoreWork2).ToNot(BeZero())
 			Expect(ignoreWork2.OrderInState > ignoreWork1.OrderInState).To(BeTrue())
+			Expect(len(lastEvents)).To(Equal(2))
+			Expect(lastEvents[1].Event).To(Equal(event.Event{SourceId: ignoreWork2.ID, SourceType: "WORK", SourceDesc: ignoreWork2.Identifier,
+				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryCreated}))
+			Expect(time.Now().Sub(lastEvents[1].Timestamp.Time()) < time.Second).To(BeTrue())
 
+			sec = testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String())
 			creation = &domain.WorkCreation{Name: "test work1", ProjectID: project1.ID, FlowID: flowDetail.ID,
 				InitialStateName: domain.StatePending.Name}
-			work, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
+			work, err := workManager.CreateWork(creation, sec)
 			Expect(err).To(BeZero())
 			Expect(work).ToNot(BeZero())
-			detail, err := workManager.WorkDetail(work.ID.String(), testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
+			detail, err := workManager.WorkDetail(work.ID.String(), sec)
 			Expect(err).To(BeNil())
 			Expect(detail).ToNot(BeNil())
 			Expect(work.OrderInState > ignoreWork2.OrderInState).To(BeTrue())
+			Expect(len(lastEvents)).To(Equal(3))
+			Expect(lastEvents[2].Event).To(Equal(event.Event{SourceId: work.ID, SourceType: "WORK", SourceDesc: work.Identifier,
+				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryCreated}))
+			Expect(time.Now().Sub(lastEvents[2].Timestamp.Time()) < time.Second).To(BeTrue())
 
 			creation = &domain.WorkCreation{Name: "test work2", ProjectID: project1.ID, FlowID: flowDetail.ID,
 				InitialStateName: domain.StatePending.Name, PriorityLevel: -1}
-			work1, err := workManager.CreateWork(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
+			sec = testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String())
+			work1, err := workManager.CreateWork(creation, sec)
 			Expect(err).To(BeZero())
 			Expect(work).ToNot(BeZero())
-			detail1, err := workManager.WorkDetail(work1.ID.String(), testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
+			Expect(len(lastEvents)).To(Equal(4))
+			Expect(lastEvents[3].Event).To(Equal(event.Event{SourceId: work1.ID, SourceType: "WORK", SourceDesc: work1.Identifier,
+				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryCreated}))
+			Expect(time.Now().Sub(lastEvents[3].Timestamp.Time()) < time.Second).To(BeTrue())
+			detail1, err := workManager.WorkDetail(work1.ID.String(), sec)
 			Expect(err).To(BeNil())
 			Expect(detail1).ToNot(BeNil())
 
@@ -386,10 +423,16 @@ var _ = Describe("WorkManager", func() {
 
 	Describe("UpdateWork", func() {
 		It("should be able to update work", func() {
+			sec := testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String())
 			detail, err := workManager.CreateWork(
 				&domain.WorkCreation{Name: "test work1", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
-				testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
+				sec,
+			)
 			Expect(err).To(BeZero())
+			Expect(len(lastEvents)).To(Equal(1))
+			Expect(lastEvents[0].Event).To(Equal(event.Event{SourceId: detail.ID, SourceType: "WORK", SourceDesc: detail.Identifier,
+				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryCreated}))
+			Expect(time.Now().Sub(lastEvents[0].Timestamp.Time()) < time.Second).To(BeTrue())
 
 			updatedWork, err := workManager.UpdateWork(detail.ID,
 				&domain.WorkUpdating{Name: "test work1 new"}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
@@ -398,6 +441,13 @@ var _ = Describe("WorkManager", func() {
 			Expect(updatedWork.ID).To(Equal(detail.ID))
 			Expect(updatedWork.Name).To(Equal("test work1 new"))
 			Expect(updatedWork.State).To(Equal(flowDetail.StateMachine.States[0]))
+
+			Expect(len(lastEvents)).To(Equal(2))
+			Expect(lastEvents[1].Event).To(Equal(event.Event{SourceId: detail.ID, SourceType: "WORK", SourceDesc: detail.Identifier,
+				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryPropertyUpdated, UpdatedProperties: []event.PropertyUpdated{{
+					PropertyName: "Name", PropertyDesc: "Name", OldValue: detail.Name, OldValueDesc: detail.Name, NewValue: updatedWork.Name, NewValueDesc: updatedWork.Name,
+				}}}))
+			Expect(time.Now().Sub(lastEvents[1].Timestamp.Time()) < time.Second).To(BeTrue())
 
 			works, err := workManager.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 			Expect(err).To(BeNil())
@@ -413,6 +463,7 @@ var _ = Describe("WorkManager", func() {
 				&domain.WorkCreation{Name: "test work1", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
 				testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 			Expect(err).To(BeZero())
+			Expect(len(lastEvents)).To(Equal(1))
 
 			updatedWork, err := workManager.UpdateWork(404,
 				&domain.WorkUpdating{Name: "test work1 new"},
@@ -420,12 +471,14 @@ var _ = Describe("WorkManager", func() {
 			Expect(updatedWork).To(BeNil())
 			Expect(err).ToNot(BeZero())
 			Expect(err.Error()).To(Equal("record not found")) // thrown when check permissions
+			Expect(len(lastEvents)).To(Equal(1))
 		})
 
 		It("should forbid to update work without permission", func() {
 			detail, err := workManager.CreateWork(&domain.WorkCreation{Name: "test work1", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
 				testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 			Expect(err).To(BeZero())
+			Expect(len(lastEvents)).To(Equal(1))
 
 			updatedWork, err := workManager.UpdateWork(detail.ID,
 				&domain.WorkUpdating{Name: "test work1 new"},
@@ -433,6 +486,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(updatedWork).To(BeNil())
 			Expect(err).ToNot(BeZero())
 			Expect(err.Error()).To(Equal("forbidden"))
+			Expect(len(lastEvents)).To(Equal(1))
 		})
 
 		It("should be able to catch db errors", func() {
@@ -443,6 +497,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(updatedWork).To(BeNil())
 			Expect(err).ToNot(BeZero())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
+			Expect(len(lastEvents)).To(Equal(0))
 		})
 
 		It("should return error if failed to find state", func() {
@@ -503,10 +558,17 @@ var _ = Describe("WorkManager", func() {
 			Expect(testDatabase.DS.GormDB().First(&transition, domain.WorkStateTransition{ID: 2}).Error).To(BeNil())
 			Expect(transition.WorkID).To(Equal(types.ID(2)))
 
+			lastEvents = []event.EventRecord{}
 			// do delete work
-			workIdToDelete := (*works)[0].ID
-			err = workManager.DeleteWork(workIdToDelete, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
+			workToDelete := (*works)[0]
+			sec := testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String())
+			err = workManager.DeleteWork(workToDelete.ID, sec)
 			Expect(err).To(BeNil())
+			Expect(len(lastEvents)).To(Equal(1))
+			Expect(lastEvents[0].Event).To(Equal(event.Event{SourceId: workToDelete.ID, SourceType: "WORK", SourceDesc: workToDelete.Identifier,
+				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryDeleted}))
+			Expect(time.Now().Sub(lastEvents[0].Timestamp.Time()) < time.Second).To(BeTrue())
+
 			works, err = workManager.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 			Expect(err).To(BeNil())
 			Expect(len(*works)).To(Equal(1))
@@ -522,7 +584,7 @@ var _ = Describe("WorkManager", func() {
 
 			// work process steps should also be deleted
 			processStep := domain.WorkProcessStep{}
-			Expect(testDatabase.DS.GormDB().First(&processStep, domain.WorkProcessStep{WorkID: workIdToDelete}).Error).To(Equal(gorm.ErrRecordNotFound))
+			Expect(testDatabase.DS.GormDB().First(&processStep, domain.WorkProcessStep{WorkID: workToDelete.ID}).Error).To(Equal(gorm.ErrRecordNotFound))
 			processStep = domain.WorkProcessStep{}
 			Expect(testDatabase.DS.GormDB().First(&processStep).Error).To(BeNil())
 		})
@@ -605,20 +667,33 @@ var _ = Describe("WorkManager", func() {
 			Expect((*works)[0].ArchiveTime.IsZero()).To(BeTrue())
 
 			// do archive work
-			workIdToArchive := (*works)[0].ID
-			err = workManager.ArchiveWorks([]types.ID{workIdToArchive}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
+			lastEvents = []event.EventRecord{}
+			sec := testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String())
+			workToArchive := (*works)[0]
+			err = workManager.ArchiveWorks([]types.ID{workToArchive.ID}, sec)
 			Expect(err).To(BeNil())
-			works, err = workManager.QueryWork(&domain.WorkQuery{ArchiveState: domain.StatusOn}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
+			works, err = workManager.QueryWork(&domain.WorkQuery{ArchiveState: domain.StatusOn}, sec)
 			Expect(err).To(BeNil())
 			Expect(len(*works)).To(Equal(1))
-			Expect((*works)[0].ArchiveTime).ToNot(BeNil())
+			archivedWork := (*works)[0]
+			Expect(archivedWork.ArchiveTime).ToNot(BeNil())
+
+			Expect(len(lastEvents)).To(Equal(1))
+			Expect(lastEvents[0].Event).To(Equal(event.Event{SourceId: workToArchive.ID, SourceType: "WORK", SourceDesc: workToArchive.Identifier,
+				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryPropertyUpdated, UpdatedProperties: []event.PropertyUpdated{{
+					PropertyName: "ArchiveTime", PropertyDesc: "ArchiveTime",
+					OldValue: workToArchive.ArchiveTime.String(), OldValueDesc: workToArchive.ArchiveTime.String(),
+					NewValue: archivedWork.ArchiveTime.String(), NewValueDesc: archivedWork.ArchiveTime.String(),
+				}}}))
+			Expect(time.Now().Sub(lastEvents[0].Timestamp.Time()) < time.Second).To(BeTrue())
 
 			// do archive again
-			err = workManager.ArchiveWorks([]types.ID{workIdToArchive}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
+			err = workManager.ArchiveWorks([]types.ID{workToArchive.ID}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 			Expect(err).To(BeNil())
 			works1, err := workManager.QueryWork(&domain.WorkQuery{ArchiveState: domain.StatusAll}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 			Expect(err).To(BeNil())
 			Expect((*works1)[0].ArchiveTime).To(Equal((*works)[0].ArchiveTime))
+			Expect(len(lastEvents)).To(Equal(1))
 		})
 	})
 
@@ -663,10 +738,21 @@ var _ = Describe("WorkManager", func() {
 			Expect([]string{list[0].Name, list[1].Name, list[2].Name}).To(Equal([]string{"w1", "w2", "w3"}))
 			Expect(list[0].OrderInState < list[1].OrderInState && list[1].OrderInState < list[2].OrderInState).To(BeTrue())
 
+			lastEvents = []event.EventRecord{}
 			// valid data: w3 > w2 > w1
 			Expect(workManager.UpdateStateRangeOrders(&[]domain.WorkOrderRangeUpdating{
 				{ID: list[0].ID, NewOlder: list[2].OrderInState + 2, OldOlder: list[0].OrderInState},
 				{ID: list[1].ID, NewOlder: list[2].OrderInState + 1, OldOlder: list[1].OrderInState}}, secCtx)).To(BeNil())
+
+			Expect(len(lastEvents)).To(Equal(2))
+			lastStateOrderUpdatedWork := list[1]
+			Expect(lastEvents[1].Event).To(Equal(event.Event{SourceId: lastStateOrderUpdatedWork.ID, SourceType: "WORK", SourceDesc: lastStateOrderUpdatedWork.Identifier,
+				CreatorId: secCtx.Identity.ID, CreatorName: secCtx.Identity.Name, EventCategory: event.EventCategoryPropertyUpdated, UpdatedProperties: []event.PropertyUpdated{{
+					PropertyName: "OrderInState", PropertyDesc: "OrderInState",
+					OldValue: strconv.FormatInt(lastStateOrderUpdatedWork.OrderInState, 10), OldValueDesc: strconv.FormatInt(lastStateOrderUpdatedWork.OrderInState, 10),
+					NewValue: strconv.FormatInt(list[2].OrderInState+1, 10), NewValueDesc: strconv.FormatInt(list[2].OrderInState+1, 10),
+				}}}))
+			Expect(time.Now().Sub(lastEvents[1].Timestamp.Time()) < time.Second).To(BeTrue())
 
 			listPtr, err = workManager.QueryWork(&domain.WorkQuery{}, secCtx)
 			Expect(err).To(BeNil())

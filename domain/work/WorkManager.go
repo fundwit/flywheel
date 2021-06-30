@@ -2,6 +2,7 @@ package work
 
 import (
 	"errors"
+	"flywheel/app/event"
 	"flywheel/bizerror"
 	"flywheel/common"
 	"flywheel/domain"
@@ -10,13 +11,101 @@ import (
 	"flywheel/domain/state"
 	"flywheel/persistence"
 	"flywheel/security"
-	"fmt"
 	"strconv"
 
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
 )
+
+// works
+// work_contributions
+// work_process_steps
+// work_state_transitions
+
+/*
+work
+{
+	"id": ...
+	"name": ...
+	"projectId": xx
+	"flowId": xxx,
+	"createTime": "xxx",
+
+	...
+	"workflowId": xxx,
+	"orderInState": "xx",
+	"state": {
+		"name": "",
+		"category": "",
+		"beginTime": "",
+	},
+	"processBeginTime": xxx,
+	"processEndTime": xxx,
+	"archiveTime": xxx
+	"properties": [{
+		...
+	}]
+	// 处于各个状态的历史
+	"processSteps": [{
+
+	}],
+	"contributions": [{
+		// id, workKey, projectId
+		"contributorId": "",
+		"contributorName": "",
+		"beginTime": "",
+		"endTime": "",
+		"effective": true
+	}],
+	// events
+	"transitions": [{
+		// id, workflowId, workId
+		"createTime": xxx,
+		"creator": xxx,
+		"fromState": xxx,
+		"toState": "xxx",
+	}],
+}
+*/
+
+// workflows
+// workflow_states
+// workflow_state_transitions
+
+/*
+{
+	"id": ...
+	"name": ...
+	"projectId": ...
+	"createTime": ...
+	"themeColor": ...
+	"themeIcon": ...
+	"states": [{
+		// workflowId, createTime
+		"name": ...
+		"category": ...
+		"order": ...
+	}],
+	"transitions": [{
+		// worklfowId, createTime, name
+		"fromState": ...
+		"toState": ...
+	}],
+	"properties": [{
+		...
+	}]
+}
+*/
+
+// projects
+// project_members
+
+// users
+// user_role_bindings
+// roles
+// role_permission_bindings
+// permissions
 
 type WorkManagerTraits interface {
 	QueryWork(query *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error)
@@ -130,19 +219,33 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 	db := m.dataSource.GormDB()
 	var workDetail *domain.WorkDetail
 	err := db.Transaction(func(tx *gorm.DB) error {
-		// TODO transition issues
 		workflowDetail, err := m.workflowManager.DetailWorkflow(c.FlowID, sec)
 		if err != nil {
 			return err
 		}
-
 		initialState, found := workflowDetail.StateMachine.FindState(c.InitialStateName)
 		if !found {
 			return bizerror.ErrUnknownState
 		}
 
-		workDetail = BuildWorkDetail(common.NextId(m.idWorker), c, workflowDetail, initialState)
-		if c.PriorityLevel < 0 {
+		now := common.CurrentTimestamp()
+		workDetail = &domain.WorkDetail{
+			Work: domain.Work{
+				ID:         common.NextId(m.idWorker),
+				Name:       c.Name,
+				ProjectID:  c.ProjectID,
+				CreateTime: now,
+
+				FlowID:         workflowDetail.ID,
+				OrderInState:   now.Time().UnixNano() / 1e6, // oldest
+				StateName:      initialState.Name,
+				StateCategory:  initialState.Category,
+				StateBeginTime: now,
+				State:          initialState,
+			},
+			Type: workflowDetail.Workflow,
+		}
+		if c.PriorityLevel < 0 { // Highest: -1, lowest： 1
 			var highestPriorityWork domain.Work
 			err := tx.Model(&domain.Work{}).Where(&domain.Work{ProjectID: c.ProjectID, StateName: initialState.Name}).
 				Select("order_in_state").
@@ -169,7 +272,11 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 		if err := tx.Create(initProcessStep).Error; err != nil {
 			return err
 		}
-		fmt.Println("work.createTime", workDetail.CreateTime, "work.StateBeginTime", workDetail.StateBeginTime, "initProcessStep.beginTime", initProcessStep.BeginTime)
+
+		if err := CreateWorkCreatedEvent(&workDetail.Work, &sec.Identity, tx); err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -198,10 +305,21 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *secur
 		if db.RowsAffected != 1 {
 			return errors.New("expected affected row is 1, but actual is " + strconv.FormatInt(db.RowsAffected, 10))
 		}
+
+		if err := CreateWorkPropertyUpdatedEvent(originWork,
+			[]event.PropertyUpdated{{
+				PropertyName: "Name", PropertyDesc: "Name",
+				OldValue: originWork.Name, OldValueDesc: originWork.Name,
+				NewValue: u.Name, NewValueDesc: u.Name,
+			}},
+			&sec.Identity, tx); err != nil {
+			return err
+		}
+
+		// append detail
 		if err := tx.Where(&domain.Work{ID: id}).First(&updatedWork).Error; err != nil {
 			return err
 		}
-		// TODO transition issues
 		workflowDetail, err := m.workflowManager.DetailWorkflow(updatedWork.FlowID, sec)
 		if err != nil {
 			return err
@@ -229,7 +347,7 @@ func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRan
 	return m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
 		for _, orderUpdating := range *wantedOrders {
 			// TODO transition issues
-			_, err := m.findWorkAndCheckPerms(tx, orderUpdating.ID, sec)
+			originWork, err := m.findWorkAndCheckPerms(tx, orderUpdating.ID, sec)
 			if err != nil {
 				return err
 			}
@@ -240,6 +358,15 @@ func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRan
 			}
 			if db.RowsAffected != 1 {
 				return errors.New("expected affected row is 1, but actual is " + strconv.FormatInt(db.RowsAffected, 10))
+			}
+			if err := CreateWorkPropertyUpdatedEvent(originWork,
+				[]event.PropertyUpdated{{
+					PropertyName: "OrderInState", PropertyDesc: "OrderInState",
+					OldValue: strconv.FormatInt(originWork.OrderInState, 10), OldValueDesc: strconv.FormatInt(originWork.OrderInState, 10),
+					NewValue: strconv.FormatInt(orderUpdating.NewOlder, 10), NewValueDesc: strconv.FormatInt(orderUpdating.NewOlder, 10),
+				}},
+				&sec.Identity, tx); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -252,6 +379,16 @@ func (m *WorkManager) DeleteWork(id types.ID, sec *security.Context) error {
 		if err != nil {
 			return err
 		}
+		work := domain.Work{ID: id}
+		err = tx.Model(&work).First(&work).Error
+		if err == nil {
+			if err := CreateWorkDeletedEvent(&work, &sec.Identity, tx); err != nil {
+				return err
+			}
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
 		if err := tx.Delete(domain.Work{}, "id = ?", id).Error; err != nil {
 			return err
 		}
@@ -282,6 +419,16 @@ func (m *WorkManager) ArchiveWorks(ids []types.ID, sec *security.Context) error 
 				return nil
 			}
 
+			if err := CreateWorkPropertyUpdatedEvent(work,
+				[]event.PropertyUpdated{{
+					PropertyName: "ArchiveTime", PropertyDesc: "ArchiveTime",
+					OldValue: work.ArchiveTime.String(), OldValueDesc: work.ArchiveTime.String(),
+					NewValue: now.String(), NewValueDesc: now.String(),
+				}},
+				&sec.Identity, tx); err != nil {
+				return err
+			}
+
 			db := tx.Model(&domain.Work{ID: id}).Updates(&domain.Work{ArchiveTime: now})
 			if err := db.Error; err != nil {
 				return err
@@ -302,24 +449,4 @@ func (m *WorkManager) findWorkAndCheckPerms(db *gorm.DB, id types.ID, sec *secur
 		return nil, bizerror.ErrForbidden
 	}
 	return &work, nil
-}
-
-func BuildWorkDetail(id types.ID, c *domain.WorkCreation, workflow *domain.WorkflowDetail, initState state.State) *domain.WorkDetail {
-	now := common.CurrentTimestamp()
-	return &domain.WorkDetail{
-		Work: domain.Work{
-			ID:         id,
-			Name:       c.Name,
-			ProjectID:  c.ProjectID,
-			CreateTime: now,
-
-			FlowID:         workflow.ID,
-			OrderInState:   now.Time().UnixNano() / 1e6,
-			StateName:      initState.Name,
-			StateCategory:  initState.Category,
-			StateBeginTime: now,
-			State:          initState,
-		},
-		Type: workflow.Workflow,
-	}
 }

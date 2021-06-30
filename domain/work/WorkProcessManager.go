@@ -2,6 +2,7 @@ package work
 
 import (
 	"errors"
+	"flywheel/app/event"
 	"flywheel/bizerror"
 	"flywheel/common"
 	"flywheel/domain"
@@ -100,6 +101,13 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkStateTransi
 		}
 		if query.RowsAffected != 1 {
 			return errors.New("expected affected row is 1, but actual is " + strconv.FormatInt(query.RowsAffected, 10))
+		}
+		if err := CreateWorkPropertyUpdatedEvent(&work,
+			[]event.PropertyUpdated{{
+				PropertyName: "StateName", PropertyDesc: "StateName", OldValue: work.StateName, OldValueDesc: work.StateName, NewValue: c.ToState, NewValueDesc: c.ToState,
+			}},
+			&sec.Identity, tx); err != nil {
+			return err
 		}
 
 		// update beginProcessTime and endProcessTime

@@ -17,7 +17,7 @@ var _ = Describe("Timestamp", func() {
 
 			v, err = common.TimestampOfDate(2021, 5, 6, 12, 30, 40, 666666666, time.Local).Value()
 			Expect(err).To(BeNil())
-			Expect(v).To(Equal("2021-05-06 12:30:40.666666666"))
+			Expect(v).To(Equal("2021-05-06 12:30:40.666667000"))
 		})
 	})
 
@@ -44,9 +44,9 @@ var _ = Describe("Timestamp", func() {
 
 	Describe("CurrentTimestamp", func() {
 		It("should be able to calculate value correctly", func() {
-			begin := time.Now()
+			begin := time.Now().Round(time.Microsecond)
 			v := common.CurrentTimestamp()
-			end := time.Now()
+			end := time.Now().Round(time.Microsecond)
 
 			Expect(v.Time().UnixNano() >= begin.UnixNano()).To(BeTrue())
 			Expect(v.Time().UnixNano() <= end.UnixNano()).To(BeTrue())
@@ -58,7 +58,7 @@ var _ = Describe("Timestamp", func() {
 			t := common.TimestampOfDate(2021, 1, 1, 12, 30, 40, 666666666, time.UTC)
 			jsonBytes, err := t.MarshalJSON()
 			Expect(err).To(BeNil())
-			Expect(string(jsonBytes)).To(Equal(`"2021-01-01T12:30:40.666666666Z"`))
+			Expect(string(jsonBytes)).To(Equal(`"2021-01-01T12:30:40.666667Z"`))
 
 			var t1 common.Timestamp
 			Expect(t1.UnmarshalJSON(jsonBytes)).To(BeNil())
@@ -78,7 +78,7 @@ var _ = Describe("Timestamp", func() {
 			t := common.TimestampOfDate(2021, 1, 1, 12, 30, 40, 666666666, time.UTC)
 			textBytes, err := t.MarshalText()
 			Expect(err).To(BeNil())
-			Expect(string(textBytes)).To(Equal(`2021-01-01T12:30:40.666666666Z`))
+			Expect(string(textBytes)).To(Equal(`2021-01-01T12:30:40.666667Z`))
 
 			var t1 common.Timestamp
 			Expect(t1.UnmarshalText(textBytes)).To(BeNil())

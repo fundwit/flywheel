@@ -11,10 +11,10 @@ type Timestamp time.Time
 const format = "2006-01-02 15:04:05.000000000"
 
 func CurrentTimestamp() Timestamp {
-	return Timestamp(time.Now())
+	return Timestamp(time.Now().Round(time.Microsecond))
 }
 func TimestampOfDate(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) Timestamp {
-	return (Timestamp)(time.Date(year, month, day, hour, min, sec, nsec, loc))
+	return (Timestamp)(time.Date(year, month, day, hour, min, sec, nsec, loc).Round(time.Microsecond))
 }
 func (t Timestamp) Time() time.Time {
 	return (time.Time)(t)
@@ -74,6 +74,7 @@ func (c *Timestamp) Scan(v interface{}) error {
 		if err != nil {
 			return err
 		}
+		parsedTime = parsedTime.Round(time.Microsecond)
 	}
 
 	// zero time normalize

@@ -1,6 +1,7 @@
 package work_test
 
 import (
+	"flywheel/app/event"
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
@@ -12,6 +13,7 @@ import (
 	"flywheel/testinfra"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -43,6 +45,9 @@ var _ = Describe("WorkProcessManager", func() {
 		Expect(err).To(BeNil())
 
 		workManager = work.NewWorkManager(testDatabase.DS, workflowManager)
+		event.EventPersistCreateFunc = func(record *event.EventRecord, db *gorm.DB) error {
+			return nil
+		}
 	})
 	AfterEach(func() {
 		testinfra.StopMysqlTestDatabase(testDatabase)

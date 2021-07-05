@@ -5,7 +5,7 @@ import (
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/namespace"
-	"flywheel/security"
+	"flywheel/session"
 	"flywheel/testinfra"
 	"net/http"
 	"net/http/httptest"
@@ -30,7 +30,7 @@ var _ = Describe("ProjectMembersRestApi", func() {
 	Describe("HandleQueryProjectMembers", func() {
 		It("should be able to query project members successfully", func() {
 			var palyload *domain.ProjectMemberQuery
-			namespace.QueryProjectMembersFunc = func(d *domain.ProjectMemberQuery, sec *security.Context) (*[]domain.ProjectMemberDetail, error) {
+			namespace.QueryProjectMembersFunc = func(d *domain.ProjectMemberQuery, sec *session.Context) (*[]domain.ProjectMemberDetail, error) {
 				palyload = d
 				t := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 				return &[]domain.ProjectMemberDetail{
@@ -54,7 +54,7 @@ var _ = Describe("ProjectMembersRestApi", func() {
 	Describe("HandleCreateProjectMember", func() {
 		It("should be able to create project member successfully", func() {
 			var payload *domain.ProjectMemberCreation
-			namespace.CreateProjectMemberFunc = func(c *domain.ProjectMemberCreation, sec *security.Context) error {
+			namespace.CreateProjectMemberFunc = func(c *domain.ProjectMemberCreation, sec *session.Context) error {
 				payload = c
 				return nil
 			}
@@ -73,7 +73,7 @@ var _ = Describe("ProjectMembersRestApi", func() {
 	Describe("HandleDeleteProjectMember", func() {
 		It("should be able to delete project member successfully", func() {
 			var payload *domain.ProjectMemberDeletion
-			namespace.DeleteProjectMemberFunc = func(d *domain.ProjectMemberDeletion, sec *security.Context) error {
+			namespace.DeleteProjectMemberFunc = func(d *domain.ProjectMemberDeletion, sec *session.Context) error {
 				payload = d
 				return nil
 			}

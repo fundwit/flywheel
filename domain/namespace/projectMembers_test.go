@@ -1,11 +1,11 @@
 package namespace_test
 
 import (
+	"flywheel/account"
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/namespace"
 	"flywheel/persistence"
-	"flywheel/security"
 	"flywheel/testinfra"
 	"time"
 
@@ -20,11 +20,11 @@ var _ = Describe("ProjectMembers", func() {
 	)
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
-		Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &security.User{}).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &account.User{}).Error).To(BeNil())
 		persistence.ActiveDataSourceManager = testDatabase.DS
 
 		namespace.QueryProjectNamesFunc = namespace.QueryProjectNames
-		namespace.QueryAccountNamesFunc = security.QueryAccountNames
+		namespace.QueryAccountNamesFunc = account.QueryAccountNames
 		namespace.DetailProjectMembersFunc = namespace.DetailProjectMembers
 	})
 	AfterEach(func() {
@@ -33,11 +33,11 @@ var _ = Describe("ProjectMembers", func() {
 
 	Describe("CreateProjectMember", func() {
 		It("should be able to create project member", func() {
-			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 111, Name: "user111", Secret: "xxxx"}).Error).To(BeNil())
-			sec := testinfra.BuildSecCtx(types.ID(111), security.SystemAdminPermission.ID)
+			Expect(testDatabase.DS.GormDB().Save(&account.User{ID: 111, Name: "user111", Secret: "xxxx"}).Error).To(BeNil())
+			sec := testinfra.BuildSecCtx(types.ID(111), account.SystemAdminPermission.ID)
 			g, err := namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).To(BeNil())
-			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 222, Name: "test", Secret: "xxxx"}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().Save(&account.User{ID: 222, Name: "test", Secret: "xxxx"}).Error).To(BeNil())
 
 			// system administrators can create project member: 222-guest
 			Expect(namespace.CreateProjectMember(
@@ -75,7 +75,7 @@ var _ = Describe("ProjectMembers", func() {
 			Expect(q[1].CreateTime.Before(time.Now()) && q[1].CreateTime.After(g.CreateTime)).To(BeTrue())
 
 			// project manager can create project member: 333-guest
-			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 333, Name: "test333", Secret: "xxxx"}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().Save(&account.User{ID: 333, Name: "test333", Secret: "xxxx"}).Error).To(BeNil())
 			Expect(namespace.CreateProjectMember(
 				&domain.ProjectMemberCreation{ProjectID: g.ID, MemberId: 333, Role: domain.ProjectRoleManager},
 				testinfra.BuildSecCtx(444, domain.ProjectRoleManager+"_"+g.ID.String()))).To(BeNil())
@@ -96,10 +96,10 @@ var _ = Describe("ProjectMembers", func() {
 		})
 
 		It("non non-administrator nor non-project manager can create project member", func() {
-			sec := testinfra.BuildSecCtx(types.ID(1), security.SystemAdminPermission.ID)
+			sec := testinfra.BuildSecCtx(types.ID(1), account.SystemAdminPermission.ID)
 			g, err := namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).To(BeNil())
-			Expect(testDatabase.DS.GormDB().Save(&security.User{ID: 2, Name: "test", Secret: "xxxx"}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().Save(&account.User{ID: 2, Name: "test", Secret: "xxxx"}).Error).To(BeNil())
 
 			Expect(namespace.CreateProjectMember(
 				&domain.ProjectMemberCreation{ProjectID: g.ID, MemberId: 2, Role: "guest"},
@@ -179,7 +179,7 @@ var _ = Describe("ProjectMembers", func() {
 			Expect(db.Save(&domain.ProjectMember{ProjectId: 2, MemberId: 30, Role: "admin", CreateTime: t}).Error).To(BeNil())
 
 			result, err := namespace.QueryProjectMemberDetails(&domain.ProjectMemberQuery{},
-				testinfra.BuildSecCtx(100, security.SystemAdminPermission.ID))
+				testinfra.BuildSecCtx(100, account.SystemAdminPermission.ID))
 			Expect(err).To(BeNil())
 			Expect(len(*result)).To(Equal(4))
 
@@ -196,7 +196,7 @@ var _ = Describe("ProjectMembers", func() {
 
 			projectId := types.ID(1)
 			result, err = namespace.QueryProjectMemberDetails(&domain.ProjectMemberQuery{ProjectID: &projectId},
-				testinfra.BuildSecCtx(100, security.SystemAdminPermission.ID))
+				testinfra.BuildSecCtx(100, account.SystemAdminPermission.ID))
 			Expect(err).To(BeNil())
 			Expect(len(*result)).To(Equal(2))
 
@@ -209,7 +209,7 @@ var _ = Describe("ProjectMembers", func() {
 
 			memberId := types.ID(10)
 			result, err = namespace.QueryProjectMemberDetails(&domain.ProjectMemberQuery{MemberID: &memberId},
-				testinfra.BuildSecCtx(100, security.SystemAdminPermission.ID))
+				testinfra.BuildSecCtx(100, account.SystemAdminPermission.ID))
 			Expect(err).To(BeNil())
 			Expect(len(*result)).To(Equal(2))
 
@@ -223,7 +223,7 @@ var _ = Describe("ProjectMembers", func() {
 			projectId = types.ID(2)
 			memberId = types.ID(10)
 			result, err = namespace.QueryProjectMemberDetails(&domain.ProjectMemberQuery{ProjectID: &projectId, MemberID: &memberId},
-				testinfra.BuildSecCtx(100, security.SystemAdminPermission.ID))
+				testinfra.BuildSecCtx(100, account.SystemAdminPermission.ID))
 			Expect(err).To(BeNil())
 			Expect(len(*result)).To(Equal(1))
 
@@ -310,7 +310,7 @@ var _ = Describe("ProjectMembers", func() {
 
 	Describe("DeleteProjectMember", func() {
 		It("should be able to delete project member by admin or project manager", func() {
-			sec := testinfra.BuildSecCtx(types.ID(111), security.SystemAdminPermission.ID)
+			sec := testinfra.BuildSecCtx(types.ID(111), account.SystemAdminPermission.ID)
 
 			db := testDatabase.DS.GormDB()
 			t := time.Date(2021, 5, 20, 0, 0, 0, 0, time.Local)
@@ -348,7 +348,7 @@ var _ = Describe("ProjectMembers", func() {
 
 			Expect(db.Save(&domain.ProjectMember{ProjectId: 1, MemberId: 11, Role: domain.ProjectRoleManager, CreateTime: t}).Error).To(BeNil())
 
-			sec := testinfra.BuildSecCtx(types.ID(111), security.SystemAdminPermission.ID)
+			sec := testinfra.BuildSecCtx(types.ID(111), account.SystemAdminPermission.ID)
 			Expect(namespace.DeleteProjectMember(&domain.ProjectMemberDeletion{ProjectID: 1, MemberID: 10}, sec)).To(BeNil())
 			Expect(namespace.DeleteProjectMember(&domain.ProjectMemberDeletion{ProjectID: 1, MemberID: 11}, sec)).To(Equal(bizerror.ErrLastProjectManagerDelete))
 		})

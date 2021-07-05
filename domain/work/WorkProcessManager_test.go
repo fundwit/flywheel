@@ -1,18 +1,18 @@
 package work_test
 
 import (
-	"flywheel/app/event"
-	"flywheel/common"
+	"flywheel/account"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/namespace"
 	"flywheel/domain/state"
 	"flywheel/domain/work"
+	"flywheel/event"
 	"flywheel/persistence"
-	"flywheel/security"
 	"flywheel/testinfra"
 	"time"
 
+	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -35,7 +35,7 @@ var _ = Describe("WorkProcessManager", func() {
 		persistence.ActiveDataSourceManager = testDatabase.DS
 		var err error
 		project1, err = namespace.CreateProject(&domain.ProjectCreating{Name: "project 1", Identifier: "GR1"},
-			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1", security.SystemAdminPermission.ID))
+			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1", account.SystemAdminPermission.ID))
 		Expect(err).To(BeNil())
 
 		workflowManager := flow.NewWorkflowManager(testDatabase.DS)
@@ -106,7 +106,7 @@ var _ = Describe("WorkProcessManager", func() {
 			Expect(err).To(BeNil())
 
 			// add a record should not be query out
-			now := common.CurrentTimestamp()
+			now := types.CurrentTimestamp()
 			Expect(testDatabase.DS.GormDB().Create(&domain.WorkProcessStep{WorkID: 3, FlowID: 2,
 				StateName: "DOING", StateCategory: state.InProcess, BeginTime: now, EndTime: now}).Error).To(BeNil())
 
@@ -127,7 +127,7 @@ var _ = Describe("WorkProcessManager", func() {
 			Expect(step2.StateName).To(Equal(domain.StateDoing.Name))
 			Expect(step2.StateCategory).To(Equal(domain.StateDoing.Category))
 			Expect(step2.BeginTime).To(Equal(step1.EndTime))
-			Expect(step2.EndTime).To(Equal(common.Timestamp{}))
+			Expect(step2.EndTime).To(Equal(types.Timestamp{}))
 
 			_, err = workProcessManager.CreateWorkStateTransition(
 				&domain.WorkStateTransitionBrief{FlowID: workflowDetail.ID, WorkID: work1.ID, FromState: domain.StateDoing.Name, ToState: domain.StateDone.Name}, secCtx)

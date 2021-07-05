@@ -1,16 +1,19 @@
 package main
 
 import (
-	"flywheel/app/avatar"
+	"flywheel/account"
+	"flywheel/avatar"
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/namespace"
 	"flywheel/domain/work"
 	"flywheel/domain/workcontribution"
+	"flywheel/event"
 	"flywheel/persistence"
-	"flywheel/security"
 	"flywheel/servehttp"
+	"flywheel/session"
+	"flywheel/sessions"
 	"log"
 	"net/http"
 
@@ -43,15 +46,15 @@ func main() {
 	// database migration (race condition)
 	err = ds.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkStateTransition{}, &domain.WorkProcessStep{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{},
-		&workcontribution.WorkContributionRecord{},
-		&security.User{}, &domain.Project{}, &domain.ProjectMember{},
-		&security.Role{}, &security.Permission{},
-		&security.UserRoleBinding{}, &security.RolePermissionBinding{}).Error
+		&workcontribution.WorkContributionRecord{}, &event.EventRecord{},
+		&account.User{}, &domain.Project{}, &domain.ProjectMember{},
+		&account.Role{}, &account.Permission{},
+		&account.UserRoleBinding{}, &account.RolePermissionBinding{}).Error
 	if err != nil {
 		log.Fatalf("database migration failed %v\n", err)
 	}
 
-	if err := security.DefaultSecurityConfiguration(); err != nil {
+	if err := account.DefaultSecurityConfiguration(); err != nil {
 		log.Fatalf("failed to prepare default security configuration %v\n", err)
 	}
 
@@ -61,14 +64,14 @@ func main() {
 		c.String(http.StatusOK, "flywheel")
 	})
 
-	security.RegisterSessionsHandler(engine)
+	securityMiddle := session.SimpleAuthFilter()
 
-	securityMiddle := security.SimpleAuthFilter()
+	sessions.RegisterSessionsHandler(engine)
+	sessions.RegisterSessionHandler(engine, securityMiddle)
 
 	namespace.RegisterProjectsRestApis(engine, securityMiddle)
 	namespace.RegisterProjectMembersRestApis(engine, securityMiddle)
-	security.RegisterUsersHandler(engine, securityMiddle)
-	security.RegisterSessionHandler(engine, securityMiddle)
+	account.RegisterUsersHandler(engine, securityMiddle)
 
 	workflowManager := flow.NewWorkflowManager(ds)
 	workProcessManager := work.NewWorkProcessManager(ds, workflowManager)

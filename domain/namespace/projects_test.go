@@ -1,11 +1,11 @@
 package namespace_test
 
 import (
+	"flywheel/account"
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/namespace"
 	"flywheel/persistence"
-	"flywheel/security"
 	"flywheel/testinfra"
 	"time"
 
@@ -29,7 +29,7 @@ var _ = Describe("Projects", func() {
 
 	Describe("CreateProject", func() {
 		It("should be able to create project with a default manager member", func() {
-			sec := testinfra.BuildSecCtx(types.ID(1), security.SystemAdminPermission.ID)
+			sec := testinfra.BuildSecCtx(types.ID(1), account.SystemAdminPermission.ID)
 			g, err := namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).To(BeNil())
 			Expect(g).ToNot(BeNil())
@@ -71,7 +71,7 @@ var _ = Describe("Projects", func() {
 		It("should return error when database action failed", func() {
 			testDatabase.DS.GormDB().DropTable(&domain.ProjectMember{})
 
-			sec := testinfra.BuildSecCtx(types.ID(1), security.SystemAdminPermission.ID)
+			sec := testinfra.BuildSecCtx(types.ID(1), account.SystemAdminPermission.ID)
 			g, err := namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).ToNot(BeNil())
 			Expect(g).To(BeNil())
@@ -92,7 +92,7 @@ var _ = Describe("Projects", func() {
 			Expect(b).To(BeNil())
 			Expect(err).To(Equal(bizerror.ErrForbidden))
 
-			b, err = namespace.QueryProjects(testinfra.BuildSecCtx(types.ID(2), security.SystemAdminPermission.ID))
+			b, err = namespace.QueryProjects(testinfra.BuildSecCtx(types.ID(2), account.SystemAdminPermission.ID))
 			Expect(err).To(BeNil())
 			Expect(*b).To(Equal([]domain.Project{{ID: 123, Identifier: "TED", Name: "test", NextWorkId: 10, CreateTime: t, Creator: 1}}))
 		})
@@ -100,7 +100,7 @@ var _ = Describe("Projects", func() {
 		It("should be able to return database error", func() {
 			testDatabase.DS.GormDB().DropTable(&domain.Project{})
 
-			b, err := namespace.QueryProjects(testinfra.BuildSecCtx(types.ID(2), security.SystemAdminPermission.ID))
+			b, err := namespace.QueryProjects(testinfra.BuildSecCtx(types.ID(2), account.SystemAdminPermission.ID))
 			Expect(b).To(BeNil())
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".projects' doesn't exist"))
@@ -116,7 +116,7 @@ var _ = Describe("Projects", func() {
 			Expect(err).To(Equal(bizerror.ErrForbidden))
 
 			err = namespace.UpdateProject(123, &domain.ProjectUpdating{Name: "new name"},
-				testinfra.BuildSecCtx(types.ID(2), security.SystemAdminPermission.ID))
+				testinfra.BuildSecCtx(types.ID(2), account.SystemAdminPermission.ID))
 			Expect(err).To(BeNil())
 
 			var q []domain.Project
@@ -158,7 +158,7 @@ var _ = Describe("Projects", func() {
 
 	Describe("NextWorkIdentifier", func() {
 		It("should be able to generate next work identifier", func() {
-			sec := testinfra.BuildSecCtx(types.ID(1), security.SystemAdminPermission.ID)
+			sec := testinfra.BuildSecCtx(types.ID(1), account.SystemAdminPermission.ID)
 
 			g1, err := namespace.CreateProject(&domain.ProjectCreating{Name: "project1", Identifier: "G1"}, sec)
 			Expect(err).To(BeNil())

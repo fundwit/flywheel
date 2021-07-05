@@ -2,15 +2,15 @@ package work
 
 import (
 	"errors"
-	"flywheel/app/event"
 	"flywheel/bizerror"
-	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/namespace"
 	"flywheel/domain/state"
+	"flywheel/event"
+	"flywheel/idgen"
 	"flywheel/persistence"
-	"flywheel/security"
+	"flywheel/session"
 	"strconv"
 
 	"github.com/fundwit/go-commons/types"
@@ -108,14 +108,14 @@ work
 // permissions
 
 type WorkManagerTraits interface {
-	QueryWork(query *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error)
-	WorkDetail(id string, sec *security.Context) (*domain.WorkDetail, error)
-	CreateWork(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error)
-	UpdateWork(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error)
-	DeleteWork(id types.ID, sec *security.Context) error
-	UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *security.Context) error
+	QueryWork(query *domain.WorkQuery, sec *session.Context) (*[]domain.Work, error)
+	WorkDetail(id string, sec *session.Context) (*domain.WorkDetail, error)
+	CreateWork(c *domain.WorkCreation, sec *session.Context) (*domain.WorkDetail, error)
+	UpdateWork(id types.ID, u *domain.WorkUpdating, sec *session.Context) (*domain.Work, error)
+	DeleteWork(id types.ID, sec *session.Context) error
+	UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *session.Context) error
 
-	ArchiveWorks(ids []types.ID, sec *security.Context) error
+	ArchiveWorks(ids []types.ID, sec *session.Context) error
 }
 
 type WorkManager struct {
@@ -132,7 +132,7 @@ func NewWorkManager(ds *persistence.DataSourceManager, workflowManager flow.Work
 	}
 }
 
-func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) (*[]domain.Work, error) {
+func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *session.Context) (*[]domain.Work, error) {
 	var works []domain.Work
 	db := m.dataSource.GormDB()
 
@@ -145,11 +145,11 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 	}
 
 	if query.ArchiveState == domain.StatusOn {
-		q = q.Where("archive_time != ?", common.Timestamp{})
+		q = q.Where("archive_time != ?", types.Timestamp{})
 	} else if query.ArchiveState == domain.StatusAll {
 		// archive_time not in where clause
 	} else {
-		q = q.Where("archive_time = ?", common.Timestamp{})
+		q = q.Where("archive_time = ?", types.Timestamp{})
 	}
 
 	visibleProjects := sec.VisibleProjects()
@@ -185,7 +185,7 @@ func (m *WorkManager) QueryWork(query *domain.WorkQuery, sec *security.Context) 
 	return &works, nil
 }
 
-func (m *WorkManager) WorkDetail(identifier string, sec *security.Context) (*domain.WorkDetail, error) {
+func (m *WorkManager) WorkDetail(identifier string, sec *session.Context) (*domain.WorkDetail, error) {
 	id, _ := types.ParseID(identifier)
 	workDetail := domain.WorkDetail{}
 	db := m.dataSource.GormDB()
@@ -211,7 +211,7 @@ func (m *WorkManager) WorkDetail(identifier string, sec *security.Context) (*dom
 	return &workDetail, nil
 }
 
-func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) (*domain.WorkDetail, error) {
+func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *session.Context) (*domain.WorkDetail, error) {
 	if !sec.HasRoleSuffix("_" + c.ProjectID.String()) {
 		return nil, bizerror.ErrForbidden
 	}
@@ -228,10 +228,10 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 			return bizerror.ErrUnknownState
 		}
 
-		now := common.CurrentTimestamp()
+		now := types.CurrentTimestamp()
 		workDetail = &domain.WorkDetail{
 			Work: domain.Work{
-				ID:         common.NextId(m.idWorker),
+				ID:         idgen.NextID(m.idWorker),
 				Name:       c.Name,
 				ProjectID:  c.ProjectID,
 				CreateTime: now,
@@ -286,7 +286,7 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *security.Context) 
 	return workDetail, nil
 }
 
-func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *security.Context) (*domain.Work, error) {
+func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *session.Context) (*domain.Work, error) {
 	var updatedWork domain.Work
 	err := m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
 		originWork, err := m.findWorkAndCheckPerms(tx, id, sec)
@@ -307,7 +307,7 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *secur
 		}
 
 		if err := CreateWorkPropertyUpdatedEvent(originWork,
-			[]event.PropertyUpdated{{
+			[]event.UpdatedProperty{{
 				PropertyName: "Name", PropertyDesc: "Name",
 				OldValue: originWork.Name, OldValueDesc: originWork.Name,
 				NewValue: u.Name, NewValueDesc: u.Name,
@@ -339,7 +339,7 @@ func (m *WorkManager) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *secur
 	return &updatedWork, nil
 }
 
-func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *security.Context) error {
+func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *session.Context) error {
 	if wantedOrders == nil || len(*wantedOrders) == 0 {
 		return nil
 	}
@@ -360,7 +360,7 @@ func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRan
 				return errors.New("expected affected row is 1, but actual is " + strconv.FormatInt(db.RowsAffected, 10))
 			}
 			if err := CreateWorkPropertyUpdatedEvent(originWork,
-				[]event.PropertyUpdated{{
+				[]event.UpdatedProperty{{
 					PropertyName: "OrderInState", PropertyDesc: "OrderInState",
 					OldValue: strconv.FormatInt(originWork.OrderInState, 10), OldValueDesc: strconv.FormatInt(originWork.OrderInState, 10),
 					NewValue: strconv.FormatInt(orderUpdating.NewOlder, 10), NewValueDesc: strconv.FormatInt(orderUpdating.NewOlder, 10),
@@ -373,7 +373,7 @@ func (m *WorkManager) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRan
 	})
 }
 
-func (m *WorkManager) DeleteWork(id types.ID, sec *security.Context) error {
+func (m *WorkManager) DeleteWork(id types.ID, sec *session.Context) error {
 	err := m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
 		_, err := m.findWorkAndCheckPerms(tx, id, sec)
 		if err != nil {
@@ -404,8 +404,8 @@ func (m *WorkManager) DeleteWork(id types.ID, sec *security.Context) error {
 	return err
 }
 
-func (m *WorkManager) ArchiveWorks(ids []types.ID, sec *security.Context) error {
-	now := common.CurrentTimestamp()
+func (m *WorkManager) ArchiveWorks(ids []types.ID, sec *session.Context) error {
+	now := types.CurrentTimestamp()
 	err := m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
 		for _, id := range ids {
 			work, err := m.findWorkAndCheckPerms(tx, id, sec)
@@ -420,7 +420,7 @@ func (m *WorkManager) ArchiveWorks(ids []types.ID, sec *security.Context) error 
 			}
 
 			if err := CreateWorkPropertyUpdatedEvent(work,
-				[]event.PropertyUpdated{{
+				[]event.UpdatedProperty{{
 					PropertyName: "ArchiveTime", PropertyDesc: "ArchiveTime",
 					OldValue: work.ArchiveTime.String(), OldValueDesc: work.ArchiveTime.String(),
 					NewValue: now.String(), NewValueDesc: now.String(),
@@ -440,7 +440,7 @@ func (m *WorkManager) ArchiveWorks(ids []types.ID, sec *security.Context) error 
 	return err
 }
 
-func (m *WorkManager) findWorkAndCheckPerms(db *gorm.DB, id types.ID, sec *security.Context) (*domain.Work, error) {
+func (m *WorkManager) findWorkAndCheckPerms(db *gorm.DB, id types.ID, sec *session.Context) (*domain.Work, error) {
 	var work domain.Work
 	if err := db.Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
 		return nil, err

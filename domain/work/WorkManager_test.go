@@ -2,16 +2,15 @@ package work_test
 
 import (
 	"errors"
-	"flywheel/app/event"
+	"flywheel/account"
 	"flywheel/bizerror"
-	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/namespace"
 	"flywheel/domain/state"
 	"flywheel/domain/work"
+	"flywheel/event"
 	"flywheel/persistence"
-	"flywheel/security"
 	"flywheel/testinfra"
 	"fmt"
 	"log"
@@ -48,10 +47,10 @@ var _ = Describe("WorkManager", func() {
 		persistence.ActiveDataSourceManager = testDatabase.DS
 		var err error
 		project1, err = namespace.CreateProject(&domain.ProjectCreating{Name: "project 1", Identifier: "GR1"},
-			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1", security.SystemAdminPermission.ID))
+			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1", account.SystemAdminPermission.ID))
 		Expect(err).To(BeNil())
 		project2, err = namespace.CreateProject(&domain.ProjectCreating{Name: "project 2", Identifier: "GR2"},
-			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_2", security.SystemAdminPermission.ID))
+			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_2", account.SystemAdminPermission.ID))
 		Expect(err).To(BeNil())
 
 		flowManager = flow.NewWorkflowManager(testDatabase.DS)
@@ -390,7 +389,7 @@ var _ = Describe("WorkManager", func() {
 		})
 
 		It("works should be ordered by orderInState asc and id asc", func() {
-			now := common.CurrentTimestamp()
+			now := types.CurrentTimestamp()
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", Identifier: "W-1", ProjectID: project1.ID,
 				CreateTime: now, FlowID: flowDetail.ID, OrderInState: 2, StateName: "PENDING", StateBeginTime: now}).Error).To(BeNil())
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 1, Name: "w2", Identifier: "W-2", ProjectID: project1.ID,
@@ -410,7 +409,7 @@ var _ = Describe("WorkManager", func() {
 		})
 
 		It("should return error if failed to find state", func() {
-			now := common.CurrentTimestamp()
+			now := types.CurrentTimestamp()
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", ProjectID: project1.ID,
 				CreateTime: now, FlowID: flowDetail.ID, OrderInState: 2, StateName: "UNKNOWN", StateBeginTime: now}).Error).To(BeNil())
 			works, err := workManager.QueryWork(&domain.WorkQuery{ProjectID: project1.ID},
@@ -444,7 +443,7 @@ var _ = Describe("WorkManager", func() {
 
 			Expect(len(lastEvents)).To(Equal(2))
 			Expect(lastEvents[1].Event).To(Equal(event.Event{SourceId: detail.ID, SourceType: "WORK", SourceDesc: detail.Identifier,
-				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryPropertyUpdated, UpdatedProperties: []event.PropertyUpdated{{
+				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryPropertyUpdated, UpdatedProperties: []event.UpdatedProperty{{
 					PropertyName: "Name", PropertyDesc: "Name", OldValue: detail.Name, OldValueDesc: detail.Name, NewValue: updatedWork.Name, NewValueDesc: updatedWork.Name,
 				}}}))
 			Expect(time.Now().Sub(lastEvents[1].Timestamp.Time()) < time.Second).To(BeTrue())
@@ -501,7 +500,7 @@ var _ = Describe("WorkManager", func() {
 		})
 
 		It("should return error if failed to find state", func() {
-			now := common.CurrentTimestamp()
+			now := types.CurrentTimestamp()
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", ProjectID: project1.ID,
 				CreateTime: now, FlowID: flowDetail.ID, OrderInState: 2, StateName: "UNKNOWN", StateBeginTime: now}).Error).To(BeNil())
 			updatedWork, err := workManager.UpdateWork(2,
@@ -513,7 +512,7 @@ var _ = Describe("WorkManager", func() {
 		})
 
 		It("should failed when work is archived when update work", func() {
-			now := common.CurrentTimestamp()
+			now := types.CurrentTimestamp()
 			Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", ProjectID: project1.ID,
 				CreateTime: now, FlowID: flowDetail.ID, OrderInState: 2,
 				StateName: domain.StateDone.Name, StateCategory: domain.StateDone.Category, StateBeginTime: now}).Error).To(BeNil())
@@ -545,10 +544,10 @@ var _ = Describe("WorkManager", func() {
 			Expect(len(*works)).To(Equal(2))
 
 			testDatabase.DS.GormDB().AutoMigrate(&domain.WorkStateTransition{})
-			err = testDatabase.DS.GormDB().Create(&domain.WorkStateTransition{ID: 1, CreateTime: common.CurrentTimestamp(), Creator: 1,
+			err = testDatabase.DS.GormDB().Create(&domain.WorkStateTransition{ID: 1, CreateTime: types.CurrentTimestamp(), Creator: 1,
 				WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FlowID: 1, WorkID: (*works)[0].ID, FromState: "PENDING", ToState: "DOING"}}).Error
 			Expect(err).To(BeNil())
-			err = testDatabase.DS.GormDB().Create(&domain.WorkStateTransition{ID: 2, CreateTime: common.CurrentTimestamp(), Creator: 1,
+			err = testDatabase.DS.GormDB().Create(&domain.WorkStateTransition{ID: 2, CreateTime: types.CurrentTimestamp(), Creator: 1,
 				WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FlowID: 1, WorkID: 2, FromState: "PENDING", ToState: "DOING"}}).Error
 			Expect(err).To(BeNil())
 			transition := domain.WorkStateTransition{}
@@ -680,7 +679,7 @@ var _ = Describe("WorkManager", func() {
 
 			Expect(len(lastEvents)).To(Equal(1))
 			Expect(lastEvents[0].Event).To(Equal(event.Event{SourceId: workToArchive.ID, SourceType: "WORK", SourceDesc: workToArchive.Identifier,
-				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryPropertyUpdated, UpdatedProperties: []event.PropertyUpdated{{
+				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryPropertyUpdated, UpdatedProperties: []event.UpdatedProperty{{
 					PropertyName: "ArchiveTime", PropertyDesc: "ArchiveTime",
 					OldValue: workToArchive.ArchiveTime.String(), OldValueDesc: workToArchive.ArchiveTime.String(),
 					NewValue: archivedWork.ArchiveTime.String(), NewValueDesc: archivedWork.ArchiveTime.String(),
@@ -747,7 +746,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(len(lastEvents)).To(Equal(2))
 			lastStateOrderUpdatedWork := list[1]
 			Expect(lastEvents[1].Event).To(Equal(event.Event{SourceId: lastStateOrderUpdatedWork.ID, SourceType: "WORK", SourceDesc: lastStateOrderUpdatedWork.Identifier,
-				CreatorId: secCtx.Identity.ID, CreatorName: secCtx.Identity.Name, EventCategory: event.EventCategoryPropertyUpdated, UpdatedProperties: []event.PropertyUpdated{{
+				CreatorId: secCtx.Identity.ID, CreatorName: secCtx.Identity.Name, EventCategory: event.EventCategoryPropertyUpdated, UpdatedProperties: []event.UpdatedProperty{{
 					PropertyName: "OrderInState", PropertyDesc: "OrderInState",
 					OldValue: strconv.FormatInt(lastStateOrderUpdatedWork.OrderInState, 10), OldValueDesc: strconv.FormatInt(lastStateOrderUpdatedWork.OrderInState, 10),
 					NewValue: strconv.FormatInt(list[2].OrderInState+1, 10), NewValueDesc: strconv.FormatInt(list[2].OrderInState+1, 10),

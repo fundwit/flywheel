@@ -3,11 +3,11 @@ package flow
 import (
 	"errors"
 	"flywheel/bizerror"
-	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/state"
+	"flywheel/idgen"
 	"flywheel/persistence"
-	"flywheel/security"
+	"flywheel/session"
 	"strconv"
 	"time"
 
@@ -17,19 +17,19 @@ import (
 )
 
 type WorkflowManagerTraits interface {
-	QueryWorkflows(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error)
-	CreateWorkflow(c *WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error)
-	DetailWorkflow(ID types.ID, sec *security.Context) (*domain.WorkflowDetail, error)
-	UpdateWorkflowBase(ID types.ID, c *WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error)
-	DeleteWorkflow(ID types.ID, sec *security.Context) error
+	QueryWorkflows(query *domain.WorkflowQuery, sec *session.Context) (*[]domain.Workflow, error)
+	CreateWorkflow(c *WorkflowCreation, sec *session.Context) (*domain.WorkflowDetail, error)
+	DetailWorkflow(ID types.ID, sec *session.Context) (*domain.WorkflowDetail, error)
+	UpdateWorkflowBase(ID types.ID, c *WorkflowBaseUpdation, sec *session.Context) (*domain.Workflow, error)
+	DeleteWorkflow(ID types.ID, sec *session.Context) error
 
 	// updateStateMachine
-	CreateWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error
-	DeleteWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error
+	CreateWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *session.Context) error
+	DeleteWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *session.Context) error
 
-	CreateState(workflowID types.ID, creating *StateCreating, sec *security.Context) error
-	UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, sec *security.Context) error
-	UpdateStateRangeOrders(workflowID types.ID, wantedOrders *[]StateOrderRangeUpdating, sec *security.Context) error
+	CreateState(workflowID types.ID, creating *StateCreating, sec *session.Context) error
+	UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, sec *session.Context) error
+	UpdateStateRangeOrders(workflowID types.ID, wantedOrders *[]StateOrderRangeUpdating, sec *session.Context) error
 }
 
 type WorkflowManager struct {
@@ -78,14 +78,14 @@ func NewWorkflowManager(ds *persistence.DataSourceManager) *WorkflowManager {
 	}
 }
 
-func (m *WorkflowManager) CreateWorkflow(c *WorkflowCreation, sec *security.Context) (*domain.WorkflowDetail, error) {
+func (m *WorkflowManager) CreateWorkflow(c *WorkflowCreation, sec *session.Context) (*domain.WorkflowDetail, error) {
 	if !sec.HasRoleSuffix("_" + c.ProjectID.String()) {
 		return nil, bizerror.ErrForbidden
 	}
 
 	workflow := &domain.WorkflowDetail{
 		Workflow: domain.Workflow{
-			ID:         common.NextId(m.idWorker),
+			ID:         idgen.NextID(m.idWorker),
 			Name:       c.Name,
 			ProjectID:  c.ProjectID,
 			ThemeColor: c.ThemeColor,
@@ -130,7 +130,7 @@ func (m *WorkflowManager) CreateWorkflow(c *WorkflowCreation, sec *security.Cont
 	return workflow, nil
 }
 
-func (m *WorkflowManager) DetailWorkflow(id types.ID, sec *security.Context) (*domain.WorkflowDetail, error) {
+func (m *WorkflowManager) DetailWorkflow(id types.ID, sec *session.Context) (*domain.WorkflowDetail, error) {
 	workflowDetail := domain.WorkflowDetail{}
 	db := m.dataSource.GormDB()
 	err := db.Transaction(func(tx *gorm.DB) error {
@@ -173,7 +173,7 @@ func (m *WorkflowManager) DetailWorkflow(id types.ID, sec *security.Context) (*d
 	return &workflowDetail, nil
 }
 
-func (m *WorkflowManager) QueryWorkflows(query *domain.WorkflowQuery, sec *security.Context) (*[]domain.Workflow, error) {
+func (m *WorkflowManager) QueryWorkflows(query *domain.WorkflowQuery, sec *session.Context) (*[]domain.Workflow, error) {
 	var workflows []domain.Workflow
 	db := m.dataSource.GormDB()
 
@@ -193,7 +193,7 @@ func (m *WorkflowManager) QueryWorkflows(query *domain.WorkflowQuery, sec *secur
 	return &workflows, nil
 }
 
-func (m *WorkflowManager) UpdateWorkflowBase(id types.ID, c *WorkflowBaseUpdation, sec *security.Context) (*domain.Workflow, error) {
+func (m *WorkflowManager) UpdateWorkflowBase(id types.ID, c *WorkflowBaseUpdation, sec *session.Context) (*domain.Workflow, error) {
 	wf := domain.Workflow{}
 	db := m.dataSource.GormDB()
 	err := db.Transaction(func(tx *gorm.DB) error {
@@ -219,7 +219,7 @@ func (m *WorkflowManager) UpdateWorkflowBase(id types.ID, c *WorkflowBaseUpdatio
 	return &wf, nil
 }
 
-func (m *WorkflowManager) DeleteWorkflow(id types.ID, sec *security.Context) error {
+func (m *WorkflowManager) DeleteWorkflow(id types.ID, sec *session.Context) error {
 	wf := domain.Workflow{}
 	db := m.dataSource.GormDB()
 	err := db.Transaction(func(tx *gorm.DB) error {
@@ -250,7 +250,7 @@ func (m *WorkflowManager) DeleteWorkflow(id types.ID, sec *security.Context) err
 	return err
 }
 
-func (m *WorkflowManager) CreateWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error {
+func (m *WorkflowManager) CreateWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *session.Context) error {
 	workflow := domain.Workflow{}
 	db := m.dataSource.GormDB()
 	return db.Transaction(func(tx *gorm.DB) error {
@@ -288,7 +288,7 @@ func (m *WorkflowManager) CreateWorkflowStateTransitions(id types.ID, transition
 	})
 }
 
-func (m *WorkflowManager) DeleteWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *security.Context) error {
+func (m *WorkflowManager) DeleteWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *session.Context) error {
 	wf := domain.Workflow{}
 	db := m.dataSource.GormDB()
 	return db.Transaction(func(tx *gorm.DB) error {
@@ -312,7 +312,7 @@ func (m *WorkflowManager) DeleteWorkflowStateTransitions(id types.ID, transition
 	})
 }
 
-func (m *WorkflowManager) UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, sec *security.Context) error {
+func (m *WorkflowManager) UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, sec *session.Context) error {
 	workflow := domain.Workflow{}
 	db := m.dataSource.GormDB()
 	return db.Transaction(func(tx *gorm.DB) error {
@@ -404,7 +404,7 @@ func (m *WorkflowManager) UpdateWorkflowState(id types.ID, updating WorkflowStat
 	})
 }
 
-func (m *WorkflowManager) CreateState(workflowID types.ID, creating *StateCreating, sec *security.Context) error {
+func (m *WorkflowManager) CreateState(workflowID types.ID, creating *StateCreating, sec *session.Context) error {
 	now := time.Now()
 	return m.dataSource.GormDB().Transaction(func(tx *gorm.DB) error {
 		if err := m.checkPerms(workflowID, sec); err != nil {
@@ -443,7 +443,7 @@ func (m *WorkflowManager) CreateState(workflowID types.ID, creating *StateCreati
 	})
 }
 
-func (m *WorkflowManager) UpdateStateRangeOrders(workflowID types.ID, wantedOrders *[]StateOrderRangeUpdating, sec *security.Context) error {
+func (m *WorkflowManager) UpdateStateRangeOrders(workflowID types.ID, wantedOrders *[]StateOrderRangeUpdating, sec *session.Context) error {
 	if wantedOrders == nil || len(*wantedOrders) == 0 {
 		return nil
 	}
@@ -468,7 +468,7 @@ func (m *WorkflowManager) UpdateStateRangeOrders(workflowID types.ID, wantedOrde
 	})
 }
 
-func (m *WorkflowManager) checkPerms(id types.ID, sec *security.Context) error {
+func (m *WorkflowManager) checkPerms(id types.ID, sec *session.Context) error {
 	var workflow domain.Workflow
 	if err := m.dataSource.GormDB().Where(&domain.Workflow{ID: id}).First(&workflow).Error; err != nil {
 		return err

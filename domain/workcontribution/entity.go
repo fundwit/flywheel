@@ -1,8 +1,6 @@
 package workcontribution
 
 import (
-	"flywheel/common"
-
 	"github.com/fundwit/go-commons/types"
 )
 
@@ -14,8 +12,8 @@ type WorkContributionRecord struct {
 	WorkProjectId   types.ID `json:"workProjectId"`
 	ContributorName string   `json:"contributorName"`
 
-	BeginTime common.Timestamp `json:"beginTime" sql:"type:DATETIME(6) NOT NULL"`
-	EndTime   common.Timestamp `json:"endTime" sql:"type:DATETIME(6) NOT NULL"`
+	BeginTime types.Timestamp `json:"beginTime" sql:"type:DATETIME(6) NOT NULL"`
+	EndTime   types.Timestamp `json:"endTime" sql:"type:DATETIME(6) NOT NULL"`
 
 	Effective bool `json:"effective"`
 }

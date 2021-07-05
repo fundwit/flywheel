@@ -2,12 +2,13 @@ package workcontribution_test
 
 import (
 	"errors"
+	"flywheel/account"
+	"flywheel/authority"
 	"flywheel/bizerror"
-	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/workcontribution"
 	"flywheel/persistence"
-	"flywheel/security"
+	"flywheel/session"
 	"flywheel/testinfra"
 	"time"
 
@@ -21,10 +22,10 @@ var _ = Describe("WorkContributions", func() {
 	var (
 		testDatabase  *testinfra.TestDatabase
 		db            *gorm.DB
-		grantedUser   *security.User
-		ungrantedUser *security.User
+		grantedUser   *account.User
+		ungrantedUser *account.User
 		givenWork     *domain.Work
-		sessionUser   *security.User
+		sessionUser   *account.User
 		testErr       error
 	)
 	BeforeEach(func() {
@@ -32,23 +33,23 @@ var _ = Describe("WorkContributions", func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
 		Expect(testDatabase.DS.GormDB().AutoMigrate(
 			&workcontribution.WorkContributionRecord{},
-			&domain.Work{}, &security.User{}).Error).To(BeNil())
+			&domain.Work{}, &account.User{}).Error).To(BeNil())
 		persistence.ActiveDataSourceManager = testDatabase.DS
 		db = testDatabase.DS.GormDB()
-		security.LoadPermFunc = func(uid types.ID) (security.Permissions, security.VisiableProjects) {
-			return security.Permissions{}, security.VisiableProjects{}
+		account.LoadPermFunc = func(uid types.ID) (authority.Permissions, authority.VisiableProjects) {
+			return authority.Permissions{}, authority.VisiableProjects{}
 		}
 		// given a work and a user
-		grantedUser = &security.User{ID: 10, Name: "testUser", Nickname: "Test User", Secret: "123"}
+		grantedUser = &account.User{ID: 10, Name: "testUser", Nickname: "Test User", Secret: "123"}
 		Expect(db.Save(grantedUser).Error).To(BeNil())
 
-		ungrantedUser = &security.User{ID: 11, Name: "test user 11", Secret: "123"}
+		ungrantedUser = &account.User{ID: 11, Name: "test user 11", Secret: "123"}
 		Expect(db.Save(ungrantedUser).Error).To(BeNil())
 
 		givenWork = &domain.Work{ID: 20, Identifier: "TES-1", Name: "test work", ProjectID: 30, FlowID: 40}
 		Expect(db.Save(givenWork).Error).To(BeNil())
 
-		sessionUser = &security.User{ID: 999, Name: "test user 999", Secret: "123"}
+		sessionUser = &account.User{ID: 999, Name: "test user 999", Secret: "123"}
 		Expect(db.Save(sessionUser).Error).To(BeNil())
 	})
 	AfterEach(func() {
@@ -57,7 +58,7 @@ var _ = Describe("WorkContributions", func() {
 
 	Describe("CheckContributorWorkPermission", func() {
 		It("should return error when contributor is not found or when work is not found", func() {
-			sec := &security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}}
+			sec := &session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}}
 
 			// work not exist
 			work, user, err := workcontribution.CheckContributorWorkPermission("TES-404", grantedUser.ID, sec)
@@ -76,7 +77,7 @@ var _ = Describe("WorkContributions", func() {
 			// session user: neither admin nor member of work's project    => Forbidden
 			// contributor : -
 			work, user, err := workcontribution.CheckContributorWorkPermission(givenWork.Identifier, ungrantedUser.ID,
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{}})
 			Expect(err).To(Equal(bizerror.ErrForbidden))
 			Expect(work).To(BeNil())
 			Expect(user).To(BeNil())
@@ -84,7 +85,7 @@ var _ = Describe("WorkContributions", func() {
 			// session user: neither admin nor manager of work's project     => Forbidden
 			// contributor : -
 			work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, ungrantedUser.ID,
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{"guest_" + givenWork.ProjectID.String()}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{"guest_" + givenWork.ProjectID.String()}})
 			Expect(err).To(Equal(bizerror.ErrForbidden))
 			Expect(work).To(BeNil())
 			Expect(user).To(BeNil())
@@ -92,7 +93,7 @@ var _ = Describe("WorkContributions", func() {
 			// session user: admin                          => OK
 			// contributor : not member of work's project   => NoContent
 			work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, ungrantedUser.ID,
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{security.SystemAdminPermission.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
 			Expect(err).To(Equal(bizerror.ErrNoContent))
 			Expect(work).To(BeNil())
 			Expect(user).To(BeNil())
@@ -100,19 +101,19 @@ var _ = Describe("WorkContributions", func() {
 			// session user: manager of work's project        => OK
 			// contributor : not member of work's project   => NoContent
 			work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, ungrantedUser.ID,
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}})
 			Expect(err).To(Equal(bizerror.ErrNoContent))
 			Expect(work).To(BeNil())
 			Expect(user).To(BeNil())
 
 			// session user: admin                               => OK
 			// contributor : member of work's project            => OK
-			security.LoadPermFunc = func(uid types.ID) (security.Permissions, security.VisiableProjects) {
-				return []string{"guest_" + givenWork.ProjectID.String()},
-					[]domain.ProjectRole{{ProjectID: givenWork.ProjectID, ProjectName: "demo project", ProjectIdentifier: "TES", Role: domain.ProjectRoleManager + ""}}
+			account.LoadPermFunc = func(uid types.ID) (authority.Permissions, authority.VisiableProjects) {
+				return authority.Permissions{"guest_" + givenWork.ProjectID.String()},
+					authority.VisiableProjects{{ProjectID: givenWork.ProjectID, ProjectName: "demo project", ProjectIdentifier: "TES", Role: domain.ProjectRoleManager + ""}}
 			}
 			work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, grantedUser.ID,
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{security.SystemAdminPermission.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
 			Expect(err).To(BeNil())
 			Expect(*work).To(Equal(*givenWork))
 			Expect(*user).To(Equal(*grantedUser))
@@ -120,7 +121,7 @@ var _ = Describe("WorkContributions", func() {
 			// session user: manager of work's project             => OK
 			// contributor : member of work's project            => OK
 			work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, grantedUser.ID,
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}})
 			Expect(err).To(BeNil())
 			Expect(*work).To(Equal(*givenWork))
 			Expect(*user).To(Equal(*grantedUser))
@@ -129,22 +130,22 @@ var _ = Describe("WorkContributions", func() {
 		It("should return corrent result when contributor is session user", func() {
 			// session user(contributor): neithr admin nor member of work's project
 			work, user, err := workcontribution.CheckContributorWorkPermission(givenWork.Identifier, sessionUser.ID,
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{}})
 			Expect(err).To(Equal(bizerror.ErrForbidden))
 			Expect(work).To(BeNil())
 			Expect(user).To(BeNil())
 
 			// session user(contributor): admin
 			work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, sessionUser.ID,
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{security.SystemAdminPermission.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
 			Expect(err).To(Equal(bizerror.ErrForbidden))
 			Expect(work).To(BeNil())
 			Expect(user).To(BeNil())
 
 			// session user(contributor): member of project
 			work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, sessionUser.ID,
-				&security.Context{
-					Identity:     security.Identity{ID: sessionUser.ID},
+				&session.Context{
+					Identity:     session.Identity{ID: sessionUser.ID},
 					Perms:        []string{"guest_" + givenWork.ProjectID.String()},
 					ProjectRoles: []domain.ProjectRole{{ProjectID: givenWork.ProjectID, ProjectName: "demo project", ProjectIdentifier: "TES", Role: "guest"}},
 				})
@@ -156,23 +157,23 @@ var _ = Describe("WorkContributions", func() {
 
 	Describe("BeginWorkContribution", func() {
 		BeforeEach(func() {
-			workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *security.Context) (*domain.Work, *security.User, error) {
+			workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
 				return givenWork, grantedUser, nil
 			}
 		})
 		It("should return error when permission check failed", func() {
-			workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *security.Context) (*domain.Work, *security.User, error) {
+			workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
 				return nil, nil, testErr
 			}
 			id, err := workcontribution.BeginWorkContribution(
 				&workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID},
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(id).To(BeZero())
 			Expect(err).To(Equal(testErr))
 		})
 
 		It("should be able to begin new contribution", func() {
-			sec := &security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{security.SystemAdminPermission.ID}}
+			sec := &session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}}
 			begin := time.Now()
 			id, err := workcontribution.BeginWorkContribution(
 				&workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}, sec)
@@ -191,11 +192,11 @@ var _ = Describe("WorkContributions", func() {
 		})
 
 		It("should be able to contribution again when last contribution is undergoing", func() {
-			sec := &security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{security.SystemAdminPermission.ID}}
+			sec := &session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}}
 
 			givenReocrd := workcontribution.WorkContributionRecord{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: "TEST-100", ContributorId: 200},
-				ID:               1000, ContributorName: "user 200", BeginTime: common.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local), Effective: true,
+				ID:               1000, ContributorName: "user 200", BeginTime: types.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local), Effective: true,
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
 
@@ -219,12 +220,12 @@ var _ = Describe("WorkContributions", func() {
 		})
 
 		It("should be able to contribution again when last contribution is finished", func() {
-			sec := &security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{security.SystemAdminPermission.ID}}
+			sec := &session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}}
 
 			givenReocrd := workcontribution.WorkContributionRecord{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: "TEST-100", ContributorId: 200},
-				ID:               1000, ContributorName: "user 200", BeginTime: common.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
-				EndTime: common.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: true,
+				ID:               1000, ContributorName: "user 200", BeginTime: types.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
+				EndTime: types.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: true,
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
 
@@ -248,12 +249,12 @@ var _ = Describe("WorkContributions", func() {
 		})
 
 		It("should be able to contribution again when last contribution is discarded", func() {
-			sec := &security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{security.SystemAdminPermission.ID}}
+			sec := &session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}}
 
 			givenReocrd := workcontribution.WorkContributionRecord{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: "TEST-100", ContributorId: 200},
-				ID:               1000, ContributorName: "user 200", BeginTime: common.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
-				EndTime: common.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: false,
+				ID:               1000, ContributorName: "user 200", BeginTime: types.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
+				EndTime: types.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: false,
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
 
@@ -279,37 +280,37 @@ var _ = Describe("WorkContributions", func() {
 
 	Describe("FinishWorkContribution effective", func() {
 		BeforeEach(func() {
-			workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *security.Context) (*domain.Work, *security.User, error) {
+			workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
 				return givenWork, grantedUser, nil
 			}
 		})
 		It("should return error when permission check failed", func() {
-			workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *security.Context) (*domain.Work, *security.User, error) {
+			workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
 				return nil, nil, testErr
 			}
 			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{Effective: true,
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(Equal(testErr))
 		})
 		It("should faild to finish work contribution when work contribution is not exist", func() {
 			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{Effective: true,
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(Equal(gorm.ErrRecordNotFound))
 		})
 
 		It("should be able to finish work contribution when work contribution is undergoing", func() {
 			givenReocrd := workcontribution.WorkContributionRecord{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID},
-				ID:               1000, ContributorName: "user 200", BeginTime: common.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
+				ID:               1000, ContributorName: "user 200", BeginTime: types.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
 				Effective: true,
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
 			begin := time.Now()
 			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{Effective: true,
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())
 
 			record := workcontribution.WorkContributionRecord{ID: givenReocrd.ID}
@@ -327,13 +328,13 @@ var _ = Describe("WorkContributions", func() {
 		It("should be able to finish work contribution when work contribution already finished", func() {
 			givenReocrd := workcontribution.WorkContributionRecord{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID},
-				ID:               1000, ContributorName: "user 200", BeginTime: common.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
-				EndTime: common.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: true,
+				ID:               1000, ContributorName: "user 200", BeginTime: types.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
+				EndTime: types.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: true,
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
 			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{Effective: true,
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())
 
 			record := workcontribution.WorkContributionRecord{ID: givenReocrd.ID}
@@ -351,13 +352,13 @@ var _ = Describe("WorkContributions", func() {
 		It("should be able to finish work contribution when work contribution is discarded", func() {
 			givenReocrd := workcontribution.WorkContributionRecord{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID},
-				ID:               1000, ContributorName: "user 200", BeginTime: common.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
-				EndTime: common.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: false,
+				ID:               1000, ContributorName: "user 200", BeginTime: types.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
+				EndTime: types.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: false,
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
 			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{Effective: true,
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())
 
 			record := workcontribution.WorkContributionRecord{ID: givenReocrd.ID}
@@ -375,37 +376,37 @@ var _ = Describe("WorkContributions", func() {
 
 	Describe("FinishWorkContribution effective = false", func() {
 		BeforeEach(func() {
-			workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *security.Context) (*domain.Work, *security.User, error) {
+			workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
 				return givenWork, grantedUser, nil
 			}
 		})
 		It("should return error when permission check failed", func() {
-			workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *security.Context) (*domain.Work, *security.User, error) {
+			workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
 				return nil, nil, testErr
 			}
 			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(Equal(testErr))
 		})
 		It("should faild to discard work contribution when work contribution is not exist", func() {
 			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(Equal(gorm.ErrRecordNotFound))
 		})
 
 		It("should be able to discard work contribution when work contribution is undergoing", func() {
 			givenReocrd := workcontribution.WorkContributionRecord{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID},
-				ID:               1000, ContributorName: "user 200", BeginTime: common.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
+				ID:               1000, ContributorName: "user 200", BeginTime: types.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
 				Effective: true,
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
 			begin := time.Now()
 			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())
 
 			record := workcontribution.WorkContributionRecord{ID: givenReocrd.ID}
@@ -423,13 +424,13 @@ var _ = Describe("WorkContributions", func() {
 		It("should be able to discard work contribution when work contribution already finished", func() {
 			givenReocrd := workcontribution.WorkContributionRecord{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID},
-				ID:               1000, ContributorName: "user 200", BeginTime: common.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
-				EndTime: common.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: true,
+				ID:               1000, ContributorName: "user 200", BeginTime: types.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
+				EndTime: types.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: true,
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
 			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())
 
 			record := workcontribution.WorkContributionRecord{ID: givenReocrd.ID}
@@ -447,13 +448,13 @@ var _ = Describe("WorkContributions", func() {
 		It("should be able to discard work contribution when work contribution is discarded", func() {
 			givenReocrd := workcontribution.WorkContributionRecord{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID},
-				ID:               1000, ContributorName: "user 200", BeginTime: common.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
-				EndTime: common.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: false,
+				ID:               1000, ContributorName: "user 200", BeginTime: types.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
+				EndTime: types.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: false,
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
 			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())
 
 			record := workcontribution.WorkContributionRecord{ID: givenReocrd.ID}
@@ -472,13 +473,13 @@ var _ = Describe("WorkContributions", func() {
 	Describe("QueryWorkContributions", func() {
 		It("should get empty result when no work keys", func() {
 			result, err := workcontribution.QueryWorkContributions(
-				workcontribution.WorkContributionsQuery{}, &security.Context{Identity: security.Identity{ID: sessionUser.ID}})
+				workcontribution.WorkContributionsQuery{}, &session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())
 			Expect(result).ToNot(BeNil())
 			Expect(len(*result)).To(BeZero())
 
 			result, err = workcontribution.QueryWorkContributions(
-				workcontribution.WorkContributionsQuery{WorkKeys: []string{}}, &security.Context{Identity: security.Identity{ID: sessionUser.ID}})
+				workcontribution.WorkContributionsQuery{WorkKeys: []string{}}, &session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())
 			Expect(result).ToNot(BeNil())
 			Expect(len(*result)).To(BeZero())
@@ -486,7 +487,7 @@ var _ = Describe("WorkContributions", func() {
 
 		It("should get empty result when work keys not exists", func() {
 			result, err := workcontribution.QueryWorkContributions(
-				workcontribution.WorkContributionsQuery{WorkKeys: []string{"TEST_404"}}, &security.Context{Identity: security.Identity{ID: sessionUser.ID}})
+				workcontribution.WorkContributionsQuery{WorkKeys: []string{"TEST_404"}}, &session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())
 			Expect(result).ToNot(BeNil())
 			Expect(len(*result)).To(BeZero())
@@ -495,15 +496,15 @@ var _ = Describe("WorkContributions", func() {
 		It("should be able to get correct result", func() {
 			givenReocrd1 := workcontribution.WorkContributionRecord{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID},
-				ID:               1000, ContributorName: "user 200", BeginTime: common.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
-				EndTime: common.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: true,
+				ID:               1000, ContributorName: "user 200", BeginTime: types.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
+				EndTime: types.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: true,
 				WorkProjectId: 300,
 			}
 			Expect(db.Save(&givenReocrd1).Error).To(BeNil())
 			givenReocrd2 := workcontribution.WorkContributionRecord{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: "TEST_404", ContributorId: grantedUser.ID},
-				ID:               1001, ContributorName: "user 200", BeginTime: common.TimestampOfDate(2021, 1, 1, 13, 0, 0, 0, time.Local),
-				EndTime: common.TimestampOfDate(2021, 1, 2, 13, 0, 0, 0, time.Local), Effective: true,
+				ID:               1001, ContributorName: "user 200", BeginTime: types.TimestampOfDate(2021, 1, 1, 13, 0, 0, 0, time.Local),
+				EndTime: types.TimestampOfDate(2021, 1, 2, 13, 0, 0, 0, time.Local), Effective: true,
 				WorkProjectId: 404,
 			}
 			Expect(db.Save(&givenReocrd2).Error).To(BeNil())
@@ -511,7 +512,7 @@ var _ = Describe("WorkContributions", func() {
 			// should be able to get result of all project for system admin
 			result, err := workcontribution.QueryWorkContributions(
 				workcontribution.WorkContributionsQuery{WorkKeys: []string{givenReocrd1.WorkKey, givenReocrd2.WorkKey}},
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{security.SystemAdminPermission.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
 			Expect(err).To(BeNil())
 			Expect(len(*result)).To(Equal(2))
 			Expect((*result)[0]).To(Equal(givenReocrd1))
@@ -519,16 +520,16 @@ var _ = Describe("WorkContributions", func() {
 
 			result, err = workcontribution.QueryWorkContributions(
 				workcontribution.WorkContributionsQuery{WorkKeys: []string{givenReocrd2.WorkKey}},
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{security.SystemAdminPermission.ID}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
 			Expect(err).To(BeNil())
 			Expect(len(*result)).To(Equal(1))
 			Expect((*result)[0]).To(Equal(givenReocrd2))
 
 			// should be able to get result from visable projects for non system admin
-			// security.Context.VisibleProjects()
+			// session.Context.VisibleProjects()
 			result, err = workcontribution.QueryWorkContributions(
 				workcontribution.WorkContributionsQuery{WorkKeys: []string{givenReocrd1.WorkKey, givenReocrd2.WorkKey}},
-				&security.Context{Identity: security.Identity{ID: sessionUser.ID}, Perms: []string{"guest_404"}})
+				&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{"guest_404"}})
 			Expect(err).To(BeNil())
 			Expect(len(*result)).To(Equal(1))
 			Expect((*result)[0]).To(Equal(givenReocrd2))

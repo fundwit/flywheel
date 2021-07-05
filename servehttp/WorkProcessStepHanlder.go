@@ -2,14 +2,15 @@ package servehttp
 
 import (
 	"flywheel/bizerror"
-	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/work"
-	"flywheel/security"
+	"flywheel/misc"
+	"flywheel/session"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"net/http"
 )
 
 func RegisterWorkProcessStepHandler(r *gin.Engine, m work.WorkProcessManagerTraits, middleWares ...gin.HandlerFunc) {
@@ -29,9 +30,9 @@ func (h *workProcessStepHandler) handleQuery(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	works, err := h.manager.QueryProcessSteps(&query, security.FindSecurityContext(c))
+	works, err := h.manager.QueryProcessSteps(&query, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}
-	c.JSON(http.StatusOK, &common.PagedBody{List: works, Total: uint64(len(*works))})
+	c.JSON(http.StatusOK, &misc.PagedBody{List: works, Total: uint64(len(*works))})
 }

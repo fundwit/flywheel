@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"flywheel/bizerror"
-	"flywheel/common"
 	"flywheel/domain/workcontribution"
-	"flywheel/security"
+	"flywheel/session"
 	"flywheel/testinfra"
 	"net/http"
 	"net/http/httptest"
@@ -32,12 +31,12 @@ var _ = Describe("WorkContributionAPI", func() {
 	Describe("HandleQueryContributions", func() {
 		It("should be able to handle work contributions query rest api request and response", func() {
 			var reqBody *workcontribution.WorkContributionsQuery
-			workcontribution.QueryWorkContributionsFunc = func(query workcontribution.WorkContributionsQuery, sec *security.Context) (*[]workcontribution.WorkContributionRecord, error) {
+			workcontribution.QueryWorkContributionsFunc = func(query workcontribution.WorkContributionsQuery, sec *session.Context) (*[]workcontribution.WorkContributionRecord, error) {
 				reqBody = &query
 				return &[]workcontribution.WorkContributionRecord{{
 					WorkContribution: workcontribution.WorkContribution{WorkKey: "TEST-1", ContributorId: 1000},
-					ID:               100, ContributorName: "user 1000", WorkProjectId: 100, BeginTime: common.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.UTC),
-					EndTime: common.TimestampOfDate(2021, 1, 1, 12, 1, 0, 0, time.UTC), Effective: true,
+					ID:               100, ContributorName: "user 1000", WorkProjectId: 100, BeginTime: types.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.UTC),
+					EndTime: types.TimestampOfDate(2021, 1, 1, 12, 1, 0, 0, time.UTC), Effective: true,
 				}}, nil
 			}
 
@@ -56,7 +55,7 @@ var _ = Describe("WorkContributionAPI", func() {
 	Describe("HandleBeginContribution", func() {
 		It("should be able to handle work contribution begining rest api request and response", func() {
 			var reqBody *workcontribution.WorkContribution
-			workcontribution.BeginWorkContributionFunc = func(d *workcontribution.WorkContribution, sec *security.Context) (types.ID, error) {
+			workcontribution.BeginWorkContributionFunc = func(d *workcontribution.WorkContribution, sec *session.Context) (types.ID, error) {
 				reqBody = d
 				return 12345, nil
 			}
@@ -75,7 +74,7 @@ var _ = Describe("WorkContributionAPI", func() {
 	Describe("HandleFinishContribution", func() {
 		It("should be able to handle work contribution finish rest api request and response", func() {
 			var reqBody *workcontribution.WorkContribuitonFinishBody
-			workcontribution.FinishWorkContributionFunc = func(d *workcontribution.WorkContribuitonFinishBody, sec *security.Context) error {
+			workcontribution.FinishWorkContributionFunc = func(d *workcontribution.WorkContribuitonFinishBody, sec *session.Context) error {
 				reqBody = d
 				return nil
 			}

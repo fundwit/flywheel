@@ -2,11 +2,12 @@ package workcontribution
 
 import (
 	"errors"
+	"flywheel/account"
 	"flywheel/bizerror"
-	"flywheel/common"
 	"flywheel/domain"
+	"flywheel/idgen"
 	"flywheel/persistence"
-	"flywheel/security"
+	"flywheel/session"
 	"fmt"
 
 	"github.com/fundwit/go-commons/types"
@@ -23,7 +24,7 @@ type WorkContributionsQuery struct {
 	WorkKeys []string `form:"workKey" json:"workKeys"`
 }
 
-func QueryWorkContributions(query WorkContributionsQuery, sec *security.Context) (*[]WorkContributionRecord, error) {
+func QueryWorkContributions(query WorkContributionsQuery, sec *session.Context) (*[]WorkContributionRecord, error) {
 	records := []WorkContributionRecord{}
 
 	if len(query.WorkKeys) == 0 {
@@ -33,7 +34,7 @@ func QueryWorkContributions(query WorkContributionsQuery, sec *security.Context)
 	db := persistence.ActiveDataSourceManager.GormDB()
 
 	// admin can view all
-	if sec.HasRole(security.SystemAdminPermission.ID) {
+	if sec.HasRole(account.SystemAdminPermission.ID) {
 		if err := db.Where("work_key IN (?)", query.WorkKeys).Find(&records).Error; err != nil {
 			return nil, err
 		}
@@ -47,7 +48,7 @@ func QueryWorkContributions(query WorkContributionsQuery, sec *security.Context)
 	return &records, nil
 }
 
-func CheckContributorWorkPermission(workKey string, contributorId types.ID, sec *security.Context) (*domain.Work, *security.User, error) {
+func CheckContributorWorkPermission(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
 	db := persistence.ActiveDataSourceManager.GormDB()
 	work := domain.Work{Identifier: workKey}
 	if err := db.Where(&work).First(&work).Error; err != nil {
@@ -56,7 +57,7 @@ func CheckContributorWorkPermission(workKey string, contributorId types.ID, sec 
 		}
 		return nil, nil, err
 	}
-	user := security.User{ID: contributorId}
+	user := account.User{ID: contributorId}
 	if err := db.Where(&user).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, bizerror.ErrNoContent // user not exist
@@ -65,11 +66,11 @@ func CheckContributorWorkPermission(workKey string, contributorId types.ID, sec 
 	}
 
 	if sec.Identity.ID != contributorId {
-		if !sec.HasRole(security.SystemAdminPermission.ID) && !sec.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, work.ProjectID)) {
+		if !sec.HasRole(account.SystemAdminPermission.ID) && !sec.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, work.ProjectID)) {
 			return nil, nil, bizerror.ErrForbidden // only system admin and project manager can assign work to other member
 		}
 
-		_, contributorVisiableProjects := security.LoadPermFunc(contributorId)
+		_, contributorVisiableProjects := account.LoadPermFunc(contributorId)
 		if !contributorVisiableProjects.HasProject(work.ProjectID) {
 			return nil, nil, bizerror.ErrNoContent // contributor is not member of project
 		}
@@ -81,7 +82,7 @@ func CheckContributorWorkPermission(workKey string, contributorId types.ID, sec 
 	return &work, &user, nil
 }
 
-func BeginWorkContribution(d *WorkContribution, sec *security.Context) (types.ID, error) {
+func BeginWorkContribution(d *WorkContribution, sec *session.Context) (types.ID, error) {
 	work, user, err := CheckContributorWorkPermissionFunc(d.WorkKey, d.ContributorId, sec)
 	if err != nil {
 		return 0, err
@@ -92,8 +93,8 @@ func BeginWorkContribution(d *WorkContribution, sec *security.Context) (types.ID
 		err := tx.Where(&WorkContributionRecord{WorkContribution: *d}).First(&record).Error
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			record = WorkContributionRecord{
-				ID:               common.NextID(idWorker),
-				BeginTime:        common.CurrentTimestamp(),
+				ID:               idgen.NextID(idWorker),
+				BeginTime:        types.CurrentTimestamp(),
 				Effective:        true,
 				WorkContribution: *d,
 				ContributorName:  user.DisplayName(),
@@ -104,7 +105,7 @@ func BeginWorkContribution(d *WorkContribution, sec *security.Context) (types.ID
 		} else {
 			record.ContributorName = user.DisplayName()
 			record.WorkProjectId = work.ProjectID
-			record.EndTime = common.Timestamp{}
+			record.EndTime = types.Timestamp{}
 			record.Effective = true
 		}
 
@@ -118,7 +119,7 @@ func BeginWorkContribution(d *WorkContribution, sec *security.Context) (types.ID
 	return record.ID, nil
 }
 
-func FinishWorkContribution(d *WorkContribuitonFinishBody, sec *security.Context) error {
+func FinishWorkContribution(d *WorkContribuitonFinishBody, sec *session.Context) error {
 	work, user, err := CheckContributorWorkPermissionFunc(d.WorkKey, d.ContributorId, sec)
 	if err != nil {
 		return err
@@ -131,7 +132,7 @@ func FinishWorkContribution(d *WorkContribuitonFinishBody, sec *security.Context
 		}
 
 		if record.EndTime.Time().IsZero() {
-			record.EndTime = common.CurrentTimestamp()
+			record.EndTime = types.CurrentTimestamp()
 		}
 		record.WorkProjectId = work.ProjectID
 		record.ContributorName = user.DisplayName()

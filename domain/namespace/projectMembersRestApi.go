@@ -2,7 +2,7 @@ package namespace
 
 import (
 	"flywheel/domain"
-	"flywheel/security"
+	"flywheel/session"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -30,7 +30,7 @@ func HandleQueryProjectMembers(c *gin.Context) {
 	if err != nil {
 		panic(err)
 	}
-	result, err := QueryProjectMembersFunc(&payload, security.FindSecurityContext(c))
+	result, err := QueryProjectMembersFunc(&payload, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +43,7 @@ func HandleCreateProjectMember(c *gin.Context) {
 	if err != nil {
 		panic(err)
 	}
-	err = CreateProjectMemberFunc(&payload, security.FindSecurityContext(c))
+	err = CreateProjectMemberFunc(&payload, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -57,7 +57,7 @@ func HandleDeleteProjectMember(c *gin.Context) {
 		panic(err)
 	}
 
-	err = DeleteProjectMemberFunc(&payload, security.FindSecurityContext(c))
+	err = DeleteProjectMemberFunc(&payload, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}

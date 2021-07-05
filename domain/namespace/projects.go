@@ -2,11 +2,12 @@ package namespace
 
 import (
 	"errors"
+	"flywheel/account"
 	"flywheel/bizerror"
-	"flywheel/common"
 	"flywheel/domain"
+	"flywheel/idgen"
 	"flywheel/persistence"
-	"flywheel/security"
+	"flywheel/session"
 	"fmt"
 	"time"
 
@@ -19,8 +20,8 @@ var (
 	idWorker = sonyflake.NewSonyflake(sonyflake.Settings{})
 )
 
-func QueryProjects(sec *security.Context) (*[]domain.Project, error) {
-	if !sec.HasRole(security.SystemAdminPermission.ID) {
+func QueryProjects(sec *session.Context) (*[]domain.Project, error) {
+	if !sec.HasRole(account.SystemAdminPermission.ID) {
 		return nil, bizerror.ErrForbidden
 	}
 
@@ -31,13 +32,13 @@ func QueryProjects(sec *security.Context) (*[]domain.Project, error) {
 	return &projects, nil
 }
 
-func CreateProject(c *domain.ProjectCreating, sec *security.Context) (*domain.Project, error) {
-	if !sec.HasRole(security.SystemAdminPermission.ID) {
+func CreateProject(c *domain.ProjectCreating, sec *session.Context) (*domain.Project, error) {
+	if !sec.HasRole(account.SystemAdminPermission.ID) {
 		return nil, bizerror.ErrForbidden
 	}
 
 	now := time.Now()
-	g := domain.Project{ID: common.NextId(idWorker), Name: c.Name, Identifier: c.Identifier, NextWorkId: 1, CreateTime: now, Creator: sec.Identity.ID}
+	g := domain.Project{ID: idgen.NextID(idWorker), Name: c.Name, Identifier: c.Identifier, NextWorkId: 1, CreateTime: now, Creator: sec.Identity.ID}
 	r := domain.ProjectMember{ProjectId: g.ID, MemberId: sec.Identity.ID, Role: domain.ProjectRoleManager, CreateTime: now}
 	err := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(g).Error; err != nil {
@@ -54,8 +55,8 @@ func CreateProject(c *domain.ProjectCreating, sec *security.Context) (*domain.Pr
 	return &g, nil
 }
 
-func UpdateProject(id types.ID, d *domain.ProjectUpdating, sec *security.Context) error {
-	if !sec.HasRole(security.SystemAdminPermission.ID) {
+func UpdateProject(id types.ID, d *domain.ProjectUpdating, sec *session.Context) error {
+	if !sec.HasRole(account.SystemAdminPermission.ID) {
 		return bizerror.ErrForbidden
 	}
 
@@ -72,7 +73,7 @@ func UpdateProject(id types.ID, d *domain.ProjectUpdating, sec *security.Context
 	})
 }
 
-func QueryProjectRole(projectId types.ID, sec *security.Context) (string, error) {
+func QueryProjectRole(projectId types.ID, sec *session.Context) (string, error) {
 	gm := domain.ProjectMember{ProjectId: projectId, MemberId: sec.Identity.ID}
 	db := persistence.ActiveDataSourceManager.GormDB()
 	var founds []domain.ProjectMember

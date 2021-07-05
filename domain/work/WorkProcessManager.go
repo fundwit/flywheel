@@ -2,23 +2,24 @@ package work
 
 import (
 	"errors"
-	"flywheel/app/event"
 	"flywheel/bizerror"
-	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/state"
+	"flywheel/event"
+	"flywheel/idgen"
 	"flywheel/persistence"
-	"flywheel/security"
+	"flywheel/session"
 	"strconv"
 
+	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
 	"github.com/sony/sonyflake"
 )
 
 type WorkProcessManagerTraits interface {
-	QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *security.Context) (*[]domain.WorkProcessStep, error)
-	CreateWorkStateTransition(*domain.WorkStateTransitionBrief, *security.Context) (*domain.WorkStateTransition, error)
+	QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error)
+	CreateWorkStateTransition(*domain.WorkStateTransitionBrief, *session.Context) (*domain.WorkStateTransition, error)
 }
 
 type WorkProcessManager struct {
@@ -35,7 +36,7 @@ func NewWorkProcessManager(ds *persistence.DataSourceManager, workflowManger flo
 	}
 }
 
-func (m *WorkProcessManager) QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *security.Context) (*[]domain.WorkProcessStep, error) {
+func (m *WorkProcessManager) QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error) {
 	db := m.dataSource.GormDB()
 	work := domain.Work{}
 	if err := db.Where(&domain.Work{ID: query.WorkID}).Select("project_id").First(&work).Error; err != nil {
@@ -56,7 +57,7 @@ func (m *WorkProcessManager) QueryProcessSteps(query *domain.WorkProcessStepQuer
 	return &processSteps, nil
 }
 
-func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error) {
+func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkStateTransitionBrief, sec *session.Context) (*domain.WorkStateTransition, error) {
 	workflow, err := m.workflowManager.DetailWorkflow(c.FlowID, sec)
 	if err != nil {
 		return nil, err
@@ -67,9 +68,9 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkStateTransi
 		return nil, errors.New("transition from " + c.FromState + " to " + c.ToState + " is not invalid")
 	}
 
-	now := common.CurrentTimestamp()
-	newId := common.NextId(m.idWorker)
-	transition := &domain.WorkStateTransition{ID: newId, CreateTime: common.Timestamp(now), Creator: sec.Identity.ID, WorkStateTransitionBrief: *c}
+	now := types.CurrentTimestamp()
+	newId := idgen.NextID(m.idWorker)
+	transition := &domain.WorkStateTransition{ID: newId, CreateTime: types.Timestamp(now), Creator: sec.Identity.ID, WorkStateTransitionBrief: *c}
 
 	fromState, found := workflow.FindState(c.FromState)
 	if !found {
@@ -103,7 +104,7 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkStateTransi
 			return errors.New("expected affected row is 1, but actual is " + strconv.FormatInt(query.RowsAffected, 10))
 		}
 		if err := CreateWorkPropertyUpdatedEvent(&work,
-			[]event.PropertyUpdated{{
+			[]event.UpdatedProperty{{
 				PropertyName: "StateName", PropertyDesc: "StateName", OldValue: work.StateName, OldValueDesc: work.StateName, NewValue: c.ToState, NewValueDesc: c.ToState,
 			}},
 			&sec.Identity, tx); err != nil {
@@ -134,13 +135,13 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkStateTransi
 		// update process step
 		if fromState.Category != state.Done {
 			if err := tx.Model(&domain.WorkProcessStep{}).LogMode(true).Where(&domain.WorkProcessStep{WorkID: c.WorkID, FlowID: workflow.ID, StateName: fromState.Name}).
-				Where("end_time = ?", common.Timestamp{}).Update(&domain.WorkProcessStep{EndTime: common.Timestamp(now)}).Error; err != nil {
+				Where("end_time = ?", types.Timestamp{}).Update(&domain.WorkProcessStep{EndTime: types.Timestamp(now)}).Error; err != nil {
 				return err
 			}
 		}
 		if toState.Category != state.Done {
 			nextProcessStep := domain.WorkProcessStep{WorkID: work.ID, FlowID: work.FlowID,
-				StateName: toState.Name, StateCategory: toState.Category, BeginTime: common.Timestamp(now)}
+				StateName: toState.Name, StateCategory: toState.Category, BeginTime: types.Timestamp(now)}
 			if err := tx.Create(nextProcessStep).Error; err != nil {
 				return err
 			}

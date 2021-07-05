@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"flywheel/bizerror"
-	"flywheel/common"
 	"flywheel/domain"
-	"flywheel/security"
 	"flywheel/servehttp"
+	"flywheel/session"
 	"flywheel/testinfra"
 	"net/http"
 	"net/http/httptest"
@@ -48,7 +47,7 @@ var _ = Describe("WorkStateTransitionHandler", func() {
 		})
 		It("should be able to handle service error", func() {
 			workProcessManager.CreateWorkStateTransitionFunc =
-				func(c *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error) {
+				func(c *domain.WorkStateTransitionBrief, sec *session.Context) (*domain.WorkStateTransition, error) {
 					return nil, errors.New("a mocked error")
 				}
 			req := httptest.NewRequest(http.MethodPost, "/v1/transitions", bytes.NewReader([]byte(
@@ -64,8 +63,8 @@ var _ = Describe("WorkStateTransitionHandler", func() {
 			timeString := strings.Trim(string(timeBytes), `"`)
 			Expect(err).To(BeNil())
 			workProcessManager.CreateWorkStateTransitionFunc =
-				func(c *domain.WorkStateTransitionBrief, sec *security.Context) (*domain.WorkStateTransition, error) {
-					return &domain.WorkStateTransition{ID: 123, Creator: types.ID(123), CreateTime: common.Timestamp(t), WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FlowID: 1, WorkID: 100, FromState: "PENDING", ToState: "DOING"}}, nil
+				func(c *domain.WorkStateTransitionBrief, sec *session.Context) (*domain.WorkStateTransition, error) {
+					return &domain.WorkStateTransition{ID: 123, Creator: types.ID(123), CreateTime: types.Timestamp(t), WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FlowID: 1, WorkID: 100, FromState: "PENDING", ToState: "DOING"}}, nil
 				}
 
 			req := httptest.NewRequest(http.MethodPost, "/v1/transitions", bytes.NewReader([]byte(

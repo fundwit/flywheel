@@ -1,12 +1,13 @@
 package namespace
 
 import (
-	"flywheel/common"
 	"flywheel/domain"
-	"flywheel/security"
+	"flywheel/misc"
+	"flywheel/session"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"net/http"
 )
 
 var (
@@ -25,7 +26,7 @@ func RegisterProjectsRestApis(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 }
 
 func HandleQueryProjects(c *gin.Context) {
-	result, err := QueryProjectsFunc(security.FindSecurityContext(c))
+	result, err := QueryProjectsFunc(session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -38,7 +39,7 @@ func HandleCreateProject(c *gin.Context) {
 	if err != nil {
 		panic(err)
 	}
-	result, err := CreateProjectFunc(&payload, security.FindSecurityContext(c))
+	result, err := CreateProjectFunc(&payload, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -46,7 +47,7 @@ func HandleCreateProject(c *gin.Context) {
 }
 
 func HandleUpdateProject(c *gin.Context) {
-	id, err := common.BindingPathID(c)
+	id, err := misc.BindingPathID(c)
 	if err != nil {
 		panic(err)
 	}
@@ -56,7 +57,7 @@ func HandleUpdateProject(c *gin.Context) {
 	if err != nil {
 		panic(err)
 	}
-	err = UpdateProjectFunc(id, &payload, security.FindSecurityContext(c))
+	err = UpdateProjectFunc(id, &payload, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}

@@ -3,15 +3,16 @@ package servehttp
 import (
 	"errors"
 	"flywheel/bizerror"
-	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/work"
-	"flywheel/security"
+	"flywheel/misc"
+	"flywheel/session"
+	"net/http"
+
 	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"net/http"
 )
 
 func RegisterWorkHandler(r *gin.Engine, m work.WorkManagerTraits, middleWares ...gin.HandlerFunc) {
@@ -48,7 +49,7 @@ func (h *workHandler) handleCreate(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	detail, err := h.workManager.CreateWork(&creation, security.FindSecurityContext(c))
+	detail, err := h.workManager.CreateWork(&creation, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -56,7 +57,7 @@ func (h *workHandler) handleCreate(c *gin.Context) {
 }
 
 func (h *workHandler) handleDetail(c *gin.Context) {
-	detail, err := h.workManager.WorkDetail(c.Param("id"), security.FindSecurityContext(c))
+	detail, err := h.workManager.WorkDetail(c.Param("id"), session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -68,11 +69,11 @@ func (h *workHandler) handleQuery(c *gin.Context) {
 	query := domain.WorkQuery{}
 	_ = c.MustBindWith(&query, binding.Query)
 
-	works, err := h.workManager.QueryWork(&query, security.FindSecurityContext(c))
+	works, err := h.workManager.QueryWork(&query, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}
-	c.JSON(http.StatusOK, &common.PagedBody{List: works, Total: uint64(len(*works))})
+	c.JSON(http.StatusOK, &misc.PagedBody{List: works, Total: uint64(len(*works))})
 }
 
 func (h *workHandler) handleUpdate(c *gin.Context) {
@@ -87,7 +88,7 @@ func (h *workHandler) handleUpdate(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	updatedWork, err := h.workManager.UpdateWork(parsedId, &updating, security.FindSecurityContext(c))
+	updatedWork, err := h.workManager.UpdateWork(parsedId, &updating, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -100,7 +101,7 @@ func (h *workHandler) handleUpdateOrders(c *gin.Context) {
 	if err != nil {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
-	err = h.workManager.UpdateStateRangeOrders(&updating, security.FindSecurityContext(c))
+	err = h.workManager.UpdateStateRangeOrders(&updating, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -113,7 +114,7 @@ func (h *workHandler) handleDelete(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: errors.New("invalid id '" + c.Param("id") + "'")})
 	}
 
-	err = h.workManager.DeleteWork(parsedId, security.FindSecurityContext(c))
+	err = h.workManager.DeleteWork(parsedId, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -126,7 +127,7 @@ func (h *workHandler) handleCreateArchivedWorks(c *gin.Context) {
 		panic(err)
 	}
 
-	err := h.workManager.ArchiveWorks(query.WorkIdList, security.FindSecurityContext(c))
+	err := h.workManager.ArchiveWorks(query.WorkIdList, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}

@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"flywheel/common"
 	"flywheel/domain/state"
 	"time"
 
@@ -14,8 +13,8 @@ type WorkProcessStep struct {
 	StateName     string         `json:"stateName"`
 	StateCategory state.Category `json:"stateCategory"`
 
-	BeginTime common.Timestamp `json:"beginTime" sql:"type:DATETIME(6) NOT NULL"`
-	EndTime   common.Timestamp `json:"endTime" sql:"type:DATETIME(6)"`
+	BeginTime types.Timestamp `json:"beginTime" sql:"type:DATETIME(6) NOT NULL"`
+	EndTime   types.Timestamp `json:"endTime" sql:"type:DATETIME(6)"`
 }
 
 type WorkProcessStepQuery struct {

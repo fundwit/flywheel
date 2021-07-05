@@ -2,11 +2,11 @@ package servehttp
 
 import (
 	"flywheel/bizerror"
-	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/state"
-	"flywheel/security"
+	"flywheel/misc"
+	"flywheel/session"
 	"net/http"
 	"strconv"
 
@@ -54,7 +54,7 @@ func (h *workflowHandler) handleQueryWorkflows(c *gin.Context) {
 	query := domain.WorkflowQuery{}
 	_ = c.MustBindWith(&query, binding.Query)
 
-	flows, err := h.workflowManager.QueryWorkflows(&query, security.FindSecurityContext(c))
+	flows, err := h.workflowManager.QueryWorkflows(&query, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -71,7 +71,7 @@ func (h *workflowHandler) handleCreateWorkflow(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	workflow, err := h.workflowManager.CreateWorkflow(&creation, security.FindSecurityContext(c))
+	workflow, err := h.workflowManager.CreateWorkflow(&creation, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -83,11 +83,11 @@ func (h *workflowHandler) handleCreateWorkflow(c *gin.Context) {
 func (h *workflowHandler) handleDetailWorkflows(c *gin.Context) {
 	id, err := types.ParseID(c.Param("flowId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
+		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
 		return
 	}
 
-	workflowDetail, err := h.workflowManager.DetailWorkflow(id, security.FindSecurityContext(c))
+	workflowDetail, err := h.workflowManager.DetailWorkflow(id, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -99,7 +99,7 @@ func (h *workflowHandler) handleDetailWorkflows(c *gin.Context) {
 func (h *workflowHandler) handleUpdateWorkflowsBase(c *gin.Context) {
 	id, err := types.ParseID(c.Param("flowId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
+		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
 		return
 	}
 
@@ -112,7 +112,7 @@ func (h *workflowHandler) handleUpdateWorkflowsBase(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	workflow, err := h.workflowManager.UpdateWorkflowBase(id, &updating, security.FindSecurityContext(c))
+	workflow, err := h.workflowManager.UpdateWorkflowBase(id, &updating, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -124,11 +124,11 @@ func (h *workflowHandler) handleUpdateWorkflowsBase(c *gin.Context) {
 func (h *workflowHandler) handleDeleteWorkflow(c *gin.Context) {
 	id, err := types.ParseID(c.Param("flowId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
+		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
 		return
 	}
 
-	err = h.workflowManager.DeleteWorkflow(id, security.FindSecurityContext(c))
+	err = h.workflowManager.DeleteWorkflow(id, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -149,9 +149,9 @@ func (h *workflowHandler) handleQueryTransitions(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	workflow, err := h.workflowManager.DetailWorkflow(query.FlowID, security.FindSecurityContext(c))
+	workflow, err := h.workflowManager.DetailWorkflow(query.FlowID, session.FindSecurityContext(c))
 	if workflow == nil {
-		c.JSON(http.StatusNotFound, &common.ErrorBody{Code: "common.bad_param",
+		c.JSON(http.StatusNotFound, &misc.ErrorBody{Code: "common.bad_param",
 			Message: "the flow of id " + strconv.FormatUint(uint64(query.FlowID), 10) + " was not found"})
 		return
 	}
@@ -163,7 +163,7 @@ func (h *workflowHandler) handleQueryTransitions(c *gin.Context) {
 func (h *workflowHandler) handleCreateStateMachineTransitions(c *gin.Context) {
 	id, err := types.ParseID(c.Param("flowId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
+		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
 		return
 	}
 
@@ -178,7 +178,7 @@ func (h *workflowHandler) handleCreateStateMachineTransitions(c *gin.Context) {
 		}
 	}
 
-	err = h.workflowManager.CreateWorkflowStateTransitions(id, transitions, security.FindSecurityContext(c))
+	err = h.workflowManager.CreateWorkflowStateTransitions(id, transitions, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -190,7 +190,7 @@ func (h *workflowHandler) handleCreateStateMachineTransitions(c *gin.Context) {
 func (h *workflowHandler) handleDeleteStateMachineTransitions(c *gin.Context) {
 	id, err := types.ParseID(c.Param("flowId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
+		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
 		return
 	}
 
@@ -205,7 +205,7 @@ func (h *workflowHandler) handleDeleteStateMachineTransitions(c *gin.Context) {
 		}
 	}
 
-	err = h.workflowManager.DeleteWorkflowStateTransitions(id, transitions, security.FindSecurityContext(c))
+	err = h.workflowManager.DeleteWorkflowStateTransitions(id, transitions, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -217,7 +217,7 @@ func (h *workflowHandler) handleDeleteStateMachineTransitions(c *gin.Context) {
 func (h *workflowHandler) handleUpdateStateMachineState(c *gin.Context) {
 	id, err := types.ParseID(c.Param("flowId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
+		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
 		return
 	}
 
@@ -230,7 +230,7 @@ func (h *workflowHandler) handleUpdateStateMachineState(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	err = h.workflowManager.UpdateWorkflowState(id, updating, security.FindSecurityContext(c))
+	err = h.workflowManager.UpdateWorkflowState(id, updating, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -242,7 +242,7 @@ func (h *workflowHandler) handleUpdateStateMachineState(c *gin.Context) {
 func (h *workflowHandler) handleUpdateStateMachineStateOrders(c *gin.Context) {
 	id, err := types.ParseID(c.Param("flowId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
+		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
 		return
 	}
 
@@ -257,7 +257,7 @@ func (h *workflowHandler) handleUpdateStateMachineStateOrders(c *gin.Context) {
 			panic(&bizerror.ErrBadParam{Cause: err})
 		}
 	}
-	err = h.workflowManager.UpdateStateRangeOrders(id, &orderUpdating, security.FindSecurityContext(c))
+	err = h.workflowManager.UpdateStateRangeOrders(id, &orderUpdating, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -269,7 +269,7 @@ func (h *workflowHandler) handleUpdateStateMachineStateOrders(c *gin.Context) {
 func (h *workflowHandler) handleCreateStateMachineState(c *gin.Context) {
 	id, err := types.ParseID(c.Param("flowId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
+		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
 		return
 	}
 
@@ -279,7 +279,7 @@ func (h *workflowHandler) handleCreateStateMachineState(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	err = h.workflowManager.CreateState(id, &stateCreating, security.FindSecurityContext(c))
+	err = h.workflowManager.CreateState(id, &stateCreating, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()

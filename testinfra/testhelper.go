@@ -2,16 +2,14 @@ package testinfra
 
 import (
 	"flywheel/domain"
-	"flywheel/domain/work"
-	"flywheel/security"
+	"flywheel/session"
 	"strings"
 
 	"github.com/fundwit/go-commons/types"
-	. "github.com/onsi/gomega"
 )
 
-// BuildSecCtx build security context
-func BuildSecCtx(uid types.ID, perms ...string) *security.Context {
+// BuildSecCtx build session context
+func BuildSecCtx(uid types.ID, perms ...string) *session.Context {
 	visiableProjects := []domain.ProjectRole{}
 	for _, perm := range perms {
 		idx := strings.Index(perm, "_")
@@ -25,20 +23,5 @@ func BuildSecCtx(uid types.ID, perms ...string) *security.Context {
 		}
 	}
 
-	return &security.Context{Identity: security.Identity{ID: uid}, Perms: perms, ProjectRoles: visiableProjects}
-}
-
-// BuildWorker build work deital
-func BuildWorker(m work.WorkManagerTraits, workName string, flowId, gid types.ID, secCtx *security.Context) *domain.WorkDetail {
-	workCreation := &domain.WorkCreation{
-		Name:             workName,
-		ProjectID:        gid,
-		FlowID:           flowId,
-		InitialStateName: domain.StatePending.Name,
-	}
-	detail, err := m.CreateWork(workCreation, secCtx)
-	Expect(err).To(BeNil())
-	Expect(detail).ToNot(BeNil())
-	Expect(detail.StateName).To(Equal("PENDING"))
-	return detail
+	return &session.Context{Identity: session.Identity{ID: uid}, Perms: perms, ProjectRoles: visiableProjects}
 }

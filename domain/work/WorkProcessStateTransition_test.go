@@ -1,16 +1,16 @@
 package work_test
 
 import (
-	"flywheel/app/event"
+	"flywheel/account"
 	"flywheel/bizerror"
-	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/namespace"
 	"flywheel/domain/state"
 	"flywheel/domain/work"
+	"flywheel/event"
 	"flywheel/persistence"
-	"flywheel/security"
+	"flywheel/session"
 	"flywheel/testinfra"
 	"fmt"
 	"time"
@@ -39,10 +39,10 @@ var _ = Describe("WorkStateTransition Manager", func() {
 		persistence.ActiveDataSourceManager = testDatabase.DS
 		var err error
 		project1, err = namespace.CreateProject(&domain.ProjectCreating{Name: "project 1", Identifier: "GR1"},
-			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1", security.SystemAdminPermission.ID))
+			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1", account.SystemAdminPermission.ID))
 		Expect(err).To(BeNil())
 		project2, err = namespace.CreateProject(&domain.ProjectCreating{Name: "project 2", Identifier: "GR2"},
-			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_2", security.SystemAdminPermission.ID))
+			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_2", account.SystemAdminPermission.ID))
 		Expect(err).To(BeNil())
 
 		flowManager = flow.NewWorkflowManager(testDatabase.DS)
@@ -109,7 +109,7 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			workflowCreation := &flow.WorkflowCreation{Name: "test workflow", ProjectID: project1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
 			Expect(err).To(BeNil())
-			detail := testinfra.BuildWorker(workManager, "test work", workflow.ID, project1.ID, sec)
+			detail := buildWork(workManager, "test work", workflow.ID, project1.ID, sec)
 
 			workflowCreation = &flow.WorkflowCreation{Name: "test workflow", ProjectID: project2.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err = flowManager.CreateWorkflow(workflowCreation, testinfra.BuildSecCtx(types.ID(2), domain.ProjectRoleManager+"_"+project2.ID.String()))
@@ -129,7 +129,7 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			workflowCreation := &flow.WorkflowCreation{Name: "test workflow", ProjectID: project1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
 			Expect(err).To(BeNil())
-			detail := testinfra.BuildWorker(workManager, "test work", workflow.ID, project1.ID, sec)
+			detail := buildWork(workManager, "test work", workflow.ID, project1.ID, sec)
 
 			lastEvents = []event.EventRecord{}
 			id, err := manager.CreateWorkStateTransition(
@@ -145,7 +145,7 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			workflowCreation := &flow.WorkflowCreation{Name: "test workflow", ProjectID: project1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
 			Expect(err).To(BeNil())
-			detail := testinfra.BuildWorker(workManager, "test work", workflow.ID, project1.ID, sec)
+			detail := buildWork(workManager, "test work", workflow.ID, project1.ID, sec)
 
 			Expect(testDatabase.DS.GormDB().DropTable(&domain.WorkStateTransition{}).Error).To(BeNil())
 
@@ -163,7 +163,7 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			workflowCreation := &flow.WorkflowCreation{Name: "test workflow", ProjectID: project1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
 			Expect(err).To(BeNil())
-			detail := testinfra.BuildWorker(workManager, "test work", workflow.ID, project1.ID, sec)
+			detail := buildWork(workManager, "test work", workflow.ID, project1.ID, sec)
 			lastEvents = []event.EventRecord{}
 
 			transition := domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DONE"}
@@ -185,7 +185,7 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
 			Expect(err).To(BeNil())
 
-			detail := testinfra.BuildWorker(workManager, "test work", workflow.ID, project1.ID, sec)
+			detail := buildWork(workManager, "test work", workflow.ID, project1.ID, sec)
 
 			lastEvents = []event.EventRecord{}
 			creation := domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DOING"}
@@ -198,7 +198,7 @@ var _ = Describe("WorkStateTransition Manager", func() {
 
 			Expect(len(lastEvents)).To(Equal(1))
 			Expect(lastEvents[0].Event).To(Equal(event.Event{SourceId: detail.ID, SourceType: "WORK", SourceDesc: detail.Identifier,
-				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryPropertyUpdated, UpdatedProperties: []event.PropertyUpdated{{
+				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryPropertyUpdated, UpdatedProperties: []event.UpdatedProperty{{
 					PropertyName: "StateName", PropertyDesc: "StateName", OldValue: "PENDING", OldValueDesc: "PENDING", NewValue: "DOING", NewValueDesc: "DOING",
 				}}}))
 			Expect(time.Now().Sub(lastEvents[0].Timestamp.Time()) < time.Second).To(BeTrue())
@@ -238,7 +238,7 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			Expect(processSteps[0]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
 				StateName: creation.FromState, StateCategory: 1, BeginTime: detail.CreateTime, EndTime: handleTimestamp}))
 			Expect(processSteps[1]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
-				StateName: creation.ToState, StateCategory: 2, BeginTime: handleTimestamp, EndTime: common.Timestamp{}}))
+				StateName: creation.ToState, StateCategory: 2, BeginTime: handleTimestamp, EndTime: types.Timestamp{}}))
 
 			// transit to done state: processEndTime should be set
 			creation = domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DOING", ToState: "DONE"}
@@ -262,3 +262,17 @@ var _ = Describe("WorkStateTransition Manager", func() {
 		})
 	})
 })
+
+func buildWork(m work.WorkManagerTraits, workName string, flowId, gid types.ID, secCtx *session.Context) *domain.WorkDetail {
+	workCreation := &domain.WorkCreation{
+		Name:             workName,
+		ProjectID:        gid,
+		FlowID:           flowId,
+		InitialStateName: domain.StatePending.Name,
+	}
+	detail, err := m.CreateWork(workCreation, secCtx)
+	Expect(err).To(BeNil())
+	Expect(detail).ToNot(BeNil())
+	Expect(detail.StateName).To(Equal("PENDING"))
+	return detail
+}

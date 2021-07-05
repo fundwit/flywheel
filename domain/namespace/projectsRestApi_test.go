@@ -5,15 +5,16 @@ import (
 	"flywheel/common"
 	"flywheel/domain"
 	"flywheel/domain/namespace"
-	"flywheel/security"
+	"flywheel/session"
 	"flywheel/testinfra"
+	"net/http"
+	"net/http/httptest"
+	"time"
+
 	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"net/http"
-	"net/http/httptest"
-	"time"
 )
 
 var _ = Describe("ProjectRestApi", func() {
@@ -28,7 +29,7 @@ var _ = Describe("ProjectRestApi", func() {
 
 	Describe("HandleQueryProjects", func() {
 		It("should be able to query projects successfully", func() {
-			namespace.QueryProjectsFunc = func(sec *security.Context) (*[]domain.Project, error) {
+			namespace.QueryProjectsFunc = func(sec *session.Context) (*[]domain.Project, error) {
 				t := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 				return &[]domain.Project{{ID: 123, Identifier: "TED", Name: "test", NextWorkId: 10, CreateTime: t, Creator: 1}}, nil
 			}
@@ -45,7 +46,7 @@ var _ = Describe("ProjectRestApi", func() {
 	Describe("HandleCreateProject", func() {
 		It("should be able to create project successfully", func() {
 			var payload *domain.ProjectCreating
-			namespace.CreateProjectFunc = func(c *domain.ProjectCreating, sec *security.Context) (*domain.Project, error) {
+			namespace.CreateProjectFunc = func(c *domain.ProjectCreating, sec *session.Context) (*domain.Project, error) {
 				payload = c
 				t := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 				return &domain.Project{ID: 123, Identifier: c.Identifier, Name: c.Name, NextWorkId: 10, CreateTime: t, Creator: 100}, nil
@@ -68,7 +69,7 @@ var _ = Describe("ProjectRestApi", func() {
 		It("should be able to update project successfully", func() {
 			var resId types.ID
 			var payload *domain.ProjectUpdating
-			namespace.UpdateProjectFunc = func(id types.ID, d *domain.ProjectUpdating, sec *security.Context) error {
+			namespace.UpdateProjectFunc = func(id types.ID, d *domain.ProjectUpdating, sec *session.Context) error {
 				resId = id
 				payload = d
 				return nil

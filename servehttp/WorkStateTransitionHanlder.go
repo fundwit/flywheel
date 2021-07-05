@@ -4,11 +4,12 @@ import (
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/work"
-	"flywheel/security"
+	"flywheel/session"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"net/http"
 )
 
 func RegisterWorkStateTransitionHandler(r *gin.Engine, m work.WorkProcessManagerTraits, middleWares ...gin.HandlerFunc) {
@@ -34,7 +35,7 @@ func (h *workStateTransitionHandler) handleCreate(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	transitionId, err := h.manager.CreateWorkStateTransition(&creation, security.FindSecurityContext(c))
+	transitionId, err := h.manager.CreateWorkStateTransition(&creation, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}

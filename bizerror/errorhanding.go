@@ -3,8 +3,8 @@ package bizerror
 import (
 	"encoding/json"
 	"errors"
-	"flywheel/common"
 	"flywheel/i18n"
+	"flywheel/misc"
 	"fmt"
 	"io"
 	"net/http"
@@ -50,61 +50,61 @@ func HandleError(c *gin.Context, err error) {
 
 	if bizErr, ok := genericErr.(BizError); ok {
 		respond := bizErr.Respond()
-		c.JSON(respond.Status, &common.ErrorBody{Code: respond.Code, Message: respond.Message, Data: respond.Data})
+		c.JSON(respond.Status, &misc.ErrorBody{Code: respond.Code, Message: respond.Message, Data: respond.Data})
 		c.Abort()
 		return
 	}
 
 	// bad request:  io.EOF (no body).
 	if errors.Is(genericErr, io.EOF) {
-		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "bad_request.body_not_found", Message: "body not found"})
+		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "bad_request.body_not_found", Message: "body not found"})
 		c.Abort()
 		return
 	}
 	// bad request: json syntax Error
 	if syntaxErr, ok := genericErr.(*json.SyntaxError); ok {
-		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "bad_request.invalid_body_format", Message: "invalid body format", Data: syntaxErr.Error()})
+		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "bad_request.invalid_body_format", Message: "invalid body format", Data: syntaxErr.Error()})
 		c.Abort()
 		return
 	}
 	// validation failed
 	if validationErr, ok := genericErr.(validator.ValidationErrors); ok {
-		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "bad_request.validation_failed", Message: "validation failed", Data: validationErr.Error()})
+		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "bad_request.validation_failed", Message: "validation failed", Data: validationErr.Error()})
 		c.Abort()
 		return
 	}
 
 	if errors.Is(genericErr, ErrUnauthenticated) {
-		c.JSON(http.StatusUnauthorized, &common.ErrorBody{Code: "common.unauthenticated", Message: "unauthenticated"})
+		c.JSON(http.StatusUnauthorized, &misc.ErrorBody{Code: "common.unauthenticated", Message: "unauthenticated"})
 		c.Abort()
 		return
 	}
 	if errors.Is(genericErr, ErrForbidden) {
-		c.JSON(http.StatusForbidden, &common.ErrorBody{Code: "security.forbidden", Message: "access forbidden"})
+		c.JSON(http.StatusForbidden, &misc.ErrorBody{Code: "security.forbidden", Message: "access forbidden"})
 		c.Abort()
 		return
 	}
 	if errors.Is(genericErr, ErrUnknownState) {
-		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "workflow.unknown_state", Message: "unknown state"})
+		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "workflow.unknown_state", Message: "unknown state"})
 		c.Abort()
 		return
 	}
 	if errors.Is(genericErr, ErrStateExisted) {
-		c.JSON(http.StatusBadRequest, &common.ErrorBody{Code: "workflow.state_existed", Message: "state existed"})
+		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "workflow.state_existed", Message: "state existed"})
 		c.Abort()
 		return
 	}
 	if errors.Is(genericErr, gorm.ErrRecordNotFound) || errors.Is(genericErr, ErrNotFound) {
-		c.JSON(http.StatusNotFound, &common.ErrorBody{Code: "common.record_not_found", Message: "record not found"})
+		c.JSON(http.StatusNotFound, &misc.ErrorBody{Code: "common.record_not_found", Message: "record not found"})
 		c.Abort()
 		return
 	}
 	if errors.Is(genericErr, mysql.ErrInvalidConn) {
-		c.JSON(http.StatusServiceUnavailable, &common.ErrorBody{Code: i18n.CommonInternalServerError, Message: err.Error()})
+		c.JSON(http.StatusServiceUnavailable, &misc.ErrorBody{Code: i18n.CommonInternalServerError, Message: err.Error()})
 		c.Abort()
 		return
 	}
 
-	c.JSON(500, &common.ErrorBody{Code: i18n.CommonInternalServerError, Message: err.Error()})
+	c.JSON(500, &misc.ErrorBody{Code: i18n.CommonInternalServerError, Message: err.Error()})
 	c.Abort()
 }

@@ -33,7 +33,7 @@ var _ = Describe("WorkStateTransition Manager", func() {
 	)
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
-		Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkStateTransition{}, &domain.WorkProcessStep{},
+		Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
 			&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error).To(BeNil())
 
 		persistence.ActiveDataSourceManager = testDatabase.DS
@@ -61,8 +61,7 @@ var _ = Describe("WorkStateTransition Manager", func() {
 
 	Describe("CreateWorkStateTransition", func() {
 		It("should failed if workflow is not exist", func() {
-			id, err := manager.CreateWorkStateTransition(&domain.WorkStateTransitionBrief{FlowID: 2}, testinfra.BuildSecCtx(123))
-			Expect(id).To(BeNil())
+			err := manager.CreateWorkStateTransition(&domain.WorkProcessStepCreation{FlowID: 2}, testinfra.BuildSecCtx(123))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("record not found"))
 			Expect(len(lastEvents)).To(BeZero())
@@ -73,9 +72,8 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
 			Expect(err).To(BeNil())
 
-			id, err := manager.CreateWorkStateTransition(
-				&domain.WorkStateTransitionBrief{FlowID: workflow.ID, WorkID: 1, FromState: "DONE", ToState: "DOING"}, sec)
-			Expect(id).To(BeNil())
+			err = manager.CreateWorkStateTransition(
+				&domain.WorkProcessStepCreation{FlowID: workflow.ID, WorkID: 1, FromState: "DONE", ToState: "DOING"}, sec)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("transition from DONE to DOING is not invalid"))
 			Expect(len(lastEvents)).To(BeZero())
@@ -84,10 +82,9 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			err := testDatabase.DS.GormDB().DropTable(&domain.Work{}).Error
 			Expect(err).To(BeNil())
 
-			id, err := manager.CreateWorkStateTransition(
-				&domain.WorkStateTransitionBrief{FlowID: 1, WorkID: 1, FromState: "PENDING", ToState: "DOING"},
+			err = manager.CreateWorkStateTransition(
+				&domain.WorkProcessStepCreation{FlowID: 1, WorkID: 1, FromState: "PENDING", ToState: "DOING"},
 				testinfra.BuildSecCtx(123))
-			Expect(id).To(BeNil())
 			Expect(err).ToNot(BeNil())
 			Expect(len(lastEvents)).To(BeZero())
 		})
@@ -97,13 +94,13 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			workflow, err := flowManager.CreateWorkflow(workflowCreation, sec)
 			Expect(err).To(BeNil())
 
-			id, err := manager.CreateWorkStateTransition(
-				&domain.WorkStateTransitionBrief{FlowID: workflow.ID, WorkID: workflow.ID, FromState: "PENDING", ToState: "DOING"}, sec)
-			Expect(id).To(BeNil())
+			err = manager.CreateWorkStateTransition(
+				&domain.WorkProcessStepCreation{FlowID: workflow.ID, WorkID: workflow.ID, FromState: "PENDING", ToState: "DOING"}, sec)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("record not found"))
 			Expect(len(lastEvents)).To(BeZero())
 		})
+
 		It("should failed when work is forbidden for current user", func() {
 			sec := testinfra.BuildSecCtx(types.ID(3), domain.ProjectRoleManager+"_"+project1.ID.String())
 			workflowCreation := &flow.WorkflowCreation{Name: "test workflow", ProjectID: project1.ID, StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -116,10 +113,9 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			Expect(err).To(BeNil())
 
 			lastEvents = []event.EventRecord{}
-			id, err := manager.CreateWorkStateTransition(
-				&domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DOING"},
+			err = manager.CreateWorkStateTransition(
+				&domain.WorkProcessStepCreation{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DOING"},
 				testinfra.BuildSecCtx(types.ID(1), domain.ProjectRoleManager+"_100", domain.ProjectRoleManager+"_"+project2.ID.String()))
-			Expect(id).To(BeNil())
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("forbidden"))
 			Expect(len(lastEvents)).To(BeZero())
@@ -132,9 +128,8 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			detail := buildWork(workManager, "test work", workflow.ID, project1.ID, sec)
 
 			lastEvents = []event.EventRecord{}
-			id, err := manager.CreateWorkStateTransition(
-				&domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DOING", ToState: "DONE"}, sec)
-			Expect(id).To(BeNil())
+			err = manager.CreateWorkStateTransition(
+				&domain.WorkProcessStepCreation{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DOING", ToState: "DONE"}, sec)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("expected affected row is 1, but actual is 0"))
 			Expect(len(lastEvents)).To(BeZero())
@@ -147,13 +142,12 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			Expect(err).To(BeNil())
 			detail := buildWork(workManager, "test work", workflow.ID, project1.ID, sec)
 
-			Expect(testDatabase.DS.GormDB().DropTable(&domain.WorkStateTransition{}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().DropTable(&domain.WorkProcessStep{}).Error).To(BeNil())
 
 			lastEvents = []event.EventRecord{}
-			transition := domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DOING"}
-			id, err := manager.CreateWorkStateTransition(&transition,
+			transition := domain.WorkProcessStepCreation{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DOING"}
+			err = manager.CreateWorkStateTransition(&transition,
 				testinfra.BuildSecCtx(types.ID(123), domain.ProjectRoleManager+"_333"))
-			Expect(id).To(BeZero())
 			Expect(err).ToNot(BeZero())
 			Expect(len(lastEvents)).To(BeZero())
 		})
@@ -166,16 +160,13 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			detail := buildWork(workManager, "test work", workflow.ID, project1.ID, sec)
 			lastEvents = []event.EventRecord{}
 
-			transition := domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DONE"}
-			id, err := manager.CreateWorkStateTransition(&transition, sec)
-			Expect(id).ToNot(BeZero())
+			transition := domain.WorkProcessStepCreation{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DONE"}
+			err = manager.CreateWorkStateTransition(&transition, sec)
 			Expect(err).To(BeZero())
-
 			Expect(workManager.ArchiveWorks([]types.ID{detail.ID}, sec)).To(BeNil())
 
-			transition = domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DONE", ToState: "PENDING"}
-			id, err = manager.CreateWorkStateTransition(&transition, sec)
-			Expect(id).To(BeZero())
+			transition = domain.WorkProcessStepCreation{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DONE", ToState: "PENDING"}
+			err = manager.CreateWorkStateTransition(&transition, sec)
 			Expect(err).To(Equal(bizerror.ErrArchiveStatusInvalid))
 		})
 
@@ -188,14 +179,22 @@ var _ = Describe("WorkStateTransition Manager", func() {
 			detail := buildWork(workManager, "test work", workflow.ID, project1.ID, sec)
 
 			lastEvents = []event.EventRecord{}
-			creation := domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DOING"}
-			transition, err := manager.CreateWorkStateTransition(&creation, sec)
-			Expect(err).To(BeNil())
-			Expect(transition).ToNot(BeZero())
-			Expect(transition.WorkStateTransitionBrief).To(Equal(creation))
-			Expect(transition.ID).ToNot(BeZero())
-			Expect(transition.CreateTime).ToNot(BeZero())
+			creation := domain.WorkProcessStepCreation{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "PENDING", ToState: "DOING"}
 
+			// assert: there should be a initial process step after work created
+			var processSteps []domain.WorkProcessStep
+			Expect(testDatabase.DS.GormDB().Model(&domain.WorkProcessStep{}).Scan(&processSteps).Error).To(BeNil())
+			Expect(processSteps).ToNot(BeNil())
+			Expect(len(processSteps)).To(Equal(1))
+			Expect(processSteps[0]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
+				CreatorID: sec.Identity.ID, CreatorName: sec.Identity.Nickname,
+				StateName: creation.FromState, StateCategory: 1, BeginTime: detail.CreateTime, EndTime: types.Timestamp{}}))
+
+			// do: create a new process step
+			err = manager.CreateWorkStateTransition(&creation, sec)
+			Expect(err).To(BeNil())
+
+			// assert: event
 			Expect(len(lastEvents)).To(Equal(1))
 			Expect(lastEvents[0].Event).To(Equal(event.Event{SourceId: detail.ID, SourceType: "WORK", SourceDesc: detail.Identifier,
 				CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryPropertyUpdated, UpdatedProperties: []event.UpdatedProperty{{
@@ -203,57 +202,48 @@ var _ = Describe("WorkStateTransition Manager", func() {
 				}}}))
 			Expect(time.Now().Sub(lastEvents[0].Timestamp.Time()) < time.Second).To(BeTrue())
 
-			// work.stateName is updated
+			// assert: work.stateName is updated
 			detail, err = workManager.WorkDetail(detail.ID.String(), sec)
 			Expect(err).To(BeNil())
 			Expect(detail.StateName).To(Equal("DOING"))
 			Expect(detail.StateCategory).To(Equal(state.InProcess))
 			Expect(detail.StateBeginTime.Time().UnixNano() >= detail.CreateTime.Time().UnixNano()).To(BeTrue())
 
-			// record is created
-			var records []domain.WorkStateTransition
-			err = testDatabase.DS.GormDB().Model(&domain.WorkStateTransition{}).Find(&records).Error
-			Expect(err).To(BeNil())
-			Expect(len(records)).To(Equal(1))
-			Expect(records[0].ID).To(Equal(transition.ID))
-			Expect(records[0].CreateTime).ToNot(BeZero())
-			Expect(records[0].FlowID).To(Equal(creation.FlowID))
-			Expect(records[0].WorkID).To(Equal(creation.WorkID))
-			Expect(records[0].FromState).To(Equal(creation.FromState))
-			Expect(records[0].ToState).To(Equal(creation.ToState))
-			Expect(records[0].Creator).To(Equal(sec.Identity.ID))
-
-			handleTimestamp := records[0].CreateTime
+			handleTimestamp := detail.StateBeginTime
 
 			fmt.Println("time diff:", detail.StateBeginTime, handleTimestamp)
 			Expect(detail.StateBeginTime).To(Equal(handleTimestamp))
 			Expect(detail.ProcessBeginTime).To(Equal(handleTimestamp))
 			Expect(detail.ProcessEndTime.IsZero()).To(BeTrue())
 
-			// should handle process step
-			var processSteps []domain.WorkProcessStep
+			// assert: should handle process step
 			Expect(testDatabase.DS.GormDB().Model(&domain.WorkProcessStep{}).Scan(&processSteps).Error).To(BeNil())
 			Expect(processSteps).ToNot(BeNil())
 			Expect(len(processSteps)).To(Equal(2))
 			Expect(processSteps[0]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
-				StateName: creation.FromState, StateCategory: 1, BeginTime: detail.CreateTime, EndTime: handleTimestamp}))
+				StateName: creation.FromState, StateCategory: 1, BeginTime: detail.CreateTime, EndTime: handleTimestamp,
+				CreatorID: sec.Identity.ID, CreatorName: sec.Identity.Nickname,
+				NextStateName: creation.ToState, NextStateCategory: state.InProcess}))
 			Expect(processSteps[1]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
+				CreatorID: sec.Identity.ID, CreatorName: sec.Identity.Nickname,
 				StateName: creation.ToState, StateCategory: 2, BeginTime: handleTimestamp, EndTime: types.Timestamp{}}))
 
-			// transit to done state: processEndTime should be set
-			creation = domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DOING", ToState: "DONE"}
-			transition, err = manager.CreateWorkStateTransition(&creation, sec)
+			// do: transit to done state
+			creation = domain.WorkProcessStepCreation{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DOING", ToState: "DONE"}
+			err = manager.CreateWorkStateTransition(&creation, sec)
 			Expect(err).To(BeNil())
+			// assert: processEndTime should be set
 			detail, err = workManager.WorkDetail(detail.Identifier, sec)
 			Expect(err).To(BeNil())
 			Expect(detail.StateBeginTime.IsZero()).To(BeFalse())
 			Expect(detail.ProcessBeginTime.IsZero()).To(BeFalse())
 			Expect(detail.ProcessEndTime.IsZero()).To(BeFalse())
 
-			// transit back to process state: processEndTime should be reset to nil
-			creation = domain.WorkStateTransitionBrief{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DONE", ToState: "PENDING"}
-			transition, err = manager.CreateWorkStateTransition(&creation, sec)
+			// do: transit back to process state
+			creation = domain.WorkProcessStepCreation{FlowID: detail.FlowID, WorkID: detail.ID, FromState: "DONE", ToState: "PENDING"}
+			err = manager.CreateWorkStateTransition(&creation, sec)
 			Expect(err).To(BeNil())
+			// assert: processEndTime should be reset to nil
 			detail, err = workManager.WorkDetail(detail.Identifier, sec)
 			Expect(err).To(BeNil())
 			Expect(detail.StateBeginTime.IsZero()).To(BeFalse())

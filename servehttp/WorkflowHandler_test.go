@@ -780,7 +780,7 @@ func buildDemoWorkflowCreation() *flow.WorkflowCreation {
 }
 
 type workflowManagerMock struct {
-	CreateWorkStateTransitionFunc func(t *domain.WorkStateTransitionBrief, sec *session.Context) (*domain.WorkStateTransition, error)
+	CreateWorkStateTransitionFunc func(t *domain.WorkProcessStepCreation, sec *session.Context) error
 	QueryWorkflowsFunc            func(query *domain.WorkflowQuery, sec *session.Context) (*[]domain.Workflow, error)
 	CreateWorkflowFunc            func(c *flow.WorkflowCreation, sec *session.Context) (*domain.WorkflowDetail, error)
 	DetailWorkflowFunc            func(ID types.ID, sec *session.Context) (*domain.WorkflowDetail, error)

@@ -23,5 +23,5 @@ func BuildSecCtx(uid types.ID, perms ...string) *session.Context {
 		}
 	}
 
-	return &session.Context{Identity: session.Identity{ID: uid}, Perms: perms, ProjectRoles: visiableProjects}
+	return &session.Context{Identity: session.Identity{ID: uid, Name: "user-" + uid.String(), Nickname: "User " + uid.String()}, Perms: perms, ProjectRoles: visiableProjects}
 }

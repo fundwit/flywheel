@@ -367,20 +367,6 @@ func (m *WorkflowManager) UpdateWorkflowState(id types.ID, updating WorkflowStat
 				Update(domain.WorkflowStateTransition{ToState: updating.Name}).Error; err != nil {
 				return err
 			}
-
-			// work_state_transitions:  flow_id, from_state, to_state
-			if err := tx.Model(&domain.WorkStateTransition{}).
-				Where("flow_id = ?", originState.WorkflowID).
-				Where("from_state LIKE ?", originState.Name).
-				Update(domain.WorkStateTransition{WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FromState: updating.Name}}).Error; err != nil {
-				return err
-			}
-			if err := tx.Model(&domain.WorkStateTransition{}).
-				Where("flow_id = ?", originState.WorkflowID).
-				Where("to_state LIKE ?", originState.Name).
-				Update(domain.WorkStateTransition{WorkStateTransitionBrief: domain.WorkStateTransitionBrief{ToState: updating.Name}}).Error; err != nil {
-				return err
-			}
 		}
 		if originState.Name != updating.Name {
 			// work:  flow_id, state_name  state_category
@@ -391,11 +377,18 @@ func (m *WorkflowManager) UpdateWorkflowState(id types.ID, updating WorkflowStat
 				return err
 			}
 
-			// work_process_steps: flow_id, state_name, state_category
+			// work_process_steps: flow_id, state_name, state_category, next_state_name, next_state_category
 			if err := tx.Model(&domain.WorkProcessStep{}).
 				Where("flow_id = ?", originState.WorkflowID).
 				Where("state_name LIKE ?", originState.Name).
 				Update(domain.WorkProcessStep{StateName: updating.Name, StateCategory: originState.Category}).Error; err != nil {
+				return err
+			}
+
+			if err := tx.Model(&domain.WorkProcessStep{}).
+				Where("flow_id = ?", originState.WorkflowID).
+				Where("next_state_name LIKE ?", originState.Name).
+				Update(domain.WorkProcessStep{NextStateName: updating.Name, NextStateCategory: originState.Category}).Error; err != nil {
 				return err
 			}
 		}
@@ -491,16 +484,6 @@ func isWorkflowReferenced(db *gorm.DB, workflowID types.ID) error {
 
 	var workProcessStep domain.WorkProcessStep
 	err = db.Model(&domain.WorkProcessStep{}).Where(&domain.WorkProcessStep{FlowID: workflowID}).First(&workProcessStep).Error
-	if err == nil {
-		return bizerror.ErrWorkflowIsReferenced
-	}
-	if err != gorm.ErrRecordNotFound {
-		return err
-	}
-
-	var workStateTransition domain.WorkStateTransition
-	err = db.Model(&domain.WorkStateTransition{}).Where(&domain.WorkStateTransition{WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FlowID: workflowID}}).
-		First(&workStateTransition).Error
 	if err == nil {
 		return bizerror.ErrWorkflowIsReferenced
 	}

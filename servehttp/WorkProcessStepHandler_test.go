@@ -1,6 +1,7 @@
 package servehttp_test
 
 import (
+	"bytes"
 	"errors"
 	"flywheel/bizerror"
 	"flywheel/domain"
@@ -29,6 +30,45 @@ var _ = Describe("WorkProcessStepHandler", func() {
 		router.Use(bizerror.ErrorHandling())
 		workProcessManager = &workProcessManagerMock{}
 		servehttp.RegisterWorkProcessStepHandler(router, workProcessManager)
+	})
+
+	Describe("handleCreate", func() {
+		It("should be able to handle bind error", func() {
+			req := httptest.NewRequest(http.MethodPost, "/v1/transitions", bytes.NewReader([]byte(`bad json`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid character 'b' looking for beginning of value","data":null}`))
+		})
+		It("should be able to handle validate error", func() {
+			req := httptest.NewRequest(http.MethodPost, "/v1/transitions", bytes.NewReader([]byte(`{}`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusBadRequest))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"Key: 'WorkProcessStepCreation.FlowID' Error:Field validation for 'FlowID' failed on the 'required' tag\nKey: 'WorkProcessStepCreation.WorkID' Error:Field validation for 'WorkID' failed on the 'required' tag\nKey: 'WorkProcessStepCreation.FromState' Error:Field validation for 'FromState' failed on the 'required' tag\nKey: 'WorkProcessStepCreation.ToState' Error:Field validation for 'ToState' failed on the 'required' tag","data":null}`))
+		})
+		It("should be able to handle service error", func() {
+			workProcessManager.CreateWorkStateTransitionFunc =
+				func(c *domain.WorkProcessStepCreation, sec *session.Context) error {
+					return errors.New("a mocked error")
+				}
+			req := httptest.NewRequest(http.MethodPost, "/v1/transitions", bytes.NewReader([]byte(
+				`{"flowId":1, "workId": "1", "fromState": "DONE", "toState": "DOING"}`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusInternalServerError))
+			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
+		})
+
+		It("should be able to create transition", func() {
+			workProcessManager.CreateWorkStateTransitionFunc =
+				func(c *domain.WorkProcessStepCreation, sec *session.Context) error {
+					return nil
+				}
+
+			req := httptest.NewRequest(http.MethodPost, "/v1/transitions", bytes.NewReader([]byte(
+				`{"flowId":1, "workId": "100", "fromState": "PENDING", "toState": "DOING"}`)))
+			status, body, _ := testinfra.ExecuteRequest(req, router)
+			Expect(status).To(Equal(http.StatusCreated))
+			Expect(body).To(BeZero())
+		})
 	})
 
 	Describe("QueryProcessSteps", func() {
@@ -65,7 +105,9 @@ var _ = Describe("WorkProcessStepHandler", func() {
 			workProcessManager.QueryProcessStepsFunc =
 				func(query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error) {
 					return &[]domain.WorkProcessStep{
-						{WorkID: 100, FlowID: 1, StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category, BeginTime: types.Timestamp(t), EndTime: types.Timestamp(t)},
+						{WorkID: 100, FlowID: 1, StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category,
+							NextStateName: domain.StateDoing.Name, NextStateCategory: domain.StateDoing.Category, CreatorID: 200, CreatorName: "user200",
+							BeginTime: types.Timestamp(t), EndTime: types.Timestamp(t)},
 						{WorkID: 100, FlowID: 1, StateName: domain.StateDoing.Name, StateCategory: domain.StateDoing.Category, BeginTime: types.Timestamp(t)},
 					}, nil
 				}
@@ -74,8 +116,10 @@ var _ = Describe("WorkProcessStepHandler", func() {
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(body).To(MatchJSON(`{"total": 2, "data": [
-				{"workId": "100", "flowId": "1", "stateName": "PENDING", "stateCategory": 1, "beginTime": "` + timeString + `", "endTime":"` + timeString + `"},
-				{"workId": "100", "flowId": "1", "stateName": "DOING", "stateCategory": 2, "beginTime": "` + timeString + `", "endTime": null}
+				{"workId": "100", "flowId": "1", "stateName": "PENDING", "stateCategory": 1, "nextStateName": "DOING", "nextStateCategory": 2, 
+					"beginTime": "` + timeString + `", "endTime":"` + timeString + `", "creatorId": "200", "creatorName": "user200"},
+				{"workId": "100", "flowId": "1", "stateName": "DOING", "stateCategory": 2, "beginTime": "` + timeString + `", "endTime": null,
+					"nextStateName": "", "nextStateCategory": 0, "creatorId": "0", "creatorName": ""}
 			]}`))
 		})
 	})
@@ -83,14 +127,13 @@ var _ = Describe("WorkProcessStepHandler", func() {
 
 type workProcessManagerMock struct {
 	QueryProcessStepsFunc         func(query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error)
-	CreateWorkStateTransitionFunc func(t *domain.WorkStateTransitionBrief, sec *session.Context) (*domain.WorkStateTransition, error)
+	CreateWorkStateTransitionFunc func(t *domain.WorkProcessStepCreation, sec *session.Context) error
 }
 
 func (m *workProcessManagerMock) QueryProcessSteps(
 	query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error) {
 	return m.QueryProcessStepsFunc(query, sec)
 }
-func (m *workProcessManagerMock) CreateWorkStateTransition(
-	c *domain.WorkStateTransitionBrief, sec *session.Context) (*domain.WorkStateTransition, error) {
+func (m *workProcessManagerMock) CreateWorkStateTransition(c *domain.WorkProcessStepCreation, sec *session.Context) error {
 	return m.CreateWorkStateTransitionFunc(c, sec)
 }

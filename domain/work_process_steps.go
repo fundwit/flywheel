@@ -13,8 +13,21 @@ type WorkProcessStep struct {
 	StateName     string         `json:"stateName"`
 	StateCategory state.Category `json:"stateCategory"`
 
-	BeginTime types.Timestamp `json:"beginTime" sql:"type:DATETIME(6) NOT NULL"`
-	EndTime   types.Timestamp `json:"endTime" sql:"type:DATETIME(6)"`
+	CreatorID   types.ID        `json:"creatorId"`
+	CreatorName string          `json:"creatorName"`
+	BeginTime   types.Timestamp `json:"beginTime" sql:"type:DATETIME(6) NOT NULL"`
+
+	EndTime types.Timestamp `json:"endTime" sql:"type:DATETIME(6)"`
+
+	NextStateName     string         `json:"nextStateName"`
+	NextStateCategory state.Category `json:"nextStateCategory"`
+}
+
+type WorkProcessStepCreation struct {
+	FlowID    types.ID `json:"flowId" validate:"required"`
+	WorkID    types.ID `json:"workId" validate:"required"`
+	FromState string   `json:"fromState" validate:"required"`
+	ToState   string   `json:"toState" validate:"required"`
 }
 
 type WorkProcessStepQuery struct {

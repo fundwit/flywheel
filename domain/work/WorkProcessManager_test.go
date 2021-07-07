@@ -29,7 +29,7 @@ var _ = Describe("WorkProcessManager", func() {
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
 		// migration
-		Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{}, &domain.WorkStateTransition{},
+		Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
 			&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error).To(BeNil())
 
 		persistence.ActiveDataSourceManager = testDatabase.DS
@@ -101,8 +101,8 @@ var _ = Describe("WorkProcessManager", func() {
 			// do transition
 			workFlowManager := flow.NewWorkflowManager(testDatabase.DS)
 			workProcessManager := work.NewWorkProcessManager(testDatabase.DS, workFlowManager)
-			_, err = workProcessManager.CreateWorkStateTransition(
-				&domain.WorkStateTransitionBrief{FlowID: workflowDetail.ID, WorkID: work1.ID, FromState: work1.StateName, ToState: domain.StateDoing.Name}, secCtx)
+			err = workProcessManager.CreateWorkStateTransition(
+				&domain.WorkProcessStepCreation{FlowID: workflowDetail.ID, WorkID: work1.ID, FromState: work1.StateName, ToState: domain.StateDoing.Name}, secCtx)
 			Expect(err).To(BeNil())
 
 			// add a record should not be query out
@@ -120,6 +120,10 @@ var _ = Describe("WorkProcessManager", func() {
 			Expect(step1.StateCategory).To(Equal(domain.StatePending.Category))
 			Expect(step1.BeginTime.Time().Round(time.Microsecond)).To(Equal(work1.CreateTime.Time().Round(time.Microsecond)))
 			Expect(step1.EndTime.Time().Unix()-step1.BeginTime.Time().Unix() >= 0).To(BeTrue())
+			Expect(step1.NextStateName).To(Equal("DOING"))
+			Expect(step1.NextStateCategory).To(Equal(state.InProcess))
+			Expect(step1.CreatorID).To(Equal(secCtx.Identity.ID))
+			Expect(step1.CreatorName).To(Equal(secCtx.Identity.Nickname))
 
 			step2 := (*results)[1]
 			Expect(step2.WorkID).To(Equal(work1.ID))
@@ -128,13 +132,17 @@ var _ = Describe("WorkProcessManager", func() {
 			Expect(step2.StateCategory).To(Equal(domain.StateDoing.Category))
 			Expect(step2.BeginTime).To(Equal(step1.EndTime))
 			Expect(step2.EndTime).To(Equal(types.Timestamp{}))
+			Expect(step2.NextStateName).To(BeZero())
+			Expect(step2.NextStateCategory).To(BeZero())
+			Expect(step2.CreatorID).To(Equal(secCtx.Identity.ID))
+			Expect(step2.CreatorName).To(Equal(secCtx.Identity.Nickname))
 
-			_, err = workProcessManager.CreateWorkStateTransition(
-				&domain.WorkStateTransitionBrief{FlowID: workflowDetail.ID, WorkID: work1.ID, FromState: domain.StateDoing.Name, ToState: domain.StateDone.Name}, secCtx)
+			err = workProcessManager.CreateWorkStateTransition(
+				&domain.WorkProcessStepCreation{FlowID: workflowDetail.ID, WorkID: work1.ID, FromState: domain.StateDoing.Name, ToState: domain.StateDone.Name}, secCtx)
 			Expect(err).To(BeNil())
 			results, err = workProcessManager.QueryProcessSteps(&domain.WorkProcessStepQuery{WorkID: work1.ID}, secCtx)
 			Expect(err).To(BeNil())
-			Expect(len(*results)).To(Equal(2))
+			Expect(len(*results)).To(Equal(3))
 
 			step2Finished := (*results)[1]
 			Expect(step2Finished.WorkID).To(Equal(work1.ID))
@@ -143,6 +151,22 @@ var _ = Describe("WorkProcessManager", func() {
 			Expect(step2Finished.StateCategory).To(Equal(domain.StateDoing.Category))
 			Expect(step2Finished.BeginTime).To(Equal(step1.EndTime))
 			Expect(step2Finished.EndTime.Time().Unix()-step2Finished.BeginTime.Time().Unix() >= 0).To(BeTrue())
+			Expect(step2Finished.NextStateName).To(Equal(domain.StateDone.Name))
+			Expect(step2Finished.NextStateCategory).To(Equal(domain.StateDone.Category))
+			Expect(step2Finished.CreatorID).To(Equal(secCtx.Identity.ID))
+			Expect(step2Finished.CreatorName).To(Equal(secCtx.Identity.Nickname))
+
+			step3 := (*results)[2]
+			Expect(step3.WorkID).To(Equal(work1.ID))
+			Expect(step3.FlowID).To(Equal(work1.FlowID))
+			Expect(step3.StateName).To(Equal(domain.StateDone.Name))
+			Expect(step3.StateCategory).To(Equal(domain.StateDone.Category))
+			Expect(step3.BeginTime).To(Equal(step2Finished.EndTime))
+			Expect(step3.EndTime).To(BeZero())
+			Expect(step3.NextStateName).To(BeZero())
+			Expect(step3.NextStateCategory).To(BeZero())
+			Expect(step3.CreatorID).To(Equal(secCtx.Identity.ID))
+			Expect(step3.CreatorName).To(Equal(secCtx.Identity.Nickname))
 		})
 	})
 })

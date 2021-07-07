@@ -13,6 +13,7 @@ var ErrStateExisted = errors.New("state existed")
 var ErrStateInvalid = errors.New("state is invalid")
 var ErrStateCategoryInvalid = errors.New("state category is invalid")
 var ErrArchiveStatusInvalid = errors.New("archive status is invalid")
+var ErrWorkProcessStepStateInvalid = errors.New("state of work process step is invalid")
 
 var ErrNotFound = errors.New("not found")
 var ErrNoContent = errors.New("no content")

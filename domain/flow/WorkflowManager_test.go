@@ -30,7 +30,7 @@ var _ = Describe("WorkflowManager", func() {
 	)
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
-		err := testDatabase.DS.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkStateTransition{}, &domain.WorkProcessStep{},
+		err := testDatabase.DS.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{},
 			&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error
 		if err != nil {
 			log.Fatalf("database migration failed %v\n", err)
@@ -360,21 +360,6 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(err).To(BeNil())
 
 			testDatabase.DS.GormDB().Save(&domain.WorkProcessStep{WorkID: 1, FlowID: workflow.ID, StateName: "PENDING", StateCategory: 0, BeginTime: types.Timestamp(time.Now())})
-
-			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, domain.ProjectRoleManager+"_1"))
-			Expect(err).To(Equal(bizerror.ErrWorkflowIsReferenced))
-		})
-		It("should forbid to delete workflow if it still be referenced by workStateTransition", func() {
-			creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-			workflow, err := manager.CreateWorkflow(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
-			Expect(err).To(BeNil())
-
-			testDatabase.DS.GormDB().Save(&domain.WorkStateTransition{
-				ID: 1, CreateTime: types.CurrentTimestamp(), Creator: 1,
-				WorkStateTransitionBrief: domain.WorkStateTransitionBrief{
-					FlowID: workflow.ID, WorkID: 1, FromState: "PENDING", ToState: "DOING"},
-			})
-
 			err = manager.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, domain.ProjectRoleManager+"_1"))
 			Expect(err).To(Equal(bizerror.ErrWorkflowIsReferenced))
 		})
@@ -431,10 +416,6 @@ var _ = Describe("WorkflowManager", func() {
 			testDatabase.DS.GormDB().DropTable(&domain.WorkflowState{})
 			Expect(manager.DeleteWorkflow(workflow.ID, sec).Error()).
 				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".workflow_states' doesn't exist"))
-
-			testDatabase.DS.GormDB().DropTable(&domain.WorkStateTransition{})
-			Expect(manager.DeleteWorkflow(workflow.ID, sec).Error()).
-				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".work_state_transitions' doesn't exist"))
 
 			testDatabase.DS.GormDB().DropTable(&domain.WorkProcessStep{})
 			Expect(manager.DeleteWorkflow(workflow.ID, sec).Error()).
@@ -694,13 +675,11 @@ var _ = Describe("WorkflowManager", func() {
 				ID: 1, Name: "test work", ProjectID: 100, CreateTime: types.Timestamp(now),
 				FlowID: workflow.ID, OrderInState: 1, StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category,
 				State: domain.StatePending, StateBeginTime: now}).Error).To(BeNil())
-			// create work_state_transitions
-			Expect(testDatabase.DS.GormDB().Create(domain.WorkStateTransition{ID: 1, CreateTime: types.Timestamp(now), Creator: 100, WorkStateTransitionBrief: domain.WorkStateTransitionBrief{
-				FlowID: workflow.ID, WorkID: 1, FromState: domain.StatePending.Name, ToState: domain.StatePending.Name,
-			}}).Error).To(BeNil())
+
 			// create work_process_steps
 			Expect(testDatabase.DS.GormDB().Create(domain.WorkProcessStep{WorkID: 1, FlowID: workflow.ID,
-				StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category, BeginTime: types.Timestamp(now)}).Error).To(BeNil())
+				StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category, BeginTime: types.Timestamp(now),
+				NextStateName: domain.StatePending.Name, NextStateCategory: domain.StatePending.Category}).Error).To(BeNil())
 
 			// do action
 			updating := flow.WorkflowStateUpdating{OriginName: domain.StatePending.Name, Name: "QUEUED", Order: 2000}
@@ -739,16 +718,13 @@ var _ = Describe("WorkflowManager", func() {
 			Expect(work.StateName).To(Equal(updating.Name))
 			Expect(work.StateCategory).To(Equal(domain.StatePending.Category))
 
-			var workStateTransition domain.WorkStateTransition
-			Expect(testDatabase.DS.GormDB().Where(domain.WorkStateTransition{ID: 1}).First(&workStateTransition).Error).To(BeNil())
-			Expect(workStateTransition.FromState).To(Equal(updating.Name))
-			Expect(workStateTransition.ToState).To(Equal(updating.Name))
-
 			var workProcessSteps []domain.WorkProcessStep
 			Expect(testDatabase.DS.GormDB().Where(domain.WorkProcessStep{FlowID: workflow.ID}).First(&workProcessSteps).Error).To(BeNil())
 			Expect(len(workProcessSteps)).To(Equal(1))
 			Expect(workProcessSteps[0].StateName).To(Equal(updating.Name))
 			Expect(workProcessSteps[0].StateCategory).To(Equal(domain.StatePending.Category))
+			Expect(workProcessSteps[0].NextStateName).To(Equal(updating.Name))
+			Expect(workProcessSteps[0].NextStateCategory).To(Equal(domain.StatePending.Category))
 		})
 
 		It("should be able to catch database error", func() {
@@ -767,10 +743,6 @@ var _ = Describe("WorkflowManager", func() {
 			testDatabase.DS.GormDB().DropTable(&domain.Work{})
 			Expect(manager.UpdateWorkflowState(workflow.ID, updating, sec).Error()).
 				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
-
-			testDatabase.DS.GormDB().DropTable(&domain.WorkStateTransition{})
-			Expect(manager.UpdateWorkflowState(workflow.ID, updating, sec).Error()).
-				To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".work_state_transitions' doesn't exist"))
 
 			testDatabase.DS.GormDB().DropTable(&domain.WorkflowStateTransition{})
 			Expect(manager.UpdateWorkflowState(workflow.ID, updating, sec).Error()).

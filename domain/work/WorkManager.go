@@ -18,57 +18,6 @@ import (
 	"github.com/sony/sonyflake"
 )
 
-// works
-// work_contributions
-// work_process_steps
-// work_state_transitions
-
-/*
-work
-{
-	"id": ...
-	"name": ...
-	"projectId": xx
-	"flowId": xxx,
-	"createTime": "xxx",
-
-	...
-	"workflowId": xxx,
-	"orderInState": "xx",
-	"state": {
-		"name": "",
-		"category": "",
-		"beginTime": "",
-	},
-	"processBeginTime": xxx,
-	"processEndTime": xxx,
-	"archiveTime": xxx
-	"properties": [{
-		...
-	}]
-	// 处于各个状态的历史
-	"processSteps": [{
-
-	}],
-	"contributions": [{
-		// id, workKey, projectId
-		"contributorId": "",
-		"contributorName": "",
-		"beginTime": "",
-		"endTime": "",
-		"effective": true
-	}],
-	// events
-	"transitions": [{
-		// id, workflowId, workId
-		"createTime": xxx,
-		"creator": xxx,
-		"fromState": xxx,
-		"toState": "xxx",
-	}],
-}
-*/
-
 // workflows
 // workflow_states
 // workflow_state_transitions
@@ -268,6 +217,7 @@ func (m *WorkManager) CreateWork(c *domain.WorkCreation, sec *session.Context) (
 		}
 
 		initProcessStep := domain.WorkProcessStep{WorkID: workDetail.ID, FlowID: workDetail.FlowID,
+			CreatorID: sec.Identity.ID, CreatorName: sec.Identity.Nickname,
 			StateName: workDetail.State.Name, StateCategory: workDetail.State.Category, BeginTime: workDetail.CreateTime}
 		if err := tx.Create(initProcessStep).Error; err != nil {
 			return err
@@ -390,9 +340,6 @@ func (m *WorkManager) DeleteWork(id types.ID, sec *session.Context) error {
 		}
 
 		if err := tx.Delete(domain.Work{}, "id = ?", id).Error; err != nil {
-			return err
-		}
-		if err := tx.Delete(domain.WorkStateTransition{}, "work_id = ?", id).Error; err != nil {
 			return err
 		}
 		if err := tx.Delete(domain.WorkProcessStep{}, "work_id = ?", id).Error; err != nil {

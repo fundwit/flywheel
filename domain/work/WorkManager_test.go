@@ -150,6 +150,7 @@ var _ = Describe("WorkManager", func() {
 			Expect(len(initProcessStep)).To(Equal(1))
 			fmt.Println(initProcessStep[0].BeginTime, "detail:", detail.CreateTime, detail.StateBeginTime, "work:", work.CreateTime, work.StateBeginTime)
 			Expect(initProcessStep[0]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
+				CreatorID: sec.Identity.ID, CreatorName: sec.Identity.Nickname,
 				StateName: detail.StateName, StateCategory: detail.State.Category, BeginTime: detail.CreateTime}))
 
 			detail, err = workManager.WorkDetail(work.Identifier, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
@@ -543,20 +544,6 @@ var _ = Describe("WorkManager", func() {
 			Expect(works).ToNot(BeNil())
 			Expect(len(*works)).To(Equal(2))
 
-			testDatabase.DS.GormDB().AutoMigrate(&domain.WorkStateTransition{})
-			err = testDatabase.DS.GormDB().Create(&domain.WorkStateTransition{ID: 1, CreateTime: types.CurrentTimestamp(), Creator: 1,
-				WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FlowID: 1, WorkID: (*works)[0].ID, FromState: "PENDING", ToState: "DOING"}}).Error
-			Expect(err).To(BeNil())
-			err = testDatabase.DS.GormDB().Create(&domain.WorkStateTransition{ID: 2, CreateTime: types.CurrentTimestamp(), Creator: 1,
-				WorkStateTransitionBrief: domain.WorkStateTransitionBrief{FlowID: 1, WorkID: 2, FromState: "PENDING", ToState: "DOING"}}).Error
-			Expect(err).To(BeNil())
-			transition := domain.WorkStateTransition{}
-			Expect(testDatabase.DS.GormDB().First(&transition, domain.WorkStateTransition{ID: 1}).Error).To(BeNil())
-			Expect(transition.WorkID).To(Equal((*works)[0].ID))
-			transition = domain.WorkStateTransition{}
-			Expect(testDatabase.DS.GormDB().First(&transition, domain.WorkStateTransition{ID: 2}).Error).To(BeNil())
-			Expect(transition.WorkID).To(Equal(types.ID(2)))
-
 			lastEvents = []event.EventRecord{}
 			// do delete work
 			workToDelete := (*works)[0]
@@ -571,15 +558,6 @@ var _ = Describe("WorkManager", func() {
 			works, err = workManager.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 			Expect(err).To(BeNil())
 			Expect(len(*works)).To(Equal(1))
-
-			// transitions should also be deleted
-			// transition of id 1 was deleted
-			transition = domain.WorkStateTransition{}
-			Expect(testDatabase.DS.GormDB().First(&transition, domain.WorkStateTransition{ID: 1}).Error).To(Equal(gorm.ErrRecordNotFound))
-			// transition of id 2 still remains
-			transition = domain.WorkStateTransition{}
-			Expect(testDatabase.DS.GormDB().First(&transition, domain.WorkStateTransition{ID: 2}).Error).To(BeNil())
-			Expect(transition.WorkID).To(Equal(types.ID(2)))
 
 			// work process steps should also be deleted
 			processStep := domain.WorkProcessStep{}
@@ -605,10 +583,10 @@ var _ = Describe("WorkManager", func() {
 				testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 			Expect(err).To(BeZero())
 
-			Expect(testDatabase.DS.GormDB().DropTable(&domain.WorkStateTransition{}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB().DropTable(&domain.WorkProcessStep{}).Error).To(BeNil())
 			err = workManager.DeleteWork(detail.ID, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".work_state_transitions' doesn't exist"))
+			Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".work_process_steps' doesn't exist"))
 
 			testDatabase.DS.GormDB().DropTable(&domain.Work{})
 			err = workManager.DeleteWork(detail.ID, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))

@@ -44,7 +44,7 @@ func main() {
 	persistence.ActiveDataSourceManager = ds
 
 	// database migration (race condition)
-	err = ds.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkStateTransition{}, &domain.WorkProcessStep{},
+	err = ds.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{},
 		&workcontribution.WorkContributionRecord{}, &event.EventRecord{},
 		&account.User{}, &domain.Project{}, &domain.ProjectMember{},
@@ -79,7 +79,6 @@ func main() {
 
 	servehttp.RegisterWorkHandler(engine, work.NewWorkManager(ds, workflowManager), securityMiddle)
 
-	servehttp.RegisterWorkStateTransitionHandler(engine, workProcessManager, securityMiddle)
 	servehttp.RegisterWorkProcessStepHandler(engine, workProcessManager, securityMiddle)
 	workcontribution.RegisterWorkContributionsHandlers(engine, securityMiddle)
 

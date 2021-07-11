@@ -24,6 +24,8 @@ jobs:
     - name: Test
       run: |
         docker run -d -e MYSQL_ROOT_PASSWORD=root -p 3306:3306 mysql:8.0.23
+        # docker run -d -e "discovery.type=single-node" docker.elastic.co/elasticsearch/elasticsearch-oss:7.9.3
+        # wait for running of mysql and es
 
         go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
         bash <(curl -s https://codecov.io/bash)

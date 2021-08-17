@@ -43,7 +43,11 @@ var _ = Describe("WorkProcessStepHandler", func() {
 			req := httptest.NewRequest(http.MethodPost, "/v1/transitions", bytes.NewReader([]byte(`{}`)))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusBadRequest))
-			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"Key: 'WorkProcessStepCreation.FlowID' Error:Field validation for 'FlowID' failed on the 'required' tag\nKey: 'WorkProcessStepCreation.WorkID' Error:Field validation for 'WorkID' failed on the 'required' tag\nKey: 'WorkProcessStepCreation.FromState' Error:Field validation for 'FromState' failed on the 'required' tag\nKey: 'WorkProcessStepCreation.ToState' Error:Field validation for 'ToState' failed on the 'required' tag","data":null}`))
+			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":
+				"Key: 'WorkProcessStepCreation.FlowID' Error:Field validation for 'FlowID' failed on the 'required' tag\n` +
+				`Key: 'WorkProcessStepCreation.WorkID' Error:Field validation for 'WorkID' failed on the 'required' tag\n` +
+				`Key: 'WorkProcessStepCreation.FromState' Error:Field validation for 'FromState' failed on the 'required' tag\n` +
+				`Key: 'WorkProcessStepCreation.ToState' Error:Field validation for 'ToState' failed on the 'required' tag","data":null}`))
 		})
 		It("should be able to handle service error", func() {
 			workProcessManager.CreateWorkStateTransitionFunc =

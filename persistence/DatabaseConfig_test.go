@@ -2,10 +2,11 @@ package persistence_test
 
 import (
 	"flywheel/persistence"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"os"
 	"strings"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("DatabaseConfig", func() {

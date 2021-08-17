@@ -74,6 +74,8 @@ func main() {
 	account.RegisterUsersHandler(engine, securityMiddle)
 
 	workflowManager := flow.NewWorkflowManager(ds)
+	flow.DetailWorkflowFunc = workflowManager.DetailWorkflow
+
 	workProcessManager := work.NewWorkProcessManager(ds, workflowManager)
 	servehttp.RegisterWorkflowHandler(engine, workflowManager, securityMiddle)
 

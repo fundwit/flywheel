@@ -11,8 +11,18 @@ jobs:
     - name: Set up Go 1.x
       uses: actions/setup-go@v2
       with:
-        go-version: ^1.13
+        go-version: ^1.16
       id: go
+    
+    - name: Start MySQL
+      uses: samin/mysql-action@v1.3
+      with:
+        mysql root password: root
+
+    - name: Setup ElasticSearch
+      uses: getong/elasticsearch-action@v1.2
+      with:
+        elasticsearch version: 7.9.3
 
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
@@ -23,9 +33,7 @@ jobs:
 
     - name: Test
       run: |
-        docker run -d -e MYSQL_ROOT_PASSWORD=root -p 3306:3306 mysql:8.0.23
-
-        go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+        TZ='Asia/Shanghai' go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
         bash <(curl -s https://codecov.io/bash)
 
     - name: Generte Build Info File

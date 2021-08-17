@@ -4,34 +4,116 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flywheel/bizerror"
+	"fmt"
 	"io/ioutil"
 	"log"
-	"strings"
+	"os"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/elastic/go-elasticsearch/v7/estransport"
 	"github.com/fundwit/go-commons/types"
 )
+
+var (
+	SearchFunc      = Search
+	IndexFunc       = Index
+	GetDocumentFunc = GetDocument
+	DropIndexFunc   = DropIndex
+	DeleteByIdFunc  = DeleteById
+)
+
+type H map[string]interface{}
+
+type ESGetResult struct {
+	Index string `json:"_index"`
+	Type  string `json:"_type"`
+	Id    string `json:"_id"`
+
+	Version     int `json:"_version"`
+	SeqNO       int `json:"_seq_no"`
+	PrimaryTerm int `json:"_primary_term"`
+
+	Found  bool   `json:"found"`
+	Source Source `json:"_source"`
+}
+
+type ESSearchResult struct {
+	Took    int            `json:"took"`
+	TimeOut bool           `json:"timed_out"`
+	Shards  ESSearchShards `json:"_shards"`
+	Hits    ESSearchHits   `json:"hits"`
+}
+type ESSearchShards struct {
+	Total      int `json:"total"`
+	Successful int `json:"successful"`
+	Skipped    int `json:"skipped"`
+	Failed     int `json:"failed"`
+}
+type ESSearchHits struct {
+	Total    ESSearchHitsTotal `json:"total"`
+	MaxScore float64           `json:"max_score"`
+	Hits     []ESSearchHit     `json:"hits"`
+}
+type ESSearchHitsTotal struct {
+	Value    int    `json:"value"`
+	Relation string `json:"relation"`
+}
+type ESSearchHit struct {
+	Index string `json:"_index"`
+	Type  string `json:"_type"`
+	Id    string `json:"_id"`
+
+	Score  float64       `json:"_score"`
+	Source Source        `json:"_source"`
+	Sort   []interface{} `sort:"sort"`
+}
+
+type Source string
+
+func (d *Source) UnmarshalJSON(data []byte) (err error) {
+	*d = Source(data)
+	return
+}
+
+func (d *Source) MarshalJSON() ([]byte, error) {
+	return []byte(*d), nil
+}
 
 // ELASTICSEARCH_URL
 var ActiveESClient *elasticsearch.Client
 
-func init() {
-	client, err := elasticsearch.NewDefaultClient()
+// CreateClientFromEnv ELASTICSEARCH_URL
+func CreateClientFromEnv() *elasticsearch.Client {
+	conf := elasticsearch.Config{Logger: &estransport.TextLogger{
+		Output: os.Stdout, EnableRequestBody: true, EnableResponseBody: true}}
+	client, err := elasticsearch.NewClient(conf)
 	if err != nil {
 		panic(err)
 	}
 	ActiveESClient = client
+	return client
 }
 
-// func Index(index string, doc interface{}) error {
-// 	res, err := ActiveESClient.Index(index, &buf, elasticsearch.Index.WithDocumentType("doc"))
-// 	if err != nil {
-// 		failOnError(err, "Error Index response")
-// 	}
-// 	defer res.Body.Close()
-// 	fmt.Println(res.String())
-// }
+func DropIndex(index string) error {
+	req := esapi.IndicesDeleteRequest{
+		Index: []string{index},
+	}
+
+	res, err := req.Do(context.Background(), ActiveESClient)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("error response status %s", res.Status())
+	} else {
+		log.Println(res.String())
+	}
+	return nil
+}
 
 func Index(index string, id types.ID, doc interface{}) error {
 	var buf bytes.Buffer
@@ -46,93 +128,76 @@ func Index(index string, id types.ID, doc interface{}) error {
 		Refresh:    "true",
 	}
 
+	log.Println("saved document body:", buf.String())
 	res, err := req.Do(context.Background(), ActiveESClient)
 	if err != nil {
-		log.Fatalf("Error getting response: %s", err)
+		return err
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		log.Printf("[%s] Error indexing", res.Status())
+		return fmt.Errorf("error response status %s", res.Status())
 	} else {
-		// Deserialize the response into a map.
-		var r map[string]interface{}
-		if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
-			log.Printf("Error parsing the response body: %s", err)
-		} else {
-			// Print the response status and indexed document version.
-			log.Printf("[%s] %s; version=%d", res.Status(), r["result"], int(r["_version"].(float64)))
-		}
+		log.Println(res.String())
 	}
 	return nil
 }
 
-func Search(doc interface{}) error {
+func Search(index string, query interface{}) (*ESSearchResult, error) {
 	// "query": { "match": {"title": "test"}}
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(doc); err != nil {
-		return err
+	var q bytes.Buffer
+	if err := json.NewEncoder(&q).Encode(query); err != nil {
+		return nil, err
 	}
 
 	res, err := ActiveESClient.Search(
 		ActiveESClient.Search.WithContext(context.Background()),
-		ActiveESClient.Search.WithIndex("test"),
-		ActiveESClient.Search.WithBody(&buf),
+		ActiveESClient.Search.WithIndex(index),
+		ActiveESClient.Search.WithBody(&q),
 		ActiveESClient.Search.WithTrackTotalHits(true),
 		ActiveESClient.Search.WithPretty(),
 	)
 	if err != nil {
-		log.Fatalf("Error getting response: %s", err)
+		return nil, err
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		var e map[string]interface{}
-		if err := json.NewDecoder(res.Body).Decode(&e); err != nil {
-			log.Fatalf("Error parsing the response body: %s", err)
-		} else {
-			// Print the response status and error information.
-			log.Fatalf("[%s] %s: %s",
-				res.Status(),
-				e["error"].(map[string]interface{})["type"],
-				e["error"].(map[string]interface{})["reason"],
-			)
-		}
+		return nil, fmt.Errorf(res.String())
 	}
 
-	r := map[string]interface{}{}
+	r := ESSearchResult{}
 	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
-		log.Fatalf("Error parsing the response body: %s", err)
+		return nil, fmt.Errorf(res.String())
 	}
-	// Print the response status, number of results, and request duration.
-
-	log.Printf(
-		"[%s] %d hits; took: %dms",
-		res.Status(),
-		int(r["hits"].(map[string]interface{})["total"].(map[string]interface{})["value"].(float64)),
-		int(r["took"].(float64)),
-	)
-	// Print the ID and document source for each hit.
-	for _, hit := range r["hits"].(map[string]interface{})["hits"].([]interface{}) {
-		log.Printf(" * ID=%s, %s", hit.(map[string]interface{})["_id"], hit.(map[string]interface{})["_source"])
-	}
-
-	log.Println(strings.Repeat("=", 37))
-	return nil
+	return &r, nil
 }
 
-func GetDocument(index string, id types.ID) ([]byte, error) {
+func GetDocument(index string, id types.ID) (Source, error) {
 	res, err := ActiveESClient.Get(index, id.String())
 	if err != nil {
-		return []byte{}, err
+		return "", err
 	}
 	defer res.Body.Close()
-	return ioutil.ReadAll(res.Body)
+	if res.IsError() {
+		return "", fmt.Errorf("error response status %s", res.Status())
+	}
+	bytes, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+
+	}
+	log.Println("get document body: ", string(bytes))
+	result := ESGetResult{}
+	if err := json.Unmarshal(bytes, &result); err != nil {
+		return "", err
+	}
+	if !result.Found {
+		return "", bizerror.ErrNotFound
+	}
+	return result.Source, nil
 }
 
-func DeleteByQuery() {
-
-}
 func DeleteById(index string, id types.ID) ([]byte, error) {
 	res, err := ActiveESClient.Delete(index, id.String())
 	if err != nil {
@@ -140,12 +205,4 @@ func DeleteById(index string, id types.ID) ([]byte, error) {
 	}
 	defer res.Body.Close()
 	return ioutil.ReadAll(res.Body)
-}
-
-func UpdateById() {
-
-}
-
-func UpdateByQuery() {
-
 }

@@ -16,6 +16,10 @@ import (
 	"github.com/sony/sonyflake"
 )
 
+var (
+	DetailWorkflowFunc func(id types.ID, sec *session.Context) (*domain.WorkflowDetail, error)
+)
+
 type WorkflowManagerTraits interface {
 	QueryWorkflows(query *domain.WorkflowQuery, sec *session.Context) (*[]domain.Workflow, error)
 	CreateWorkflow(c *WorkflowCreation, sec *session.Context) (*domain.WorkflowDetail, error)

@@ -11,6 +11,7 @@ import (
 	"flywheel/servehttp"
 	"flywheel/session"
 	"flywheel/testinfra"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -399,11 +400,12 @@ var _ = Describe("WorkflowHandler", func() {
 			req := httptest.NewRequest(http.MethodPost, "/v1/workflows/1/transitions", bytes.NewReader([]byte(`[{"name": "test"}]`)))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusBadRequest))
+			fmt.Println(body)
 			Expect(body).To(MatchJSON(`{
-			  "code": "common.bad_param",
-			  "message": "Key: 'Transition.From' Error:Field validation for 'From' failed on the 'required' tag\n` +
+				"code":"common.bad_param",
+				"message":"[0]: Key: 'Transition.From' Error:Field validation for 'From' failed on the 'required' tag\n` +
 				`Key: 'Transition.To' Error:Field validation for 'To' failed on the 'required' tag",
-			  "data": null
+				"data":null
 			}`))
 		})
 
@@ -489,12 +491,13 @@ var _ = Describe("WorkflowHandler", func() {
 			req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/1/transitions", bytes.NewReader([]byte(`[{"name": "test"}]`)))
 			status, body, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusBadRequest))
+			fmt.Println(body)
 			Expect(body).To(MatchJSON(`{
-			  "code": "common.bad_param",
-			  "message": "Key: 'Transition.From' Error:Field validation for 'From' failed on the 'required' tag\n` +
+				"code":"common.bad_param",
+				"message":"[0]: Key: 'Transition.From' Error:Field validation for 'From' failed on the 'required' tag\n` +
 				`Key: 'Transition.To' Error:Field validation for 'To' failed on the 'required' tag",
-			  "data": null
-			}`))
+				"data":null}
+			`))
 		})
 
 		It("should return 404 when workflow is not exist", func() {

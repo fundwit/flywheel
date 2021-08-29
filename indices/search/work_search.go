@@ -56,9 +56,12 @@ func SearchWorks(q domain.WorkQuery, sec *session.Context) ([]domain.Work, error
 	if len(q.StateCategories) > 0 {
 		filters = append(filters, es.H{"terms": es.H{"stateCategory": q.StateCategories}})
 	}
+
 	if q.ArchiveState == domain.StatusOn {
 		filters = append(filters, es.H{"exists": es.H{"field": "archivedTime"}})
-	} else if q.ArchiveState == domain.StatusOff {
+	} else if q.ArchiveState == domain.StatusAll {
+		// do nothing
+	} else {
 		filters = append(filters, es.H{"bool": es.H{"must_not": es.H{"exists": es.H{"field": "archivedTime"}}}})
 	}
 

@@ -53,7 +53,7 @@ func TestSearchWorks(t *testing.T) {
 		Expect(indices.IndexWorks([]domain.Work{w1000})).To(BeNil())
 		Expect(indices.IndexWorks([]domain.Work{w1001})).To(BeNil())
 		Expect(indices.IndexWorks([]domain.Work{w1002})).To(BeNil())
-		Expect(indices.IndexWorks([]domain.Work{w1003})).To(BeNil())
+		Expect(indices.IndexWorks([]domain.Work{w1003})).To(BeNil()) // archived
 		Expect(indices.IndexWorks([]domain.Work{w2002})).To(BeNil())
 
 		// assert: visible project limit
@@ -79,7 +79,7 @@ func TestSearchWorks(t *testing.T) {
 		Expect(len(works)).To(Equal(1))
 		Expect(works[0]).To(Equal(w1001))
 
-		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100,
+		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100, ArchiveState: "ALL",
 			StateCategories: []state.Category{state.InProcess, state.Done}},
 			&session.Context{Perms: []string{"common_100"}})
 		Expect(err).To(BeNil())
@@ -96,6 +96,15 @@ func TestSearchWorks(t *testing.T) {
 		Expect(works[0]).To(Equal(w1003))
 
 		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100, ArchiveState: "OFF",
+			StateCategories: []state.Category{state.InProcess, state.Done}},
+			&session.Context{Perms: []string{"common_100"}})
+		Expect(err).To(BeNil())
+		Expect(len(works)).To(Equal(2))
+		Expect(works[0]).To(Equal(w1001))
+		Expect(works[1]).To(Equal(w1002))
+
+		// default archive state is OFF
+		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100,
 			StateCategories: []state.Category{state.InProcess, state.Done}},
 			&session.Context{Perms: []string{"common_100"}})
 		Expect(err).To(BeNil())

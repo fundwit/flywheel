@@ -217,7 +217,7 @@ func GetDocument(index string, id types.ID) (Source, error) {
 }
 
 func DeleteDocumentById(index string, id types.ID) error {
-	res, err := ActiveESClient.Delete(index, id.String())
+	res, err := ActiveESClient.Delete(index, id.String(), ActiveESClient.Delete.WithRefresh("true"))
 	if err != nil {
 		return err
 	}

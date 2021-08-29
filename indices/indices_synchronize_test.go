@@ -142,6 +142,21 @@ func TestIndicesFullSync(t *testing.T) {
 		doc   interface{}
 	}
 
+	t.Run("should recover panic to error", func(t *testing.T) {
+		raisedErr := errors.New("error on load works")
+		work.LoadWorksFunc = func(page, size int) ([]domain.Work, error) {
+			panic(raisedErr)
+		}
+		err := indices.IndicesFullSync()
+		Expect(err).To(Equal(raisedErr))
+
+		work.LoadWorksFunc = func(page, size int) ([]domain.Work, error) {
+			panic("error on load works")
+		}
+		err = indices.IndicesFullSync()
+		Expect(err).To(Equal(errors.New("error on indices full sync: error on load works")))
+	})
+
 	t.Run("should be able to index all works", func(t *testing.T) {
 		docs := []indexResult{}
 
@@ -163,7 +178,7 @@ func TestIndicesFullSync(t *testing.T) {
 		}
 
 		indices.SyncBatchSize = 2
-		indices.IndicesFullSync()
+		Expect(indices.IndicesFullSync()).To(BeNil())
 
 		wantedDocs := []indexResult{}
 		for i := 0; i < total; i++ {
@@ -199,7 +214,7 @@ func TestIndicesFullSync(t *testing.T) {
 		}
 
 		indices.SyncBatchSize = 2
-		indices.IndicesFullSync()
+		Expect(indices.IndicesFullSync()).To(BeNil())
 
 		wantedDocs := []indexResult{}
 		for i := 0; i < total; i++ {
@@ -238,7 +253,7 @@ func TestIndicesFullSync(t *testing.T) {
 		}
 
 		indices.SyncBatchSize = 2
-		indices.IndicesFullSync()
+		Expect(indices.IndicesFullSync()).To(BeNil())
 
 		wantedDocs := []indexResult{}
 		for i := 0; i < total; i++ {

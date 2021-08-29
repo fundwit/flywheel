@@ -61,9 +61,19 @@ var (
 	SyncBatchSize = 500
 )
 
-func IndicesFullSync() error {
-	page := 1
+func IndicesFullSync() (err error) {
+	defer func() {
+		if ret := recover(); ret != nil {
+			e, ok := ret.(error)
+			if ok {
+				err = e
+			} else {
+				err = fmt.Errorf("error on indices full sync: %v", ret)
+			}
+		}
+	}()
 
+	page := 1
 	for {
 		works, err := work.LoadWorksFunc(page, SyncBatchSize)
 		if err != nil {

@@ -8,6 +8,7 @@ import (
 	"flywheel/domain/flow"
 	"flywheel/domain/namespace"
 	"flywheel/domain/workcontribution"
+	"flywheel/es"
 	"flywheel/event"
 	"flywheel/indices"
 	"flywheel/persistence"
@@ -57,6 +58,8 @@ func main() {
 	if err := account.DefaultSecurityConfiguration(); err != nil {
 		log.Fatalf("failed to prepare default security configuration %v\n", err)
 	}
+
+	es.CreateClientFromEnv()
 
 	engine := gin.Default()
 	engine.Use(bizerror.ErrorHandling())

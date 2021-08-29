@@ -104,8 +104,9 @@ var ActiveESClient *elasticsearch.Client
 
 // CreateClientFromEnv ELASTICSEARCH_URL
 func CreateClientFromEnv() *elasticsearch.Client {
+	debug := os.Getenv("GIN_MODE") == "debug"
 	conf := elasticsearch.Config{Logger: &estransport.TextLogger{
-		Output: os.Stdout, EnableRequestBody: true, EnableResponseBody: true}}
+		Output: os.Stdout, EnableRequestBody: debug, EnableResponseBody: debug}}
 	client, err := elasticsearch.NewClient(conf)
 	if err != nil {
 		panic(err)

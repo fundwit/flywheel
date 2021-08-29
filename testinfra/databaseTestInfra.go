@@ -2,11 +2,11 @@ package testinfra
 
 import (
 	"flywheel/persistence"
-	"log"
 	"os"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 type TestDatabase struct {
@@ -28,14 +28,14 @@ func StartMysqlTestDatabase(baseName string) *TestDatabase {
 
 	// create database (no conflict)
 	if err := persistence.PrepareMysqlDatabase(dbConfig.DriverArgs); err != nil {
-		log.Fatalf("failed to prepare database %v\n", err)
+		logrus.Fatalf("failed to prepare database %v\n", err)
 	}
 
 	ds := &persistence.DataSourceManager{DatabaseConfig: dbConfig}
 	// connect
 	if err := ds.Start(); err != nil {
 		defer ds.Stop()
-		log.Fatalf("database conneciton failed %v\n", err)
+		logrus.Fatalf("database connection failed %v\n", err)
 	}
 
 	return &TestDatabase{TestDatabaseName: databaseName, DS: ds}
@@ -45,9 +45,9 @@ func StopMysqlTestDatabase(testDatabase *TestDatabase) {
 	if testDatabase != nil || testDatabase.DS != nil {
 		if testDatabase.DS.GormDB() != nil {
 			if err := testDatabase.DS.GormDB().Exec("DROP DATABASE " + testDatabase.TestDatabaseName).Error; err != nil {
-				log.Println("failed to drop test database: " + testDatabase.TestDatabaseName)
+				logrus.Println("failed to drop test database: " + testDatabase.TestDatabaseName)
 			} else {
-				//log.Println("test database " + testDatabase.TestDatabaseName + " dropped")
+				logrus.Debugln("test database " + testDatabase.TestDatabaseName + " dropped")
 			}
 		}
 

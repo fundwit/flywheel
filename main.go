@@ -15,31 +15,31 @@ import (
 	"flywheel/servehttp"
 	"flywheel/session"
 	"flywheel/sessions"
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
-	log.Println("service start")
+	logrus.Infoln("service start")
 
 	dbConfig, err := persistence.ParseDatabaseConfigFromEnv()
 	if err != nil {
-		log.Fatalf("parse database config failed %v\n", err)
+		logrus.Fatalf("parse database config failed %v\n", err)
 	}
 
 	// create database (no conflict)
 	if dbConfig.DriverType == "mysql" {
 		if err := persistence.PrepareMysqlDatabase(dbConfig.DriverArgs); err != nil {
-			log.Fatalf("failed to prepare database %v\n", err)
+			logrus.Fatalf("failed to prepare database %v\n", err)
 		}
 	}
 
 	// connect database
 	ds := &persistence.DataSourceManager{DatabaseConfig: dbConfig}
 	if err := ds.Start(); err != nil {
-		log.Fatalf("database connection failed %v\n", err)
+		logrus.Fatalf("database connection failed %v\n", err)
 	}
 	defer ds.Stop()
 	persistence.ActiveDataSourceManager = ds
@@ -52,11 +52,11 @@ func main() {
 		&account.Role{}, &account.Permission{},
 		&account.UserRoleBinding{}, &account.RolePermissionBinding{}).Error
 	if err != nil {
-		log.Fatalf("database migration failed %v\n", err)
+		logrus.Fatalf("database migration failed %v\n", err)
 	}
 
 	if err := account.DefaultSecurityConfiguration(); err != nil {
-		log.Fatalf("failed to prepare default security configuration %v\n", err)
+		logrus.Fatalf("failed to prepare default security configuration %v\n", err)
 	}
 
 	es.CreateClientFromEnv()

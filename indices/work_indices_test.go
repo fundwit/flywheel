@@ -7,7 +7,6 @@ import (
 	"flywheel/es"
 	"flywheel/indices"
 	"flywheel/session"
-	"log"
 	"strings"
 	"testing"
 	"time"
@@ -35,7 +34,6 @@ func TestIndexWorks(t *testing.T) {
 		// assert: doc existed
 		source, err := es.GetDocument(indices.WorkIndexName, 1)
 		Expect(err).To(BeNil())
-		log.Println(source)
 		record := indices.WorkDocument{}
 		err = json.Unmarshal([]byte(source), &record)
 		Expect(err).To(BeNil())

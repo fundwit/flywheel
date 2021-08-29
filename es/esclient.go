@@ -7,13 +7,13 @@ import (
 	"flywheel/bizerror"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/elastic/go-elasticsearch/v7/estransport"
 	"github.com/fundwit/go-commons/types"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -128,7 +128,7 @@ func DropIndex(index string) error {
 	if res.IsError() {
 		return fmt.Errorf("error response status %s", res.Status())
 	} else {
-		log.Println(res.String())
+		logrus.Debugln(res.String())
 	}
 	return nil
 }
@@ -146,7 +146,7 @@ func Index(index string, id types.ID, doc interface{}) error {
 		Refresh:    "true",
 	}
 
-	log.Println("saved document body:", buf.String())
+	logrus.Debugln("saved document body:", buf.String())
 	res, err := req.Do(context.Background(), ActiveESClient)
 	if err != nil {
 		return err
@@ -156,7 +156,7 @@ func Index(index string, id types.ID, doc interface{}) error {
 	if res.IsError() {
 		return fmt.Errorf("error response status %s", res.Status())
 	} else {
-		log.Println(res.String())
+		logrus.Debugln(res.String())
 	}
 	return nil
 }
@@ -204,7 +204,7 @@ func GetDocument(index string, id types.ID) (Source, error) {
 	if err != nil {
 		return "", err
 	}
-	log.Println("get document body: ", string(bytes))
+	logrus.Debugln("get document body: ", string(bytes))
 	result := ESGetResult{}
 	if err := json.Unmarshal(bytes, &result); err != nil {
 		return "", err
@@ -225,7 +225,7 @@ func DeleteDocumentById(index string, id types.ID) error {
 	if err != nil {
 		return err
 	}
-	log.Println("delete document respone body: ", string(bytes))
+	logrus.Debugln("delete document respone body: ", string(bytes))
 	result := ESDeleteResult{}
 	if err := json.Unmarshal(bytes, &result); err != nil {
 		return err

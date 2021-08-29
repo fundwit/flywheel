@@ -19,7 +19,7 @@ var _ = Describe("DataSourceManager", func() {
 				//Expect(ds.GormDB()).To(BeNil())
 				//
 				//if err := ds.Start(); err != nil {
-				//	log.Fatal(err)
+				//	logrus.Fatal(err)
 				//}
 				//defer ds.Stop()
 				//Expect(ds.GormDB()).ToNot(BeNil())

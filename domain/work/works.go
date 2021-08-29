@@ -406,7 +406,7 @@ func LoadWorks(page, size int) ([]domain.Work, error) {
 	if offset < 0 {
 		offset = 0
 	}
-	if err := db.LogMode(true).Order("ID ASC").Offset(offset).Limit(size).Find(&works).Error; err != nil {
+	if err := db.Order("ID ASC").Offset(offset).Limit(size).Find(&works).Error; err != nil {
 		return nil, err
 	}
 	return works, nil

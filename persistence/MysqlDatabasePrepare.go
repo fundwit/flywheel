@@ -2,12 +2,12 @@ package persistence
 
 import (
 	"errors"
-	"log"
 	"os"
 	"strings"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
+	"github.com/sirupsen/logrus"
 )
 
 func PrepareMysqlDatabase(mysqlDriverArgs string) error {
@@ -24,7 +24,7 @@ func PrepareMysqlDatabase(mysqlDriverArgs string) error {
 	defer func() {
 		err := db.Close()
 		if err != nil {
-			log.Printf("[prepare] failed to close connection after prepare mysql database: %v\n", err)
+			logrus.Warnf("[prepare] failed to close connection after prepare mysql database: %v\n", err)
 		}
 	}()
 

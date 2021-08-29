@@ -32,7 +32,7 @@ func invokeHandlers(record *EventRecord) []EventHandleResult {
 		results = append(results, *r)
 
 		if r.Success {
-			logrus.Debug("post handle event. ", r)
+			logrus.Info("post handle event. ", r)
 		} else {
 			logrus.Error("post handler error. ", r)
 		}

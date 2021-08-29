@@ -1,14 +1,15 @@
 package common
 
 import (
-	"github.com/sirupsen/logrus"
 	"os"
+
+	"github.com/sirupsen/logrus"
 )
 
 func init() {
 	logger := logrus.StandardLogger()
 	logger.Out = os.Stdout
-	logger.Formatter = &logrus.JSONFormatter{}
+	logger.Formatter = &logrus.TextFormatter{}
 	logger.AddHook(&DefaultFieldsHook{})
 }
 
@@ -20,7 +21,7 @@ func (hook *DefaultFieldsHook) Levels() []logrus.Level {
 }
 
 func (hook *DefaultFieldsHook) Fire(e *logrus.Entry) error {
-	e.Data["serviceName"] = GetServiceName()
-	e.Data["serviceInstance"] = GetServiceInstance()
+	// e.Data["serviceName"] = GetServiceName()
+	// e.Data["serviceInstance"] = GetServiceInstance()
 	return nil
 }

@@ -1,10 +1,10 @@
 package persistence
 
 import (
-	"log"
 	"os"
 
 	"github.com/jinzhu/gorm"
+	"github.com/sirupsen/logrus"
 )
 
 var ActiveDataSourceManager *DataSourceManager
@@ -30,7 +30,7 @@ func (m *DataSourceManager) Start() error {
 func (m *DataSourceManager) Stop() {
 	if m.gormDB != nil {
 		if err := m.gormDB.Close(); err != nil {
-			log.Printf("fialed to close DB: %v", err)
+			logrus.Warnln("failed to close DB:", err)
 		}
 		m.gormDB = nil
 	}

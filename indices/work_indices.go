@@ -5,9 +5,9 @@ import (
 	"flywheel/domain/work"
 	"flywheel/es"
 	"fmt"
-	"log"
 
 	"github.com/fundwit/go-commons/types"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -43,9 +43,9 @@ func saveWorkDocuments(workDocs []WorkDocument) BatchActionError {
 	for _, doc := range workDocs {
 		if err := es.IndexFunc(WorkIndexName, doc.ID, doc); err != nil {
 			errs[doc.ID] = err
-			log.Printf("index work %d %s\n", doc.ID, err)
+			logrus.Warnf("index work %d %s %s\n", doc.ID, doc.Identifier, err)
 		} else {
-			log.Printf("index work %d successfully\n", doc.ID)
+			logrus.Infof("index work %d %s successfully\n", doc.ID, doc.Identifier)
 		}
 	}
 	if len(errs) == 0 {

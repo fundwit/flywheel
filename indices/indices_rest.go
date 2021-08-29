@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	PathIndexRequests = "/v1/index-request"
+	PathIndexRequests = "/v1/index-requests"
 )
 
 func RegisterIndicesRestAPI(r *gin.Engine, middleWares ...gin.HandlerFunc) {

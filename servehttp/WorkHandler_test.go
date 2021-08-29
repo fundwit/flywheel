@@ -8,6 +8,7 @@ import (
 	"flywheel/domain"
 	"flywheel/domain/state"
 	"flywheel/domain/work"
+	"flywheel/indices/search"
 	"flywheel/servehttp"
 	"flywheel/session"
 	"flywheel/testinfra"
@@ -119,14 +120,14 @@ var _ = Describe("WorkHandler", func() {
 
 	Describe("handleQuery", func() {
 		It("should be able to serve query request", func() {
-			work.QueryWorkFunc = func(q *domain.WorkQuery, sec *session.Context) (*[]domain.Work, error) {
+			search.SearchWorksFunc = func(q domain.WorkQuery, sec *session.Context) ([]domain.Work, error) {
 				works := []domain.Work{
 					{ID: 1, Name: "work1", Identifier: "W-1", ProjectID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.Time().UnixNano() / 1e6,
 						StateName: "PENDING", State: domain.StatePending, StateCategory: state.InBacklog},
 					{ID: 2, Name: "work2", Identifier: "W-2", ProjectID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.Time().UnixNano() / 1e6,
 						StateName: "DONE", State: domain.StateDone, StateCategory: state.Done},
 				}
-				return &works, nil
+				return works, nil
 			}
 
 			req := httptest.NewRequest(http.MethodGet, "/v1/works?name=aaa", nil)
@@ -144,9 +145,9 @@ var _ = Describe("WorkHandler", func() {
 
 		It("should be able to receive parameters", func() {
 			query := &domain.WorkQuery{}
-			work.QueryWorkFunc = func(q *domain.WorkQuery, sec *session.Context) (*[]domain.Work, error) {
-				query = q
-				return &[]domain.Work{}, nil
+			search.SearchWorksFunc = func(q domain.WorkQuery, sec *session.Context) ([]domain.Work, error) {
+				*query = q
+				return []domain.Work{}, nil
 			}
 			req := httptest.NewRequest(http.MethodGet, "/v1/works?name=aaa&projectId=3&stateCategory=2&stateCategory=3", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
@@ -158,8 +159,8 @@ var _ = Describe("WorkHandler", func() {
 		})
 
 		It("should return 500 when service failed", func() {
-			work.QueryWorkFunc = func(q *domain.WorkQuery, sec *session.Context) (*[]domain.Work, error) {
-				return &[]domain.Work{}, errors.New("a mocked error")
+			search.SearchWorksFunc = func(q domain.WorkQuery, sec *session.Context) ([]domain.Work, error) {
+				return []domain.Work{}, errors.New("a mocked error")
 			}
 
 			req := httptest.NewRequest(http.MethodGet, "/v1/works", nil)

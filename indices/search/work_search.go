@@ -10,6 +10,10 @@ import (
 	"strings"
 )
 
+var (
+	SearchWorksFunc = SearchWorks
+)
+
 func SearchWorks(q domain.WorkQuery, sec *session.Context) ([]domain.Work, error) {
 	visibleProjects := sec.VisibleProjects()
 	if len(visibleProjects) == 0 {

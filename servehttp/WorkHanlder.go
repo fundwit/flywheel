@@ -5,6 +5,7 @@ import (
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/work"
+	"flywheel/indices/search"
 	"flywheel/misc"
 	"flywheel/session"
 	"net/http"
@@ -68,11 +69,12 @@ func (h *workHandler) handleQuery(c *gin.Context) {
 	query := domain.WorkQuery{}
 	_ = c.MustBindWith(&query, binding.Query)
 
-	works, err := work.QueryWorkFunc(&query, session.FindSecurityContext(c))
+	//works, err := work.QueryWorkFunc(&query, session.FindSecurityContext(c))
+	works, err := search.SearchWorksFunc(query, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}
-	c.JSON(http.StatusOK, &misc.PagedBody{List: works, Total: uint64(len(*works))})
+	c.JSON(http.StatusOK, &misc.PagedBody{List: works, Total: uint64(len(works))})
 }
 
 func (h *workHandler) handleUpdate(c *gin.Context) {

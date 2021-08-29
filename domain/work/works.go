@@ -21,10 +21,10 @@ import (
 var (
 	workIdWorker = sonyflake.NewSonyflake(sonyflake.Settings{})
 
-	CreateWorkFunc             = CreateWork
-	UpdateWorkFunc             = UpdateWork
-	DetailWorkFunc             = DetailWork
-	QueryWorkFunc              = QueryWork
+	CreateWorkFunc = CreateWork
+	UpdateWorkFunc = UpdateWork
+	DetailWorkFunc = DetailWork
+
 	LoadWorksFunc              = LoadWorks
 	ArchiveWorksFunc           = ArchiveWorks
 	DeleteWorkFunc             = DeleteWork

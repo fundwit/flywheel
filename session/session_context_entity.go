@@ -27,6 +27,15 @@ func (c *Context) HasRole(role string) bool {
 	return c.Perms.HasRole(role)
 }
 
+func (c *Context) HasGlobalViewRole() bool {
+	for _, v := range c.Perms {
+		if strings.HasPrefix(strings.ToLower(v), "system:") {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Context) HasRolePrefix(prefix string) bool {
 	for _, v := range c.Perms {
 		if strings.HasPrefix(strings.ToLower(v), strings.ToLower(prefix)) {
@@ -34,6 +43,10 @@ func (c *Context) HasRolePrefix(prefix string) bool {
 		}
 	}
 	return false
+}
+
+func (c *Context) HasProjectViewPerm(projectId types.ID) bool {
+	return c.HasGlobalViewRole() || c.HasRoleSuffix(projectId.String())
 }
 
 func (c *Context) HasRoleSuffix(suffix string) bool {

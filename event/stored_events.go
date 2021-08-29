@@ -6,6 +6,6 @@ var (
 	EventPersistCreateFunc = eventPersistCreate
 )
 
-func eventPersistCreate(record *EventRecord, db *gorm.DB) error {
-	return db.LogMode(true).Create(record).Error
+func eventPersistCreate(record *EventRecord, tx *gorm.DB) error {
+	return tx.Create(record).Error
 }

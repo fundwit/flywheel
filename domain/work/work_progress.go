@@ -13,30 +13,15 @@ import (
 
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
-	"github.com/sony/sonyflake"
 )
 
-type WorkProcessManagerTraits interface {
-	QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error)
-	CreateWorkStateTransition(*domain.WorkProcessStepCreation, *session.Context) error
-}
+var (
+	QueryProcessStepsFunc         = QueryProcessSteps
+	CreateWorkStateTransitionFunc = CreateWorkStateTransition
+)
 
-type WorkProcessManager struct {
-	dataSource      *persistence.DataSourceManager
-	workflowManager flow.WorkflowManagerTraits
-	idWorker        *sonyflake.Sonyflake
-}
-
-func NewWorkProcessManager(ds *persistence.DataSourceManager, workflowManger flow.WorkflowManagerTraits) *WorkProcessManager {
-	return &WorkProcessManager{
-		dataSource:      ds,
-		workflowManager: workflowManger,
-		idWorker:        sonyflake.NewSonyflake(sonyflake.Settings{}),
-	}
-}
-
-func (m *WorkProcessManager) QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error) {
-	db := m.dataSource.GormDB()
+func QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error) {
+	db := persistence.ActiveDataSourceManager.GormDB()
 	work := domain.Work{}
 	if err := db.Where(&domain.Work{ID: query.WorkID}).Select("project_id").First(&work).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -45,7 +30,7 @@ func (m *WorkProcessManager) QueryProcessSteps(query *domain.WorkProcessStepQuer
 			return nil, err
 		}
 	}
-	if !sec.HasRoleSuffix("_" + work.ProjectID.String()) {
+	if !sec.HasProjectViewPerm(work.ProjectID) {
 		return &[]domain.WorkProcessStep{}, nil
 	}
 
@@ -56,8 +41,8 @@ func (m *WorkProcessManager) QueryProcessSteps(query *domain.WorkProcessStepQuer
 	return &processSteps, nil
 }
 
-func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkProcessStepCreation, sec *session.Context) error {
-	workflow, err := m.workflowManager.DetailWorkflow(c.FlowID, sec)
+func CreateWorkStateTransition(c *domain.WorkProcessStepCreation, sec *session.Context) error {
+	workflow, err := flow.DetailWorkflowFunc(c.FlowID, sec)
 	if err != nil {
 		return err
 	}
@@ -77,7 +62,8 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkProcessStep
 		return errors.New("invalid state " + toState.Name)
 	}
 
-	db := m.dataSource.GormDB()
+	db := persistence.ActiveDataSourceManager.GormDB()
+	var ev *event.EventRecord
 	err = db.Transaction(func(tx *gorm.DB) error {
 		// check perms
 		work := domain.Work{ID: c.WorkID}
@@ -99,13 +85,6 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkProcessStep
 		if query.RowsAffected != 1 {
 			return errors.New("expected affected row is 1, but actual is " + strconv.FormatInt(query.RowsAffected, 10))
 		}
-		if err := CreateWorkPropertyUpdatedEvent(&work,
-			[]event.UpdatedProperty{{
-				PropertyName: "StateName", PropertyDesc: "StateName", OldValue: work.StateName, OldValueDesc: work.StateName, NewValue: c.ToState, NewValueDesc: c.ToState,
-			}},
-			&sec.Identity, tx); err != nil {
-			return err
-		}
 
 		// update work: beginProcessTime and endProcessTime
 		if work.ProcessBeginTime.IsZero() && toState.Category != state.InBacklog {
@@ -124,14 +103,14 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkProcessStep
 		}
 
 		// update process step
-		db := tx.Model(&domain.WorkProcessStep{}).
+		ret := tx.Model(&domain.WorkProcessStep{}).
 			Where(&domain.WorkProcessStep{WorkID: c.WorkID, FlowID: workflow.ID, StateName: fromState.Name}).
 			Where("end_time = ?", types.Timestamp{}).
 			Update(&domain.WorkProcessStep{EndTime: now, NextStateName: toState.Name, NextStateCategory: toState.Category})
-		if db.Error != nil {
+		if ret.Error != nil {
 			return err
 		}
-		if db.RowsAffected != 1 {
+		if ret.RowsAffected != 1 {
 			return bizerror.ErrWorkProcessStepStateInvalid
 		}
 		nextProcessStep := domain.WorkProcessStep{WorkID: work.ID, FlowID: work.FlowID, CreatorID: sec.Identity.ID, CreatorName: sec.Identity.Nickname,
@@ -140,10 +119,23 @@ func (m *WorkProcessManager) CreateWorkStateTransition(c *domain.WorkProcessStep
 			return err
 		}
 
+		ev, err = CreateWorkPropertyUpdatedEvent(&work,
+			[]event.UpdatedProperty{{
+				PropertyName: "StateName", PropertyDesc: "StateName", OldValue: work.StateName, OldValueDesc: work.StateName, NewValue: c.ToState, NewValueDesc: c.ToState,
+			}},
+			&sec.Identity, now, tx)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {
 		return err
 	}
+	if event.InvokeHandlersFunc != nil {
+		event.InvokeHandlersFunc(ev)
+	}
+
 	return nil
 }

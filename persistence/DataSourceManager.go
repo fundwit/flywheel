@@ -1,9 +1,10 @@
 package persistence
 
 import (
-	"github.com/jinzhu/gorm"
 	"log"
 	"os"
+
+	"github.com/jinzhu/gorm"
 )
 
 var ActiveDataSourceManager *DataSourceManager

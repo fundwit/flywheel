@@ -13,9 +13,9 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-func RegisterWorkProcessStepHandler(r *gin.Engine, m work.WorkProcessManagerTraits, middleWares ...gin.HandlerFunc) {
+func RegisterWorkProcessStepHandler(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 	g := r.Group("/v1/work-process-steps", middleWares...)
-	handler := &workProcessStepHandler{manager: m, validator: validator.New()}
+	handler := &workProcessStepHandler{validator: validator.New()}
 	g.GET("", handler.handleQuery)
 
 	g.POST("", handler.handleCreate)
@@ -25,7 +25,6 @@ func RegisterWorkProcessStepHandler(r *gin.Engine, m work.WorkProcessManagerTrai
 }
 
 type workProcessStepHandler struct {
-	manager   work.WorkProcessManagerTraits
 	validator *validator.Validate
 }
 
@@ -40,7 +39,7 @@ func (h *workProcessStepHandler) handleCreate(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	err = h.manager.CreateWorkStateTransition(&creation, session.FindSecurityContext(c))
+	err = work.CreateWorkStateTransitionFunc(&creation, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -53,7 +52,7 @@ func (h *workProcessStepHandler) handleQuery(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	works, err := h.manager.QueryProcessSteps(&query, session.FindSecurityContext(c))
+	works, err := work.QueryProcessStepsFunc(&query, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}

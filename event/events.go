@@ -9,7 +9,7 @@ import (
 
 func CreateEvent(sourceType string, sourceId types.ID, sourceDesc string, category EventCategory,
 	updatedProperties []UpdatedProperty, updatedRelations []UpdatedRelation,
-	identity *session.Identity, db *gorm.DB) error {
+	identity *session.Identity, timestamp types.Timestamp, tx *gorm.DB) (*EventRecord, error) {
 
 	record := EventRecord{
 		Event: Event{
@@ -25,7 +25,11 @@ func CreateEvent(sourceType string, sourceId types.ID, sourceDesc string, catego
 			CreatorName: identity.Name,
 		},
 		Synced:    false,
-		Timestamp: types.CurrentTimestamp(),
+		Timestamp: timestamp,
 	}
-	return EventPersistCreateFunc(&record, db)
+
+	if err := EventPersistCreateFunc(&record, tx); err != nil {
+		return nil, err
+	}
+	return &record, nil
 }

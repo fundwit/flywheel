@@ -2,10 +2,11 @@ package testinfra
 
 import (
 	"flywheel/persistence"
-	"github.com/google/uuid"
 	"log"
 	"os"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 type TestDatabase struct {
@@ -46,7 +47,7 @@ func StopMysqlTestDatabase(testDatabase *TestDatabase) {
 			if err := testDatabase.DS.GormDB().Exec("DROP DATABASE " + testDatabase.TestDatabaseName).Error; err != nil {
 				log.Println("failed to drop test database: " + testDatabase.TestDatabaseName)
 			} else {
-				log.Println("test database " + testDatabase.TestDatabaseName + " dropped")
+				//log.Println("test database " + testDatabase.TestDatabaseName + " dropped")
 			}
 		}
 

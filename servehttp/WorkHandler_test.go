@@ -7,6 +7,7 @@ import (
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/state"
+	"flywheel/domain/work"
 	"flywheel/servehttp"
 	"flywheel/session"
 	"flywheel/testinfra"
@@ -24,8 +25,7 @@ import (
 
 var _ = Describe("WorkHandler", func() {
 	var (
-		router      *gin.Engine
-		workManager *workManagerMock
+		router *gin.Engine
 
 		demoTime         types.Timestamp
 		timeString       string
@@ -36,8 +36,7 @@ var _ = Describe("WorkHandler", func() {
 	BeforeEach(func() {
 		router = gin.Default()
 		router.Use(bizerror.ErrorHandling())
-		workManager = &workManagerMock{}
-		servehttp.RegisterWorkHandler(router, workManager)
+		servehttp.RegisterWorkHandler(router)
 
 		demoTime = types.TimestampOfDate(2020, 1, 1, 1, 0, 0, 0, time.Now().Location())
 		timeBytes, err := demoTime.Time().MarshalJSON()
@@ -55,7 +54,7 @@ var _ = Describe("WorkHandler", func() {
 
 	Describe("handleCreate", func() {
 		It("should be able to serve create request", func() {
-			workManager.CreateWorkFunc = func(creation *domain.WorkCreation, sec *session.Context) (*domain.WorkDetail, error) {
+			work.CreateWorkFunc = func(creation *domain.WorkCreation, sec *session.Context) (*domain.WorkDetail, error) {
 				detail := domain.WorkDetail{
 					Work: domain.Work{
 						ID:            123,
@@ -107,7 +106,7 @@ var _ = Describe("WorkHandler", func() {
 		})
 
 		It("should return 500 when service process failed", func() {
-			workManager.CreateWorkFunc = func(creation *domain.WorkCreation, sec *session.Context) (*domain.WorkDetail, error) {
+			work.CreateWorkFunc = func(creation *domain.WorkCreation, sec *session.Context) (*domain.WorkDetail, error) {
 				return nil, errors.New("a mocked error")
 			}
 			req := httptest.NewRequest(http.MethodPost, "/v1/works",
@@ -120,7 +119,7 @@ var _ = Describe("WorkHandler", func() {
 
 	Describe("handleQuery", func() {
 		It("should be able to serve query request", func() {
-			workManager.QueryWorkFunc = func(q *domain.WorkQuery, sec *session.Context) (*[]domain.Work, error) {
+			work.QueryWorkFunc = func(q *domain.WorkQuery, sec *session.Context) (*[]domain.Work, error) {
 				works := []domain.Work{
 					{ID: 1, Name: "work1", Identifier: "W-1", ProjectID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.Time().UnixNano() / 1e6,
 						StateName: "PENDING", State: domain.StatePending, StateCategory: state.InBacklog},
@@ -145,7 +144,7 @@ var _ = Describe("WorkHandler", func() {
 
 		It("should be able to receive parameters", func() {
 			query := &domain.WorkQuery{}
-			workManager.QueryWorkFunc = func(q *domain.WorkQuery, sec *session.Context) (*[]domain.Work, error) {
+			work.QueryWorkFunc = func(q *domain.WorkQuery, sec *session.Context) (*[]domain.Work, error) {
 				query = q
 				return &[]domain.Work{}, nil
 			}
@@ -159,7 +158,7 @@ var _ = Describe("WorkHandler", func() {
 		})
 
 		It("should return 500 when service failed", func() {
-			workManager.QueryWorkFunc = func(q *domain.WorkQuery, sec *session.Context) (*[]domain.Work, error) {
+			work.QueryWorkFunc = func(q *domain.WorkQuery, sec *session.Context) (*[]domain.Work, error) {
 				return &[]domain.Work{}, errors.New("a mocked error")
 			}
 
@@ -172,7 +171,7 @@ var _ = Describe("WorkHandler", func() {
 
 	Describe("handleDetail", func() {
 		It("should return 500 when service failed", func() {
-			workManager.WorkDetailFunc = func(id string, sec *session.Context) (*domain.WorkDetail, error) {
+			work.DetailWorkFunc = func(id string, sec *session.Context) (*domain.WorkDetail, error) {
 				return nil, errors.New("a mocked error")
 			}
 			req := httptest.NewRequest(http.MethodGet, "/v1/works/123", nil)
@@ -182,7 +181,7 @@ var _ = Describe("WorkHandler", func() {
 		})
 
 		It("should return work detail as expected when everything is ok", func() {
-			workManager.WorkDetailFunc = func(id string, sec *session.Context) (*domain.WorkDetail, error) {
+			work.DetailWorkFunc = func(id string, sec *session.Context) (*domain.WorkDetail, error) {
 				return &domain.WorkDetail{
 					Work: domain.Work{
 						ID: 123, Name: "test work", Identifier: "W-1", ProjectID: 100, CreateTime: demoTime, FlowID: demoWorkflow.ID, OrderInState: 999,
@@ -217,7 +216,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid character 'b' looking for beginning of value","data":null}`))
 		})
 		It("should failed when service failed", func() {
-			workManager.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *session.Context) (*domain.Work, error) {
+			work.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *session.Context) (*domain.Work, error) {
 				return nil, errors.New("a mocked error")
 			}
 			req := httptest.NewRequest(http.MethodPut, "/v1/works/100", bytes.NewReader([]byte(
@@ -227,7 +226,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
 		})
 		It("should be able to update work successfully", func() {
-			workManager.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *session.Context) (*domain.Work, error) {
+			work.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *session.Context) (*domain.Work, error) {
 				return &domain.Work{ID: 100, Name: "new-name", Identifier: "W-1", ProjectID: types.ID(333), CreateTime: demoTime,
 					FlowID: 1, OrderInState: demoTime.Time().UnixNano() / 1e6,
 					StateName: "PENDING", StateCategory: domain.StatePending.Category, State: domain.StatePending}, nil
@@ -245,7 +244,7 @@ var _ = Describe("WorkHandler", func() {
 
 	Describe("handleDelete", func() {
 		It("should be able to handle delete work", func() {
-			workManager.DeleteWorkFunc = func(id types.ID, sec *session.Context) error {
+			work.DeleteWorkFunc = func(id types.ID, sec *session.Context) error {
 				return nil
 			}
 			req := httptest.NewRequest(http.MethodDelete, "/v1/works/123", nil)
@@ -262,7 +261,7 @@ var _ = Describe("WorkHandler", func() {
 		})
 
 		It("should be able to handle exception of unexpected", func() {
-			workManager.DeleteWorkFunc = func(id types.ID, sec *session.Context) error {
+			work.DeleteWorkFunc = func(id types.ID, sec *session.Context) error {
 				return errors.New("unexpected exception")
 			}
 			req := httptest.NewRequest(http.MethodDelete, "/v1/works/123", nil)
@@ -274,7 +273,7 @@ var _ = Describe("WorkHandler", func() {
 
 	Describe("handleCreateArchivedWorks", func() {
 		It("should be able to handle archive work", func() {
-			workManager.ArchiveWorksFunc = func(id []types.ID, sec *session.Context) error {
+			work.ArchiveWorksFunc = func(id []types.ID, sec *session.Context) error {
 				return nil
 			}
 
@@ -308,7 +307,7 @@ var _ = Describe("WorkHandler", func() {
 		})
 
 		XIt("should be able to handle exception of unexpected", func() {
-			workManager.ArchiveWorksFunc = func(id []types.ID, sec *session.Context) error {
+			work.ArchiveWorksFunc = func(id []types.ID, sec *session.Context) error {
 				return errors.New("unexpected exception")
 			}
 			req := httptest.NewRequest(http.MethodPost, "/v1/archived-works", nil)
@@ -326,7 +325,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"json: cannot unmarshal object into Go value of type []domain.WorkOrderRangeUpdating","data":null}`))
 		})
 		It("should be able to handle process error", func() {
-			workManager.UpdateStateRangeOrdersFunc = func(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *session.Context) error {
+			work.UpdateStateRangeOrdersFunc = func(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *session.Context) error {
 				return errors.New("unexpected exception")
 			}
 			req := httptest.NewRequest(http.MethodPut, "/v1/work-orders", bytes.NewReader([]byte(`[]`)))
@@ -335,7 +334,7 @@ var _ = Describe("WorkHandler", func() {
 			Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"unexpected exception","data":null}`))
 		})
 		It("should be able to handle update", func() {
-			workManager.UpdateStateRangeOrdersFunc = func(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *session.Context) error {
+			work.UpdateStateRangeOrdersFunc = func(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *session.Context) error {
 				return nil
 			}
 			req := httptest.NewRequest(http.MethodPut, "/v1/work-orders", bytes.NewReader([]byte(`[]`)))
@@ -345,35 +344,3 @@ var _ = Describe("WorkHandler", func() {
 		})
 	})
 })
-
-type workManagerMock struct {
-	QueryWorkFunc              func(q *domain.WorkQuery, sec *session.Context) (*[]domain.Work, error)
-	WorkDetailFunc             func(id string, sec *session.Context) (*domain.WorkDetail, error)
-	CreateWorkFunc             func(c *domain.WorkCreation, sec *session.Context) (*domain.WorkDetail, error)
-	DeleteWorkFunc             func(id types.ID, sec *session.Context) error
-	UpdateWorkFunc             func(id types.ID, u *domain.WorkUpdating, sec *session.Context) (*domain.Work, error)
-	UpdateStateRangeOrdersFunc func(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *session.Context) error
-	ArchiveWorksFunc           func(ids []types.ID, sec *session.Context) error
-}
-
-func (m *workManagerMock) QueryWork(q *domain.WorkQuery, sec *session.Context) (*[]domain.Work, error) {
-	return m.QueryWorkFunc(q, sec)
-}
-func (m *workManagerMock) WorkDetail(id string, sec *session.Context) (*domain.WorkDetail, error) {
-	return m.WorkDetailFunc(id, sec)
-}
-func (m *workManagerMock) CreateWork(c *domain.WorkCreation, sec *session.Context) (*domain.WorkDetail, error) {
-	return m.CreateWorkFunc(c, sec)
-}
-func (m *workManagerMock) UpdateWork(id types.ID, u *domain.WorkUpdating, sec *session.Context) (*domain.Work, error) {
-	return m.UpdateWorkFunc(id, u, sec)
-}
-func (m *workManagerMock) DeleteWork(id types.ID, sec *session.Context) error {
-	return m.DeleteWorkFunc(id, sec)
-}
-func (m *workManagerMock) UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *session.Context) error {
-	return m.UpdateStateRangeOrdersFunc(wantedOrders, sec)
-}
-func (m *workManagerMock) ArchiveWorks(ids []types.ID, sec *session.Context) error {
-	return m.ArchiveWorksFunc(ids, sec)
-}

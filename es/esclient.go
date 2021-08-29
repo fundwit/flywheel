@@ -17,11 +17,11 @@ import (
 )
 
 var (
-	SearchFunc      = Search
-	IndexFunc       = Index
-	GetDocumentFunc = GetDocument
-	DropIndexFunc   = DropIndex
-	DeleteByIdFunc  = DeleteById
+	SearchFunc             = Search
+	IndexFunc              = Index
+	GetDocumentFunc        = GetDocument
+	DropIndexFunc          = DropIndex
+	DeleteDocumentByIdFunc = DeleteDocumentById
 )
 
 type H map[string]interface{}
@@ -37,6 +37,24 @@ type ESGetResult struct {
 
 	Found  bool   `json:"found"`
 	Source Source `json:"_source"`
+}
+
+const (
+	DeleteResultDeleted  = "deleted"
+	DeleteResultNotFound = "not_found"
+)
+
+type ESDeleteResult struct {
+	Index string `json:"_index"`
+	Type  string `json:"_type"`
+	Id    string `json:"_id"`
+
+	Version     int `json:"_version"`
+	SeqNO       int `json:"_seq_no"`
+	PrimaryTerm int `json:"_primary_term"`
+
+	Result string         `json:"result"` // deleted, not_found
+	Shards ESSearchShards `json:"_shards"`
 }
 
 type ESSearchResult struct {
@@ -185,7 +203,6 @@ func GetDocument(index string, id types.ID) (Source, error) {
 	bytes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return "", err
-
 	}
 	log.Println("get document body: ", string(bytes))
 	result := ESGetResult{}
@@ -198,11 +215,23 @@ func GetDocument(index string, id types.ID) (Source, error) {
 	return result.Source, nil
 }
 
-func DeleteById(index string, id types.ID) ([]byte, error) {
+func DeleteDocumentById(index string, id types.ID) error {
 	res, err := ActiveESClient.Delete(index, id.String())
 	if err != nil {
-		return []byte{}, err
+		return err
 	}
 	defer res.Body.Close()
-	return ioutil.ReadAll(res.Body)
+	bytes, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+	log.Println("delete document respone body: ", string(bytes))
+	result := ESDeleteResult{}
+	if err := json.Unmarshal(bytes, &result); err != nil {
+		return err
+	}
+	if result.Result == DeleteResultDeleted || result.Result == DeleteResultNotFound {
+		return nil
+	}
+	return fmt.Errorf("delete error on elasticsearch: %v", string(bytes))
 }

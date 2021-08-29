@@ -7,9 +7,9 @@ import (
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/namespace"
-	"flywheel/domain/work"
 	"flywheel/domain/workcontribution"
 	"flywheel/event"
+	"flywheel/indices"
 	"flywheel/persistence"
 	"flywheel/servehttp"
 	"flywheel/session"
@@ -38,7 +38,7 @@ func main() {
 	// connect database
 	ds := &persistence.DataSourceManager{DatabaseConfig: dbConfig}
 	if err := ds.Start(); err != nil {
-		log.Fatalf("database conneciton failed %v\n", err)
+		log.Fatalf("database connection failed %v\n", err)
 	}
 	defer ds.Stop()
 	persistence.ActiveDataSourceManager = ds
@@ -68,20 +68,20 @@ func main() {
 
 	sessions.RegisterSessionsHandler(engine)
 	sessions.RegisterSessionHandler(engine, securityMiddle)
-
+	indices.RegisterIndicesRestAPI(engine, securityMiddle)
 	namespace.RegisterProjectsRestApis(engine, securityMiddle)
 	namespace.RegisterProjectMembersRestApis(engine, securityMiddle)
 	account.RegisterUsersHandler(engine, securityMiddle)
 
-	workflowManager := flow.NewWorkflowManager(ds)
-	flow.DetailWorkflowFunc = workflowManager.DetailWorkflow
+	flow.DetailWorkflowFunc = flow.DetailWorkflow
 
-	workProcessManager := work.NewWorkProcessManager(ds, workflowManager)
-	servehttp.RegisterWorkflowHandler(engine, workflowManager, securityMiddle)
+	event.EventHandlers = append(event.EventHandlers, indices.IndexWorkEventHandle)
 
-	servehttp.RegisterWorkHandler(engine, work.NewWorkManager(ds, workflowManager), securityMiddle)
+	servehttp.RegisterWorkflowHandler(engine, securityMiddle)
 
-	servehttp.RegisterWorkProcessStepHandler(engine, workProcessManager, securityMiddle)
+	servehttp.RegisterWorkHandler(engine, securityMiddle)
+
+	servehttp.RegisterWorkProcessStepHandler(engine, securityMiddle)
 	workcontribution.RegisterWorkContributionsHandlers(engine, securityMiddle)
 
 	avatar.RegisterAvatarAPI(engine, securityMiddle)

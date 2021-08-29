@@ -22,12 +22,11 @@ type TransitionQuery struct {
 	ToState   string   `form:"toState"`
 }
 
-func RegisterWorkflowHandler(r *gin.Engine, flowManager flow.WorkflowManagerTraits, middleWares ...gin.HandlerFunc) {
+func RegisterWorkflowHandler(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 	g := r.Group("/v1/workflows", middleWares...)
 
 	handler := &workflowHandler{
-		validator:       validator.New(),
-		workflowManager: flowManager,
+		validator: validator.New(),
 	}
 
 	g.POST("", handler.handleCreateWorkflow)
@@ -46,15 +45,14 @@ func RegisterWorkflowHandler(r *gin.Engine, flowManager flow.WorkflowManagerTrai
 }
 
 type workflowHandler struct {
-	validator       *validator.Validate
-	workflowManager flow.WorkflowManagerTraits
+	validator *validator.Validate
 }
 
 func (h *workflowHandler) handleQueryWorkflows(c *gin.Context) {
 	query := domain.WorkflowQuery{}
 	_ = c.MustBindWith(&query, binding.Query)
 
-	flows, err := h.workflowManager.QueryWorkflows(&query, session.FindSecurityContext(c))
+	flows, err := flow.QueryWorkflowsFunc(&query, session.FindSecurityContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -71,7 +69,7 @@ func (h *workflowHandler) handleCreateWorkflow(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	workflow, err := h.workflowManager.CreateWorkflow(&creation, session.FindSecurityContext(c))
+	workflow, err := flow.CreateWorkflowFunc(&creation, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -87,7 +85,7 @@ func (h *workflowHandler) handleDetailWorkflows(c *gin.Context) {
 		return
 	}
 
-	workflowDetail, err := h.workflowManager.DetailWorkflow(id, session.FindSecurityContext(c))
+	workflowDetail, err := flow.DetailWorkflowFunc(id, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -112,7 +110,7 @@ func (h *workflowHandler) handleUpdateWorkflowsBase(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	workflow, err := h.workflowManager.UpdateWorkflowBase(id, &updating, session.FindSecurityContext(c))
+	workflow, err := flow.UpdateWorkflowBaseFunc(id, &updating, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -128,7 +126,7 @@ func (h *workflowHandler) handleDeleteWorkflow(c *gin.Context) {
 		return
 	}
 
-	err = h.workflowManager.DeleteWorkflow(id, session.FindSecurityContext(c))
+	err = flow.DeleteWorkflowFunc(id, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -149,7 +147,7 @@ func (h *workflowHandler) handleQueryTransitions(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	workflow, err := h.workflowManager.DetailWorkflow(query.FlowID, session.FindSecurityContext(c))
+	workflow, _ := flow.DetailWorkflowFunc(query.FlowID, session.FindSecurityContext(c))
 	if workflow == nil {
 		c.JSON(http.StatusNotFound, &misc.ErrorBody{Code: "common.bad_param",
 			Message: "the flow of id " + strconv.FormatUint(uint64(query.FlowID), 10) + " was not found"})
@@ -178,7 +176,7 @@ func (h *workflowHandler) handleCreateStateMachineTransitions(c *gin.Context) {
 		}
 	}
 
-	err = h.workflowManager.CreateWorkflowStateTransitions(id, transitions, session.FindSecurityContext(c))
+	err = flow.CreateWorkflowStateTransitionsFunc(id, transitions, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -205,7 +203,7 @@ func (h *workflowHandler) handleDeleteStateMachineTransitions(c *gin.Context) {
 		}
 	}
 
-	err = h.workflowManager.DeleteWorkflowStateTransitions(id, transitions, session.FindSecurityContext(c))
+	err = flow.DeleteWorkflowStateTransitionsFunc(id, transitions, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -230,7 +228,7 @@ func (h *workflowHandler) handleUpdateStateMachineState(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	err = h.workflowManager.UpdateWorkflowState(id, updating, session.FindSecurityContext(c))
+	err = flow.UpdateWorkflowStateFunc(id, updating, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -257,7 +255,7 @@ func (h *workflowHandler) handleUpdateStateMachineStateOrders(c *gin.Context) {
 			panic(&bizerror.ErrBadParam{Cause: err})
 		}
 	}
-	err = h.workflowManager.UpdateStateRangeOrders(id, &orderUpdating, session.FindSecurityContext(c))
+	err = flow.UpdateStateRangeOrdersFunc(id, &orderUpdating, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -279,7 +277,7 @@ func (h *workflowHandler) handleCreateStateMachineState(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	err = h.workflowManager.CreateState(id, &stateCreating, session.FindSecurityContext(c))
+	err = flow.CreateStateFunc(id, &stateCreating, session.FindSecurityContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flywheel/bizerror"
 	"flywheel/domain"
+	"flywheel/domain/work"
 	"flywheel/servehttp"
 	"flywheel/session"
 	"flywheel/testinfra"
@@ -21,15 +22,13 @@ import (
 
 var _ = Describe("WorkProcessStepHandler", func() {
 	var (
-		router             *gin.Engine
-		workProcessManager *workProcessManagerMock
+		router *gin.Engine
 	)
 
 	BeforeEach(func() {
 		router = gin.Default()
 		router.Use(bizerror.ErrorHandling())
-		workProcessManager = &workProcessManagerMock{}
-		servehttp.RegisterWorkProcessStepHandler(router, workProcessManager)
+		servehttp.RegisterWorkProcessStepHandler(router)
 	})
 
 	Describe("handleCreate", func() {
@@ -50,7 +49,7 @@ var _ = Describe("WorkProcessStepHandler", func() {
 				`Key: 'WorkProcessStepCreation.ToState' Error:Field validation for 'ToState' failed on the 'required' tag","data":null}`))
 		})
 		It("should be able to handle service error", func() {
-			workProcessManager.CreateWorkStateTransitionFunc =
+			work.CreateWorkStateTransitionFunc =
 				func(c *domain.WorkProcessStepCreation, sec *session.Context) error {
 					return errors.New("a mocked error")
 				}
@@ -62,7 +61,7 @@ var _ = Describe("WorkProcessStepHandler", func() {
 		})
 
 		It("should be able to create transition", func() {
-			workProcessManager.CreateWorkStateTransitionFunc =
+			work.CreateWorkStateTransitionFunc =
 				func(c *domain.WorkProcessStepCreation, sec *session.Context) error {
 					return nil
 				}
@@ -91,7 +90,7 @@ var _ = Describe("WorkProcessStepHandler", func() {
 		})
 
 		It("should be able to handle service error", func() {
-			workProcessManager.QueryProcessStepsFunc =
+			work.QueryProcessStepsFunc =
 				func(query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error) {
 					return nil, errors.New("a mocked error")
 				}
@@ -106,7 +105,7 @@ var _ = Describe("WorkProcessStepHandler", func() {
 			timeBytes, err := t.MarshalJSON()
 			timeString := strings.Trim(string(timeBytes), `"`)
 			Expect(err).To(BeNil())
-			workProcessManager.QueryProcessStepsFunc =
+			work.QueryProcessStepsFunc =
 				func(query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error) {
 					return &[]domain.WorkProcessStep{
 						{WorkID: 100, FlowID: 1, StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category,
@@ -128,16 +127,3 @@ var _ = Describe("WorkProcessStepHandler", func() {
 		})
 	})
 })
-
-type workProcessManagerMock struct {
-	QueryProcessStepsFunc         func(query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error)
-	CreateWorkStateTransitionFunc func(t *domain.WorkProcessStepCreation, sec *session.Context) error
-}
-
-func (m *workProcessManagerMock) QueryProcessSteps(
-	query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error) {
-	return m.QueryProcessStepsFunc(query, sec)
-}
-func (m *workProcessManagerMock) CreateWorkStateTransition(c *domain.WorkProcessStepCreation, sec *session.Context) error {
-	return m.CreateWorkStateTransitionFunc(c, sec)
-}

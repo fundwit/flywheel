@@ -5,6 +5,7 @@ import (
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/state"
+	"flywheel/event"
 	"flywheel/idgen"
 	"flywheel/persistence"
 	"flywheel/session"
@@ -243,10 +244,18 @@ func CreateState(workflowID types.ID, creating *StateCreating, sec *session.Cont
 	})
 }
 
+type workBrief struct {
+	ID         types.ID
+	Identifier string
+	Name       string
+}
+
 func UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, sec *session.Context) error {
 	workflow := domain.Workflow{}
 	db := persistence.ActiveDataSourceManager.GormDB()
-	return db.Transaction(func(tx *gorm.DB) error {
+
+	events := []event.EventRecord{}
+	err1 := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&workflow).Error; err != nil {
 			return err
 		}
@@ -301,11 +310,32 @@ func UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, sec *sessi
 		}
 		if originState.Name != updating.Name {
 			// work:  flow_id, state_name  state_category
+			worksToUpdate := []workBrief{}
+			if err := tx.Model(&domain.Work{}).
+				Where("flow_id = ?", originState.WorkflowID).
+				Where("state_name LIKE ?", originState.Name).
+				Select("id, identifier, name").
+				Scan(&worksToUpdate).Error; err != nil {
+				return err
+			}
 			if err := tx.Model(&domain.Work{}).
 				Where("flow_id = ?", originState.WorkflowID).
 				Where("state_name LIKE ?", originState.Name).
 				Update(domain.Work{StateName: updating.Name, StateCategory: originState.Category}).Error; err != nil {
 				return err
+			}
+			now := types.CurrentTimestamp()
+			for _, w := range worksToUpdate {
+				ev, err := event.CreateEvent("WORK", w.ID, w.Identifier, event.EventCategoryExtensionUpdated,
+					[]event.UpdatedProperty{{
+						PropertyName: "StateName", PropertyDesc: "StateName",
+						OldValue: originState.Name, OldValueDesc: originState.Name,
+						NewValue: updating.Name, NewValueDesc: updating.Name,
+					}}, nil, &sec.Identity, now, tx)
+				if err != nil {
+					return err
+				}
+				events = append(events, *ev)
 			}
 
 			// work_process_steps: flow_id, state_name, state_category, next_state_name, next_state_category
@@ -323,9 +353,19 @@ func UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, sec *sessi
 				return err
 			}
 		}
-
 		return nil
 	})
+
+	if err1 != nil {
+		return err1
+	}
+
+	if event.InvokeHandlersFunc != nil {
+		for _, ev := range events {
+			event.InvokeHandlersFunc(&ev)
+		}
+	}
+	return nil
 }
 
 func UpdateStateRangeOrders(workflowID types.ID, wantedOrders *[]StateOrderRangeUpdating, sec *session.Context) error {

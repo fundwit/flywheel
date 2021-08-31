@@ -114,42 +114,6 @@ func CreateWork(c *domain.WorkCreation, sec *session.Context) (*domain.WorkDetai
 	return workDetail, nil
 }
 
-func QueryWork(query *domain.WorkQuery, sec *session.Context) (*[]domain.Work, error) {
-	var works []domain.Work
-	db := persistence.ActiveDataSourceManager.GormDB()
-
-	q := db.Where(domain.Work{ProjectID: query.ProjectID})
-	if query.Name != "" {
-		q = q.Where("name like ?", "%"+query.Name+"%")
-	}
-	if len(query.StateCategories) > 0 {
-		q = q.Where("state_category in (?)", query.StateCategories)
-	}
-
-	if query.ArchiveState == domain.StatusOn {
-		q = q.Where("archive_time != ?", types.Timestamp{})
-	} else if query.ArchiveState == domain.StatusAll {
-		// archive_time not in where clause
-	} else {
-		q = q.Where("archive_time = ?", types.Timestamp{})
-	}
-
-	visibleProjects := sec.VisibleProjects()
-	if len(visibleProjects) == 0 {
-		return &[]domain.Work{}, nil
-	}
-	q = q.Where("project_id in (?)", visibleProjects).Order("order_in_state ASC")
-	if err := q.Find(&works).Error; err != nil {
-		return nil, err
-	}
-
-	if err := ExtendWorks(works, sec); err != nil {
-		return nil, err
-	}
-
-	return &works, nil
-}
-
 func DetailWork(identifier string, sec *session.Context) (*domain.WorkDetail, error) {
 	id, _ := types.ParseID(identifier)
 	workDetail := domain.WorkDetail{}

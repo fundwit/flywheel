@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	EventCategoryCreated         = "CREATED"
-	EventCategoryDeleted         = "DELETED"
-	EventCategoryPropertyUpdated = "PROPERTY_UPDATED"
-	EventCategoryRelationUpdated = "RELEATION_UPDATED"
+	EventCategoryCreated          = "CREATED"
+	EventCategoryDeleted          = "DELETED"
+	EventCategoryPropertyUpdated  = "PROPERTY_UPDATED"
+	EventCategoryRelationUpdated  = "RELATION_UPDATED"
+	EventCategoryExtensionUpdated = "EXTENSION_UPDATED"
 )
 
 type EventCategory string
@@ -42,6 +43,16 @@ func (r *EventRecord) TableName() string {
 }
 
 type UpdatedProperty struct {
+	PropertyName string `json:"propertyName"`
+	PropertyDesc string `json:"propertyDesc"`
+
+	OldValue     string `json:"oldValue"`
+	OldValueDesc string `json:"oldValueDesc"`
+	NewValue     string `json:"newValue"`
+	NewValueDesc string `json:"newValueDesc"`
+}
+
+type UpdatedExtension struct {
 	PropertyName string `json:"propertyName"`
 	PropertyDesc string `json:"propertyDesc"`
 

@@ -5,6 +5,7 @@ import (
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/state"
+	"flywheel/event"
 	"flywheel/persistence"
 	"flywheel/testinfra"
 	"testing"
@@ -683,6 +684,17 @@ func TestUpdateWorkflowState(t *testing.T) {
 		defer teardown(t)
 		setup(t)
 
+		handedEvents := []event.EventRecord{}
+		event.InvokeHandlersFunc = func(record *event.EventRecord) []event.EventHandleResult {
+			handedEvents = append(handedEvents, *record)
+			return nil
+		}
+		persistedEvents := []event.EventRecord{}
+		event.EventPersistCreateFunc = func(record *event.EventRecord, db *gorm.DB) error {
+			persistedEvents = append(persistedEvents, *record)
+			return nil
+		}
+
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 		sm := state.NewStateMachine([]state.State{domain.StatePending, domain.StateDoing, domain.StateDone}, []state.Transition{
 			{Name: "begin", From: domain.StatePending.Name, To: domain.StateDoing.Name},
@@ -705,6 +717,9 @@ func TestUpdateWorkflowState(t *testing.T) {
 			StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category, BeginTime: types.Timestamp(now),
 			NextStateName: domain.StatePending.Name, NextStateCategory: domain.StatePending.Category}).Error).To(BeNil())
 
+		// reset events history
+		handedEvents = []event.EventRecord{}
+		persistedEvents = []event.EventRecord{}
 		// do action
 		updating := flow.WorkflowStateUpdating{OriginName: domain.StatePending.Name, Name: "QUEUED", Order: 2000}
 		err = flow.UpdateWorkflowState(workflow.ID, updating, sec)
@@ -749,6 +764,17 @@ func TestUpdateWorkflowState(t *testing.T) {
 		Expect(workProcessSteps[0].StateCategory).To(Equal(domain.StatePending.Category))
 		Expect(workProcessSteps[0].NextStateName).To(Equal(updating.Name))
 		Expect(workProcessSteps[0].NextStateCategory).To(Equal(domain.StatePending.Category))
+
+		Expect(len(handedEvents)).To(Equal(1))
+		Expect((handedEvents)[0].Event).To(Equal(event.Event{SourceId: work.ID, SourceType: "WORK", SourceDesc: work.Identifier,
+			CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name,
+			UpdatedProperties: []event.UpdatedProperty{{
+				PropertyName: "StateName", PropertyDesc: "StateName",
+				OldValue: updating.OriginName, OldValueDesc: updating.OriginName,
+				NewValue: updating.Name, NewValueDesc: updating.Name,
+			}},
+			EventCategory: event.EventCategoryExtensionUpdated}))
+		Expect(time.Since((handedEvents)[0].Timestamp.Time()) < time.Second).To(BeTrue())
 	})
 
 	t.Run("should be able to catch database error", func(t *testing.T) {

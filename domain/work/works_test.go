@@ -7,7 +7,6 @@ import (
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/namespace"
-	"flywheel/domain/state"
 	"flywheel/domain/work"
 	"flywheel/event"
 	"flywheel/persistence"
@@ -280,196 +279,6 @@ func TestDetailWork(t *testing.T) {
 
 }
 
-func TestQueryWork(t *testing.T) {
-	RegisterTestingT(t)
-	var testDatabase *testinfra.TestDatabase
-
-	t.Run("should query all works successfully", func(t *testing.T) {
-		defer teardown(t, testDatabase)
-		flowDetail, flowDetail2, project1, project2, _, _ := setup(t, &testDatabase)
-
-		_, err := work.CreateWork(
-			&domain.WorkCreation{Name: "test work1", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
-			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
-		Expect(err).To(BeZero())
-		_, err = work.CreateWork(
-			&domain.WorkCreation{Name: "test work2", ProjectID: project2.ID, FlowID: flowDetail2.ID, InitialStateName: domain.StatePending.Name},
-			testinfra.BuildSecCtx(2, domain.ProjectRoleManager+"_"+project2.ID.String()))
-		Expect(err).To(BeZero())
-
-		works, err := work.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String(), domain.ProjectRoleManager+"_"+project2.ID.String()))
-		Expect(err).To(BeNil())
-		Expect(works).ToNot(BeNil())
-		Expect(len(*works)).To(Equal(2))
-
-		works, err = work.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1))
-		Expect(err).To(BeNil())
-		Expect(works).ToNot(BeNil())
-		Expect(len(*works)).To(Equal(0))
-
-		works, err = work.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
-		Expect(err).To(BeNil())
-		Expect(works).ToNot(BeNil())
-		Expect(len(*works)).To(Equal(1))
-
-		work1 := (*works)[0]
-		Expect(work1.ID).ToNot(BeZero())
-		Expect(work1.Name).To(Equal("test work1"))
-		Expect(work1.ProjectID).To(Equal(project1.ID))
-		Expect(work1.CreateTime).ToNot(BeZero())
-		Expect(work1.FlowID).To(Equal(flowDetail.ID))
-		Expect(work1.StateName).To(Equal(flowDetail.StateMachine.States[0].Name))
-		Expect(work1.StateCategory).To(Equal(flowDetail.StateMachine.States[0].Category))
-	})
-
-	t.Run("should query by name and project id", func(t *testing.T) {
-		defer teardown(t, testDatabase)
-		flowDetail, flowDetail2, project1, project2, _, _ := setup(t, &testDatabase)
-
-		_, err := work.CreateWork(
-			&domain.WorkCreation{Name: "test work1", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
-			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
-		Expect(err).To(BeZero())
-		_, err = work.CreateWork(
-			&domain.WorkCreation{Name: "test work2", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
-			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
-		Expect(err).To(BeZero())
-		_, err = work.CreateWork(
-			&domain.WorkCreation{Name: "test work2", ProjectID: project2.ID, FlowID: flowDetail2.ID, InitialStateName: domain.StatePending.Name},
-			testinfra.BuildSecCtx(2, domain.ProjectRoleManager+"_"+project2.ID.String()))
-		Expect(err).To(BeZero())
-
-		works, err := work.QueryWork(
-			&domain.WorkQuery{Name: "work2", ProjectID: project1.ID},
-			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
-		Expect(err).To(BeNil())
-		Expect(works).ToNot(BeNil())
-		Expect(len(*works)).To(Equal(1))
-
-		work1 := (*works)[0]
-		Expect(work1.ID).ToNot(BeZero())
-		Expect(work1.Name).To(Equal("test work2"))
-		Expect(work1.ProjectID).To(Equal(project1.ID))
-		Expect(work1.CreateTime).ToNot(BeZero())
-		Expect(work1.FlowID).To(Equal(flowDetail.ID))
-		Expect(work1.StateName).To(Equal(flowDetail.StateMachine.States[0].Name))
-		Expect(work1.StateCategory).To(Equal(flowDetail.StateMachine.States[0].Category))
-		Expect(work1.State).To(Equal(flowDetail.StateMachine.States[0]))
-	})
-
-	t.Run("should query by stateCategory", func(t *testing.T) {
-		defer teardown(t, testDatabase)
-		flowDetail, _, project1, _, _, _ := setup(t, &testDatabase)
-
-		work1, err := work.CreateWork(
-			&domain.WorkCreation{Name: "test work1", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
-			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
-		Expect(err).To(BeZero())
-
-		work2, err := work.CreateWork(
-			&domain.WorkCreation{Name: "test work2", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
-			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
-		Expect(err).To(BeZero())
-		Expect(testDatabase.DS.GormDB().Model(&domain.Work{}).Where(&domain.Work{ID: work2.ID}).
-			Update("state_category", state.InProcess).Error).To(BeNil())
-
-		work3, err := work.CreateWork(
-			&domain.WorkCreation{Name: "test work3", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
-			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
-		Expect(err).To(BeZero())
-		Expect(testDatabase.DS.GormDB().Model(&domain.Work{}).Where(&domain.Work{ID: work3.ID}).
-			Update("state_category", state.Done).Error).To(BeNil())
-
-		works, err := work.QueryWork(&domain.WorkQuery{ProjectID: project1.ID, StateCategories: []state.Category{state.InBacklog, state.InProcess}},
-			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
-		Expect(err).To(BeNil())
-		Expect(works).ToNot(BeNil())
-		Expect(len(*works)).To(Equal(2))
-		Expect((*works)[0].ID).To(Equal(work1.ID))
-		Expect((*works)[1].ID).To(Equal(work2.ID))
-	})
-
-	t.Run("should be able to query by archive status", func(t *testing.T) {
-		defer teardown(t, testDatabase)
-		flowDetail, _, project1, _, _, _ := setup(t, &testDatabase)
-
-		secCtx := testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String())
-		work1, err := work.CreateWork(
-			&domain.WorkCreation{Name: "test work1", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name}, secCtx)
-		Expect(err).To(BeZero())
-		work2, err := work.CreateWork(
-			&domain.WorkCreation{Name: "test work2", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StateDone.Name}, secCtx)
-		Expect(err).To(BeZero())
-		Expect(work.ArchiveWorks([]types.ID{work2.ID}, secCtx)).To(BeNil())
-		work3, err := work.CreateWork(
-			&domain.WorkCreation{Name: "test work3", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StateDone.Name}, secCtx)
-		Expect(err).To(BeZero())
-
-		// default is OFF
-		works, err := work.QueryWork(&domain.WorkQuery{ProjectID: project1.ID}, secCtx)
-		Expect(err).To(BeNil())
-		Expect(works).ToNot(BeNil())
-		Expect(len(*works)).To(Equal(2))
-		Expect((*works)[0].ID).To(Equal(work1.ID))
-		Expect((*works)[1].ID).To(Equal(work3.ID))
-
-		works, err = work.QueryWork(&domain.WorkQuery{ProjectID: project1.ID, ArchiveState: domain.StatusOff}, secCtx)
-		Expect(err).To(BeNil())
-		Expect(works).ToNot(BeNil())
-		Expect(len(*works)).To(Equal(2))
-		Expect((*works)[0].ID).To(Equal(work1.ID))
-		Expect((*works)[1].ID).To(Equal(work3.ID))
-
-		works, err = work.QueryWork(&domain.WorkQuery{ProjectID: project1.ID, ArchiveState: domain.StatusOn}, secCtx)
-		Expect(err).To(BeNil())
-		Expect(works).ToNot(BeNil())
-		Expect(len(*works)).To(Equal(1))
-		Expect((*works)[0].ID).To(Equal(work2.ID))
-
-		works, err = work.QueryWork(&domain.WorkQuery{ProjectID: project1.ID, ArchiveState: domain.StatusAll}, secCtx)
-		Expect(err).To(BeNil())
-		Expect(works).ToNot(BeNil())
-		Expect(len(*works)).To(Equal(3))
-	})
-
-	t.Run("works should be ordered by orderInState asc and id asc", func(t *testing.T) {
-		defer teardown(t, testDatabase)
-		flowDetail, _, project1, _, _, _ := setup(t, &testDatabase)
-
-		now := types.CurrentTimestamp()
-		Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", Identifier: "W-1", ProjectID: project1.ID,
-			CreateTime: now, FlowID: flowDetail.ID, OrderInState: 2, StateName: "PENDING", StateBeginTime: now}).Error).To(BeNil())
-		Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 1, Name: "w2", Identifier: "W-2", ProjectID: project1.ID,
-			CreateTime: now, FlowID: flowDetail.ID, OrderInState: 2, StateName: "PENDING", StateBeginTime: now}).Error).To(BeNil())
-		Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 3, Name: "w3", Identifier: "W-3", ProjectID: project1.ID,
-			CreateTime: now, FlowID: flowDetail.ID, OrderInState: 1, StateName: "PENDING", StateBeginTime: now}).Error).To(BeNil())
-
-		// order by orderInState:    w3(1) > w2(2) = w1(2)
-		// order by id (default):         w2(1) > w1(2)
-		works, err := work.QueryWork(&domain.WorkQuery{ProjectID: project1.ID},
-			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
-		Expect(err).To(BeNil())
-		Expect(len(*works)).To(Equal(3))
-		Expect((*works)[0].Name).To(Equal("w3"))
-		Expect((*works)[1].Name).To(Equal("w2"))
-		Expect((*works)[2].Name).To(Equal("w1"))
-	})
-
-	t.Run("should return error if failed to find state", func(t *testing.T) {
-		defer teardown(t, testDatabase)
-		flowDetail, _, project1, _, _, _ := setup(t, &testDatabase)
-
-		now := types.CurrentTimestamp()
-		Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", ProjectID: project1.ID,
-			CreateTime: now, FlowID: flowDetail.ID, OrderInState: 2, StateName: "UNKNOWN", StateBeginTime: now}).Error).To(BeNil())
-		works, err := work.QueryWork(&domain.WorkQuery{ProjectID: project1.ID},
-			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
-		Expect(err).ToNot(BeNil())
-		Expect(works).To(BeNil())
-		Expect(err).To(Equal(bizerror.ErrStateInvalid))
-	})
-}
-
 func TestArchiveWorks(t *testing.T) {
 	RegisterTestingT(t)
 	var testDatabase *testinfra.TestDatabase
@@ -527,24 +336,27 @@ func TestArchiveWorks(t *testing.T) {
 			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 		Expect(err).To(BeZero())
 
-		works, err := work.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
+		var works []domain.Work
+		Expect(testDatabase.DS.GormDB().Find(&works).Error).To(BeNil())
 		Expect(err).To(BeNil())
 		Expect(works).ToNot(BeNil())
-		Expect(len(*works)).To(Equal(1))
-		Expect((*works)[0].ArchiveTime.IsZero()).To(BeTrue())
+		Expect(len(works)).To(Equal(1))
+		Expect((works)[0].ArchiveTime.IsZero()).To(BeTrue())
 
 		// do archive work
 		*persistedEvents = []event.EventRecord{}
 		*handedEvents = []event.EventRecord{}
 		sec := testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String())
-		workToArchive := (*works)[0]
+		workToArchive := (works)[0]
 		err = work.ArchiveWorks([]types.ID{workToArchive.ID}, sec)
 		Expect(err).To(BeNil())
-		works, err = work.QueryWork(&domain.WorkQuery{ArchiveState: domain.StatusOn}, sec)
+
+		works = []domain.Work{}
+		Expect(testDatabase.DS.GormDB().Where("id = ?", workToArchive.ID).Find(&works).Error).To(BeNil())
 		Expect(err).To(BeNil())
-		Expect(len(*works)).To(Equal(1))
-		archivedWork := (*works)[0]
-		Expect(archivedWork.ArchiveTime).ToNot(BeNil())
+		Expect(len(works)).To(Equal(1))
+		archivedWork := (works)[0]
+		Expect(archivedWork.ArchiveTime.IsZero()).ToNot(BeTrue())
 
 		Expect(len(*persistedEvents)).To(Equal(1))
 		Expect((*persistedEvents)[0].Event).To(Equal(event.Event{SourceId: workToArchive.ID, SourceType: "WORK", SourceDesc: workToArchive.Identifier,
@@ -559,9 +371,11 @@ func TestArchiveWorks(t *testing.T) {
 		// do archive again
 		err = work.ArchiveWorks([]types.ID{workToArchive.ID}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 		Expect(err).To(BeNil())
-		works1, err := work.QueryWork(&domain.WorkQuery{ArchiveState: domain.StatusAll}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
+
+		works1 := []domain.Work{}
+		Expect(testDatabase.DS.GormDB().Where("id = ?", workToArchive.ID).Find(&works1).Error).To(BeNil())
 		Expect(err).To(BeNil())
-		Expect((*works1)[0].ArchiveTime).To(Equal((*works)[0].ArchiveTime))
+		Expect((works1)[0].ArchiveTime).To(Equal((works)[0].ArchiveTime))
 		Expect(len(*persistedEvents)).To(Equal(1))
 		Expect(*handedEvents).To(Equal(*persistedEvents))
 	})
@@ -606,14 +420,13 @@ func TestUpdateWork(t *testing.T) {
 		Expect(time.Since((*persistedEvents)[1].Timestamp.Time()) < time.Second).To(BeTrue())
 		Expect(*handedEvents).To(Equal(*persistedEvents))
 
-		works, err := work.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
-		Expect(err).To(BeNil())
+		var works []domain.Work
+		Expect(testDatabase.DS.GormDB().Find(&works).Error).To(BeNil())
 		Expect(works).ToNot(BeNil())
-		Expect(len(*works)).To(Equal(1))
+		Expect(len(works)).To(Equal(1))
 
-		Expect((*works)[0].ID).To(Equal(detail.ID))
-		Expect((*works)[0].Name).To(Equal("test work1 new"))
-		Expect((*works)[0].State).To(Equal(flowDetail.StateMachine.States[0]))
+		Expect((works)[0].ID).To(Equal(detail.ID))
+		Expect((works)[0].Name).To(Equal("test work1 new"))
 	})
 
 	t.Run("should be able to catch error when work not found", func(t *testing.T) {
@@ -723,15 +536,16 @@ func TestDeleteWork(t *testing.T) {
 			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 		Expect(err).To(BeZero())
 
-		works, err := work.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
+		var works []domain.Work
+		Expect(testDatabase.DS.GormDB().Find(&works).Error).To(BeNil())
 		Expect(err).To(BeNil())
 		Expect(works).ToNot(BeNil())
-		Expect(len(*works)).To(Equal(2))
+		Expect(len(works)).To(Equal(2))
 
 		*persistedEvents = []event.EventRecord{}
 		*handedEvents = []event.EventRecord{}
 		// do delete work
-		workToDelete := (*works)[0]
+		workToDelete := (works)[0]
 		sec := testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String())
 		err = work.DeleteWork(workToDelete.ID, sec)
 		Expect(err).To(BeNil())
@@ -743,9 +557,10 @@ func TestDeleteWork(t *testing.T) {
 		Expect(time.Since((*persistedEvents)[0].Timestamp.Time()) < time.Second).To(BeTrue())
 		Expect(*handedEvents).To(Equal(*persistedEvents))
 
-		works, err = work.QueryWork(&domain.WorkQuery{}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
+		works = []domain.Work{}
+		Expect(testDatabase.DS.GormDB().Find(&works).Error).To(BeNil())
 		Expect(err).To(BeNil())
-		Expect(len(*works)).To(Equal(1))
+		Expect(len(works)).To(Equal(1))
 
 		// work process steps should also be deleted
 		processStep := domain.WorkProcessStep{}
@@ -824,9 +639,8 @@ func TestUpdateStateRangeOrders(t *testing.T) {
 		Expect(err).To(BeZero())
 
 		// default w1 > w2 > w3
-		listPtr, err := work.QueryWork(&domain.WorkQuery{}, secCtx)
-		Expect(err).To(BeNil())
-		list := *listPtr
+		list := []domain.Work{}
+		Expect(testDatabase.DS.GormDB().Order("order_in_state ASC").Find(&list).Error).To(BeNil())
 		Expect(len(list)).To(Equal(3))
 		Expect([]string{list[0].Name, list[1].Name, list[2].Name}).To(Equal([]string{"w1", "w2", "w3"}))
 		Expect(list[0].OrderInState < list[1].OrderInState && list[1].OrderInState < list[2].OrderInState).To(BeTrue())
@@ -835,9 +649,8 @@ func TestUpdateStateRangeOrders(t *testing.T) {
 		Expect(work.UpdateStateRangeOrders(&[]domain.WorkOrderRangeUpdating{{ID: list[0].ID, NewOlder: 3, OldOlder: 2}}, secCtx)).
 			To(Equal(errors.New("expected affected row is 1, but actual is 0")))
 
-		listPtr, err = work.QueryWork(&domain.WorkQuery{}, secCtx)
-		Expect(err).To(BeNil())
-		list = *listPtr
+		list = []domain.Work{}
+		Expect(testDatabase.DS.GormDB().Order("order_in_state ASC").Find(&list).Error).To(BeNil())
 		Expect(len(list)).To(Equal(3))
 		Expect([]string{list[0].Name, list[1].Name, list[2].Name}).To(Equal([]string{"w1", "w2", "w3"}))
 		Expect(list[0].OrderInState < list[1].OrderInState && list[1].OrderInState < list[2].OrderInState).To(BeTrue())
@@ -861,9 +674,8 @@ func TestUpdateStateRangeOrders(t *testing.T) {
 		Expect(time.Since((*persistedEvents)[1].Timestamp.Time()) < time.Second).To(BeTrue())
 		Expect(*handedEvents).To(Equal(*persistedEvents))
 
-		listPtr, err = work.QueryWork(&domain.WorkQuery{}, secCtx)
-		Expect(err).To(BeNil())
-		list = *listPtr
+		list = []domain.Work{}
+		Expect(testDatabase.DS.GormDB().Order("order_in_state ASC").Find(&list).Error).To(BeNil())
 		Expect(len(list)).To(Equal(3))
 		Expect([]string{list[0].Name, list[1].Name, list[2].Name}).To(Equal([]string{"w3", "w2", "w1"}))
 		Expect(list[0].OrderInState < list[1].OrderInState && list[1].OrderInState < list[2].OrderInState).To(BeTrue())

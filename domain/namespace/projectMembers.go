@@ -22,12 +22,12 @@ var (
 
 func CreateProjectMember(d *domain.ProjectMemberCreation, sec *session.Context) error {
 	return persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
-		if !sec.HasRole(account.SystemAdminPermission.ID) && !sec.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, d.ProjectID)) {
+		if !sec.Perms.HasRole(account.SystemAdminPermission.ID) && !sec.Perms.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, d.ProjectID)) {
 			return bizerror.ErrForbidden
 		}
 
 		// non system administrators can not grant for themselfs
-		if !sec.HasRole(account.SystemAdminPermission.ID) && sec.Identity.ID == d.MemberId {
+		if !sec.Perms.HasRole(account.SystemAdminPermission.ID) && sec.Identity.ID == d.MemberId {
 			return bizerror.ErrProjectMemberSelfGrant
 		}
 
@@ -53,7 +53,7 @@ func CreateProjectMember(d *domain.ProjectMemberCreation, sec *session.Context) 
 func QueryProjectMemberDetails(d *domain.ProjectMemberQuery, sec *session.Context) (*[]domain.ProjectMemberDetail, error) {
 	dbQuery := persistence.ActiveDataSourceManager.GormDB().Model(&domain.ProjectMember{})
 
-	if !sec.HasRole(account.SystemAdminPermission.ID) {
+	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
 		dbQuery = dbQuery.Where("project_id IN (?)", sec.VisibleProjects())
 	}
 	if d.ProjectID != nil {
@@ -117,7 +117,7 @@ func DetailProjectMembers(pms *[]domain.ProjectMember) (*[]domain.ProjectMemberD
 }
 
 func DeleteProjectMember(d *domain.ProjectMemberDeletion, sec *session.Context) error {
-	if !sec.HasRole(account.SystemAdminPermission.ID) && !sec.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, d.ProjectID)) {
+	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) && !sec.Perms.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, d.ProjectID)) {
 		return bizerror.ErrForbidden
 	}
 

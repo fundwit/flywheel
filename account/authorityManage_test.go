@@ -106,7 +106,7 @@ var _ = Describe("AuthorityManage", func() {
 
 			s, gr := account.LoadPermFunc(3)
 			Expect(s).To(Equal(authority.Permissions{domain.ProjectRoleManager + "_1", "viewer_20"}))
-			Expect(gr).To(Equal(authority.VisiableProjects{{ProjectID: 1, ProjectName: "project1", Role: domain.ProjectRoleManager + "", ProjectIdentifier: "1"},
+			Expect(gr).To(Equal(authority.ProjectRoles{{ProjectID: 1, ProjectName: "project1", Role: domain.ProjectRoleManager + "", ProjectIdentifier: "1"},
 				{ProjectID: 20, ProjectName: "project20", ProjectIdentifier: "20", Role: "viewer"}}))
 
 			s, gr = account.LoadPermFunc(100)
@@ -132,12 +132,12 @@ var _ = Describe("AuthorityManage", func() {
 
 			s, gr := account.LoadPermFunc(3)
 			Expect(s).To(Equal(authority.Permissions{"system:admin", domain.ProjectRoleManager + "_1", "manager_20"}))
-			Expect(gr).To(Equal(authority.VisiableProjects{{ProjectID: 1, ProjectName: "project1", Role: domain.ProjectRoleManager + "", ProjectIdentifier: "1"},
+			Expect(gr).To(Equal(authority.ProjectRoles{{ProjectID: 1, ProjectName: "project1", Role: domain.ProjectRoleManager + "", ProjectIdentifier: "1"},
 				{ProjectID: 20, ProjectName: "project20", ProjectIdentifier: "20", Role: "manager"}}))
 
 			s, gr = account.LoadPermFunc(1)
 			Expect(s).To(Equal(authority.Permissions{"system:admin", domain.ProjectRoleManager + "_1", "manager_20"}))
-			Expect(gr).To(Equal(authority.VisiableProjects{{ProjectID: 1, ProjectName: "project1", Role: domain.ProjectRoleManager + "", ProjectIdentifier: "1"},
+			Expect(gr).To(Equal(authority.ProjectRoles{{ProjectID: 1, ProjectName: "project1", Role: domain.ProjectRoleManager + "", ProjectIdentifier: "1"},
 				{ProjectID: 20, ProjectName: "project20", ProjectIdentifier: "20", Role: "manager"}}))
 
 			s, gr = account.LoadPermFunc(100)

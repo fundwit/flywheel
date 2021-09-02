@@ -30,7 +30,7 @@ var (
 )
 
 func ScheduleNewSyncRun(sec *session.Context) (bool, error) {
-	if !sec.HasRole(account.SystemAdminPermission.ID) {
+	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
 		return false, bizerror.ErrForbidden
 	}
 

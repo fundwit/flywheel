@@ -30,7 +30,7 @@ func QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *session.Context)
 			return nil, err
 		}
 	}
-	if !sec.HasProjectViewPerm(work.ProjectID) {
+	if !sec.Perms.HasProjectViewPerm(work.ProjectID) {
 		return &[]domain.WorkProcessStep{}, nil
 	}
 
@@ -70,7 +70,7 @@ func CreateWorkStateTransition(c *domain.WorkProcessStepCreation, sec *session.C
 		if err := tx.Where(&work).First(&work).Error; err != nil {
 			return err
 		}
-		if !sec.HasRoleSuffix("_" + work.ProjectID.String()) {
+		if !sec.Perms.HasRoleSuffix("_" + work.ProjectID.String()) {
 			return bizerror.ErrForbidden
 		}
 		if !work.ArchiveTime.IsZero() {

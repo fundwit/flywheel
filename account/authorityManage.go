@@ -68,7 +68,7 @@ func DefaultSecurityConfiguration() error {
 }
 
 // as a simple initial solution, we use project member relationship as the metadata of permissions
-func loadPerms(uid types.ID) (authority.Permissions, authority.VisiableProjects) {
+func loadPerms(uid types.ID) (authority.Permissions, authority.ProjectRoles) {
 	var roles []string
 	var projectRoles []domain.ProjectRole
 	db := persistence.ActiveDataSourceManager.GormDB()

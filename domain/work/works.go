@@ -32,7 +32,7 @@ var (
 )
 
 func CreateWork(c *domain.WorkCreation, sec *session.Context) (*domain.WorkDetail, error) {
-	if !sec.HasRoleSuffix("_" + c.ProjectID.String()) {
+	if !sec.Perms.HasRoleSuffix("_" + c.ProjectID.String()) {
 		return nil, bizerror.ErrForbidden
 	}
 
@@ -122,7 +122,7 @@ func DetailWork(identifier string, sec *session.Context) (*domain.WorkDetail, er
 		return nil, err
 	}
 
-	if !sec.HasProjectViewPerm(workDetail.ProjectID) {
+	if !sec.Perms.HasProjectViewPerm(workDetail.ProjectID) {
 		return nil, bizerror.ErrForbidden
 	}
 
@@ -217,7 +217,7 @@ func findWorkAndCheckPerms(db *gorm.DB, id types.ID, sec *session.Context) (*dom
 	if err := db.Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
 		return nil, err
 	}
-	if sec == nil || !sec.HasRoleSuffix("_"+work.ProjectID.String()) {
+	if sec == nil || !sec.Perms.HasRoleSuffix("_"+work.ProjectID.String()) {
 		return nil, bizerror.ErrForbidden
 	}
 	return &work, nil

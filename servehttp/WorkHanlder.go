@@ -67,7 +67,10 @@ func (h *workHandler) handleDetail(c *gin.Context) {
 
 func (h *workHandler) handleQuery(c *gin.Context) {
 	query := domain.WorkQuery{}
-	_ = c.MustBindWith(&query, binding.Query)
+	err := c.MustBindWith(&query, binding.Query)
+	if err != nil {
+		panic(&bizerror.ErrBadParam{Cause: err})
+	}
 
 	//works, err := work.QueryWorkFunc(&query, session.FindSecurityContext(c))
 	works, err := search.SearchWorksFunc(query, session.FindSecurityContext(c))

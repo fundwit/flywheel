@@ -43,8 +43,8 @@ func TestDetailSessionSecurityContext(t *testing.T) {
 				Role: domain.ProjectRoleManager, ProjectName: "project1", ProjectIdentifier: "TES", ProjectID: types.ID(1),
 			}}, SigningTime: time.Now()}, cache.DefaultExpiration)
 
-		account.LoadPermFunc = func(uid types.ID) (authority.Permissions, authority.VisiableProjects) {
-			return authority.Permissions{"manager_1"}, authority.VisiableProjects{{ProjectID: 1, ProjectName: "project1new", ProjectIdentifier: "TES", Role: "manager"}}
+		account.LoadPermFunc = func(uid types.ID) (authority.Permissions, authority.ProjectRoles) {
+			return authority.Permissions{"manager_1"}, authority.ProjectRoles{{ProjectID: 1, ProjectName: "project1new", ProjectIdentifier: "TES", Role: "manager"}}
 		}
 		req := httptest.NewRequest(http.MethodGet, "/v1/session", nil)
 		req.AddCookie(&http.Cookie{Name: session.KeySecToken, Value: token})

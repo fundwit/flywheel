@@ -34,7 +34,7 @@ func QueryWorkContributions(query WorkContributionsQuery, sec *session.Context) 
 	db := persistence.ActiveDataSourceManager.GormDB()
 
 	// admin can view all
-	if sec.HasRole(account.SystemAdminPermission.ID) {
+	if sec.Perms.HasRole(account.SystemAdminPermission.ID) {
 		if err := db.Where("work_key IN (?)", query.WorkKeys).Find(&records).Error; err != nil {
 			return nil, err
 		}
@@ -66,7 +66,7 @@ func CheckContributorWorkPermission(workKey string, contributorId types.ID, sec 
 	}
 
 	if sec.Identity.ID != contributorId {
-		if !sec.HasRole(account.SystemAdminPermission.ID) && !sec.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, work.ProjectID)) {
+		if !sec.Perms.HasRole(account.SystemAdminPermission.ID) && !sec.Perms.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, work.ProjectID)) {
 			return nil, nil, bizerror.ErrForbidden // only system admin and project manager can assign work to other member
 		}
 

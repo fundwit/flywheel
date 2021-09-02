@@ -18,9 +18,40 @@ func (c Permissions) HasRole(role string) bool {
 	return false
 }
 
-type VisiableProjects []domain.ProjectRole
+func (c Permissions) HasGlobalViewRole() bool {
+	for _, v := range c {
+		if strings.HasPrefix(strings.ToLower(v), "system:") {
+			return true
+		}
+	}
+	return false
+}
 
-func (c VisiableProjects) HasProject(projectId types.ID) bool {
+func (c Permissions) HasRolePrefix(prefix string) bool {
+	for _, v := range c {
+		if strings.HasPrefix(strings.ToLower(v), strings.ToLower(prefix)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c Permissions) HasProjectViewPerm(projectId types.ID) bool {
+	return c.HasGlobalViewRole() || c.HasRoleSuffix(projectId.String())
+}
+
+func (c Permissions) HasRoleSuffix(suffix string) bool {
+	for _, v := range c {
+		if strings.HasSuffix(strings.ToLower(v), strings.ToLower(suffix)) {
+			return true
+		}
+	}
+	return false
+}
+
+type ProjectRoles []domain.ProjectRole
+
+func (c ProjectRoles) HasProject(projectId types.ID) bool {
 	for _, v := range c {
 		if v.ProjectID == projectId {
 			return true

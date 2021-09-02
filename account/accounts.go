@@ -55,7 +55,7 @@ func QueryUsers(sec *session.Context) (*[]UserInfo, error) {
 }
 
 func CreateUser(c *UserCreation, sec *session.Context) (*UserInfo, error) {
-	if !sec.HasRole(SystemAdminPermission.ID) {
+	if !sec.Perms.HasRole(SystemAdminPermission.ID) {
 		return nil, bizerror.ErrForbidden
 	}
 
@@ -67,7 +67,7 @@ func CreateUser(c *UserCreation, sec *session.Context) (*UserInfo, error) {
 }
 
 func UpdateUser(userId types.ID, c *UserUpdation, sec *session.Context) error {
-	if !sec.HasRole(SystemAdminPermission.ID) && userId != sec.Identity.ID {
+	if !sec.Perms.HasRole(SystemAdminPermission.ID) && userId != sec.Identity.ID {
 		return bizerror.ErrForbidden
 	}
 

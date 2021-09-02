@@ -21,7 +21,7 @@ var (
 )
 
 func QueryProjects(sec *session.Context) (*[]domain.Project, error) {
-	if !sec.HasRole(account.SystemAdminPermission.ID) {
+	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
 		return nil, bizerror.ErrForbidden
 	}
 
@@ -33,7 +33,7 @@ func QueryProjects(sec *session.Context) (*[]domain.Project, error) {
 }
 
 func CreateProject(c *domain.ProjectCreating, sec *session.Context) (*domain.Project, error) {
-	if !sec.HasRole(account.SystemAdminPermission.ID) {
+	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
 		return nil, bizerror.ErrForbidden
 	}
 
@@ -56,7 +56,7 @@ func CreateProject(c *domain.ProjectCreating, sec *session.Context) (*domain.Pro
 }
 
 func UpdateProject(id types.ID, d *domain.ProjectUpdating, sec *session.Context) error {
-	if !sec.HasRole(account.SystemAdminPermission.ID) {
+	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
 		return bizerror.ErrForbidden
 	}
 

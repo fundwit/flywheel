@@ -36,8 +36,8 @@ var _ = Describe("WorkContributions", func() {
 			&domain.Work{}, &account.User{}).Error).To(BeNil())
 		persistence.ActiveDataSourceManager = testDatabase.DS
 		db = testDatabase.DS.GormDB()
-		account.LoadPermFunc = func(uid types.ID) (authority.Permissions, authority.VisiableProjects) {
-			return authority.Permissions{}, authority.VisiableProjects{}
+		account.LoadPermFunc = func(uid types.ID) (authority.Permissions, authority.ProjectRoles) {
+			return authority.Permissions{}, authority.ProjectRoles{}
 		}
 		// given a work and a user
 		grantedUser = &account.User{ID: 10, Name: "testUser", Nickname: "Test User", Secret: "123"}
@@ -108,9 +108,9 @@ var _ = Describe("WorkContributions", func() {
 
 			// session user: admin                               => OK
 			// contributor : member of work's project            => OK
-			account.LoadPermFunc = func(uid types.ID) (authority.Permissions, authority.VisiableProjects) {
+			account.LoadPermFunc = func(uid types.ID) (authority.Permissions, authority.ProjectRoles) {
 				return authority.Permissions{"guest_" + givenWork.ProjectID.String()},
-					authority.VisiableProjects{{ProjectID: givenWork.ProjectID, ProjectName: "demo project", ProjectIdentifier: "TES", Role: domain.ProjectRoleManager + ""}}
+					authority.ProjectRoles{{ProjectID: givenWork.ProjectID, ProjectName: "demo project", ProjectIdentifier: "TES", Role: domain.ProjectRoleManager + ""}}
 			}
 			work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, grantedUser.ID,
 				&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})

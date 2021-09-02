@@ -9,10 +9,10 @@ import (
 )
 
 type Context struct {
-	Token        string                     `json:"token"`
-	Identity     Identity                   `json:"identity"`
-	Perms        authority.Permissions      `json:"perms"`
-	ProjectRoles authority.VisiableProjects `json:"projectRoles"`
+	Token        string                 `json:"token"`
+	Identity     Identity               `json:"identity"`
+	Perms        authority.Permissions  `json:"perms"`
+	ProjectRoles authority.ProjectRoles `json:"projectRoles"`
 
 	SigningTime time.Time `json:"-"`
 }
@@ -21,41 +21,6 @@ type Identity struct {
 	ID       types.ID `json:"id"`
 	Name     string   `json:"name"`
 	Nickname string   `json:"nickname"`
-}
-
-func (c *Context) HasRole(role string) bool {
-	return c.Perms.HasRole(role)
-}
-
-func (c *Context) HasGlobalViewRole() bool {
-	for _, v := range c.Perms {
-		if strings.HasPrefix(strings.ToLower(v), "system:") {
-			return true
-		}
-	}
-	return false
-}
-
-func (c *Context) HasRolePrefix(prefix string) bool {
-	for _, v := range c.Perms {
-		if strings.HasPrefix(strings.ToLower(v), strings.ToLower(prefix)) {
-			return true
-		}
-	}
-	return false
-}
-
-func (c *Context) HasProjectViewPerm(projectId types.ID) bool {
-	return c.HasGlobalViewRole() || c.HasRoleSuffix(projectId.String())
-}
-
-func (c *Context) HasRoleSuffix(suffix string) bool {
-	for _, v := range c.Perms {
-		if strings.HasSuffix(strings.ToLower(v), strings.ToLower(suffix)) {
-			return true
-		}
-	}
-	return false
 }
 
 // VisibleProjects  parse visible project ids from Context.Perms

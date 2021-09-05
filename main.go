@@ -6,6 +6,7 @@ import (
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/flow"
+	"flywheel/domain/label"
 	"flywheel/domain/namespace"
 	"flywheel/domain/workcontribution"
 	"flywheel/es"
@@ -75,6 +76,7 @@ func main() {
 	namespace.RegisterProjectsRestApis(engine, securityMiddle)
 	namespace.RegisterProjectMembersRestApis(engine, securityMiddle)
 	account.RegisterUsersHandler(engine, securityMiddle)
+	label.RegisterLabelsRestAPI(engine, securityMiddle)
 
 	flow.DetailWorkflowFunc = flow.DetailWorkflow
 

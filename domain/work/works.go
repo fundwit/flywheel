@@ -214,7 +214,7 @@ func ArchiveWorks(ids []types.ID, sec *session.Context) error {
 
 func findWorkAndCheckPerms(db *gorm.DB, id types.ID, sec *session.Context) (*domain.Work, error) {
 	var work domain.Work
-	if err := db.Where(&domain.Work{ID: id}).First(&work).Error; err != nil {
+	if err := db.Where("id = ?", id).First(&work).Error; err != nil {
 		return nil, err
 	}
 	if sec == nil || !sec.Perms.HasRoleSuffix("_"+work.ProjectID.String()) {

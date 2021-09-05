@@ -5,6 +5,7 @@ import (
 	"net/http"
 )
 
+var ErrInvalidArguments = errors.New("invalid arguments")
 var ErrUnauthenticated = errors.New("unauthenticated")
 var ErrForbidden = errors.New("forbidden")
 var ErrWorkflowIsReferenced = errors.New("workflow is referenced")
@@ -14,6 +15,9 @@ var ErrStateInvalid = errors.New("state is invalid")
 var ErrStateCategoryInvalid = errors.New("state category is invalid")
 var ErrArchiveStatusInvalid = errors.New("archive status is invalid")
 var ErrWorkProcessStepStateInvalid = errors.New("state of work process step is invalid")
+
+var ErrLabelNotFound = errors.New("label not found")
+var ErrLabelIsReferenced = errors.New("label is referenced")
 
 var ErrNotFound = errors.New("not found")
 var ErrNoContent = errors.New("no content")

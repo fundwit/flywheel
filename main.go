@@ -8,6 +8,7 @@ import (
 	"flywheel/domain/flow"
 	"flywheel/domain/label"
 	"flywheel/domain/namespace"
+	"flywheel/domain/work"
 	"flywheel/domain/workcontribution"
 	"flywheel/es"
 	"flywheel/event"
@@ -50,7 +51,7 @@ func main() {
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{},
 		&workcontribution.WorkContributionRecord{}, &event.EventRecord{},
 		&account.User{}, &domain.Project{}, &domain.ProjectMember{},
-		&account.Role{}, &account.Permission{}, &label.Label{},
+		&account.Role{}, &account.Permission{}, &label.Label{}, &work.WorkLabelRelation{},
 		&account.UserRoleBinding{}, &account.RolePermissionBinding{}).Error
 	if err != nil {
 		logrus.Fatalf("database migration failed %v\n", err)
@@ -76,7 +77,10 @@ func main() {
 	namespace.RegisterProjectsRestApis(engine, securityMiddle)
 	namespace.RegisterProjectMembersRestApis(engine, securityMiddle)
 	account.RegisterUsersHandler(engine, securityMiddle)
+
 	label.RegisterLabelsRestAPI(engine, securityMiddle)
+	work.RegisterWorkLabelRelationsRestAPI(engine, securityMiddle)
+	label.LabelDeleteCheckFuncs = append(label.LabelDeleteCheckFuncs, work.IsLabelReferencedByWork)
 
 	flow.DetailWorkflowFunc = flow.DetailWorkflow
 

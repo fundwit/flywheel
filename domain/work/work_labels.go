@@ -1,0 +1,93 @@
+package work
+
+import (
+	"flywheel/bizerror"
+	"flywheel/domain/label"
+	"flywheel/persistence"
+	"flywheel/session"
+
+	"github.com/fundwit/go-commons/types"
+	"github.com/jinzhu/gorm"
+)
+
+type WorkLabelRelation struct {
+	WorkId  types.ID `json:"workId" gorm:"primary_key" sql:"type:BIGINT UNSIGNED NOT NULL" binding:"required"`
+	LabelId types.ID `json:"labelId" gorm:"primary_key" sql:"type:BIGINT UNSIGNED NOT NULL" binding:"required"`
+
+	CreateTime types.Timestamp `json:"createTime" sql:"type:DATETIME(6)" binding:"required"`
+	CreatorId  types.ID        `json:"creatorId" binding:"required"`
+}
+
+type WorkLabelRelationReq struct {
+	WorkId  types.ID `json:"workId" form:"workId" binding:"required"`
+	LabelId types.ID `json:"labelId" form:"labelId" binding:"required"`
+}
+
+var (
+	CreateWorkLabelRelationFunc = CreateWorkLabelRelation
+	DeleteWorkLabelRelationFunc = DeleteWorkLabelRelation
+)
+
+func IsLabelReferencedByWork(l label.Label, tx *gorm.DB) error {
+	var r WorkLabelRelation
+	if err := tx.Where(&WorkLabelRelation{LabelId: l.ID}).First(&r).Error; err == gorm.ErrRecordNotFound {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	return bizerror.ErrLabelIsReferenced
+}
+
+func CreateWorkLabelRelation(req WorkLabelRelationReq, c *session.Context) (*WorkLabelRelation, error) {
+	var r *WorkLabelRelation
+	txErr := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+		// load work, check perms against to project of work
+		w, err := findWorkAndCheckPerms(tx, req.WorkId, c)
+		if err != nil {
+			return err
+		}
+		var l label.Label
+		if err := tx.Where(&label.Label{ID: req.LabelId, ProjectID: w.ProjectID}).First(&l).Error; err == gorm.ErrRecordNotFound {
+			return bizerror.ErrLabelNotFound
+		} else if err != nil {
+			return err
+		}
+
+		r = &WorkLabelRelation{
+			WorkId: w.ID, LabelId: l.ID,
+			CreateTime: types.CurrentTimestamp(), CreatorId: c.Identity.ID,
+		}
+
+		if err := tx.Save(&r).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if txErr != nil {
+		return nil, txErr
+	}
+
+	return r, nil
+}
+
+func DeleteWorkLabelRelation(req WorkLabelRelationReq, c *session.Context) error {
+	if (req == WorkLabelRelationReq{}) {
+		return bizerror.ErrInvalidArguments
+	}
+
+	err1 := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+		// load work, check perms against to project of work
+		w, err := findWorkAndCheckPerms(tx, req.WorkId, c)
+		if err != nil {
+			return err
+		}
+
+		return persistence.ActiveDataSourceManager.GormDB().
+			Delete(&WorkLabelRelation{}, &WorkLabelRelation{WorkId: w.ID, LabelId: req.LabelId}).Error
+	})
+	if err1 != nil {
+		return err1
+	}
+	return nil
+}

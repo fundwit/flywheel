@@ -95,7 +95,7 @@ func DeleteLabel(id types.ID, ctx *session.Context) error {
 
 func findLabelAndCheckPerms(db *gorm.DB, id types.ID, sec *session.Context) (*Label, error) {
 	var l Label
-	if err := db.Where(&Label{ID: id}).First(&l).Error; err != nil {
+	if err := db.Where("id = ?", id).First(&l).Error; err != nil {
 		return nil, err
 	}
 	if sec == nil || !sec.Perms.HasRoleSuffix("_"+l.ProjectID.String()) {

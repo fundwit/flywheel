@@ -121,3 +121,44 @@ func TestCreateLabelAPI(t *testing.T) {
 		Expect(body).To(MatchJSON(`{"id": "1111", "creatorId": "10", "createTime": "` + timeString + `", "name": "test-label", "projectId": "999"}`))
 	})
 }
+
+func TestDeleteLabelAPI(t *testing.T) {
+	RegisterTestingT(t)
+
+	router := gin.Default()
+	router.Use(bizerror.ErrorHandling())
+	label.RegisterLabelsRestAPI(router)
+
+	t.Run("should be able to validate parameters", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, label.PathLabels+"/aaa", nil)
+		status, body, _ := testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusBadRequest))
+		Expect(body).To(MatchJSON(`{"code":"common.bad_param",
+		"message": "invalid id 'aaa'",
+		"data":null}`))
+	})
+
+	t.Run("should be able to delete label", func(t *testing.T) {
+		var reqId types.ID
+		label.DeleteLabelFunc = func(id types.ID, ctx *session.Context) error {
+			reqId = id
+			return nil
+		}
+		req := httptest.NewRequest(http.MethodDelete, label.PathLabels+"/100", nil)
+		status, body, _ := testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusNoContent))
+		Expect(body).To(BeZero())
+
+		Expect(reqId).To(Equal(types.ID(100)))
+	})
+
+	t.Run("should be able to handle error", func(t *testing.T) {
+		label.DeleteLabelFunc = func(id types.ID, ctx *session.Context) error {
+			return errors.New("some error")
+		}
+		req := httptest.NewRequest(http.MethodDelete, label.PathLabels+"/100", nil)
+		status, body, _ := testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusInternalServerError))
+		Expect(body).To(MatchJSON(`{"code":"common.internal_server_error", "message":"some error", "data":null}`))
+	})
+}

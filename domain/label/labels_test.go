@@ -1,6 +1,7 @@
 package label_test
 
 import (
+	"errors"
 	"flywheel/account"
 	"flywheel/authority"
 	"flywheel/bizerror"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/fundwit/go-commons/types"
+	"github.com/jinzhu/gorm"
 	. "github.com/onsi/gomega"
 )
 
@@ -104,5 +106,92 @@ func TestCreateLabel(t *testing.T) {
 		l.ID = 0
 		l.CreateTime = types.Timestamp{}
 		Expect(*l).To(Equal(label.Label{Name: i.Name, ProjectID: i.ProjectID, CreatorID: c.Identity.ID}))
+	})
+
+	t.Run("label name should be unique in each project", func(t *testing.T) {
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
+
+		c := &session.Context{Perms: authority.Permissions{"admin_100", "admin_200"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
+		i := label.LabelCreation{ProjectID: 100, Name: "test label"}
+		_, err := label.CreateLabel(i, c)
+		Expect(err).To(BeNil())
+
+		i = label.LabelCreation{ProjectID: 200, Name: "test label"}
+		_, err = label.CreateLabel(i, c)
+		Expect(err).To(BeNil())
+
+		_, err = label.CreateLabel(i, c)
+		Expect(err).ToNot(BeNil())
+		Expect(err.Error()).To(Equal("Error 1062: Duplicate entry 'test label-200' for key 'labels.uni_name_project'"))
+	})
+}
+
+func TestDeleteLabel(t *testing.T) {
+	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
+
+	t.Run("only project member has permission to delete label", func(t *testing.T) {
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
+
+		c := &session.Context{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
+		i := label.LabelCreation{ProjectID: 100, Name: "test label"}
+		l, err := label.CreateLabel(i, c)
+		Expect(err).To(BeNil())
+
+		err = label.DeleteLabel(l.ID, &session.Context{Perms: authority.Permissions{
+			account.SystemAdminPermission.ID, "admin_101"}})
+		Expect(err).To(Equal(bizerror.ErrForbidden))
+
+		err = label.DeleteLabel(l.ID, &session.Context{Identity: session.Identity{ID: 10, Name: "user 10"}})
+		Expect(err).To(Equal(bizerror.ErrForbidden))
+	})
+
+	t.Run("should be able delete label successfully", func(t *testing.T) {
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
+
+		c := &session.Context{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
+		i := label.LabelCreation{ProjectID: 100, Name: "test label"}
+		l, err := label.CreateLabel(i, c)
+		Expect(err).To(BeNil())
+
+		var labelToDeleted label.Label
+		var actualDB *gorm.DB
+		label.LabelDeleteCheckFuncs = append(label.LabelDeleteCheckFuncs, func(l label.Label, tx *gorm.DB) error {
+			labelToDeleted = l
+			actualDB = tx
+			return nil
+		})
+		err = label.DeleteLabel(l.ID, c)
+		Expect(err).To(BeNil())
+		Expect(actualDB).ToNot(BeNil())
+		Expect(labelToDeleted).To(Equal(*l))
+
+		r := label.Label{}
+		Expect(persistence.ActiveDataSourceManager.GormDB().
+			Where("id = ?", l.ID).First(&r).Error).To(Equal(gorm.ErrRecordNotFound))
+	})
+
+	t.Run("delete action can be blocked by delete check hooks", func(t *testing.T) {
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
+
+		c := &session.Context{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
+		i := label.LabelCreation{ProjectID: 100, Name: "test label"}
+		l, err := label.CreateLabel(i, c)
+		Expect(err).To(BeNil())
+
+		labelReferencedByWork := errors.New("label referenced by work")
+		label.LabelDeleteCheckFuncs = append(label.LabelDeleteCheckFuncs, func(l label.Label, tx *gorm.DB) error {
+			return labelReferencedByWork
+		})
+		err = label.DeleteLabel(l.ID, c)
+		Expect(err).To(Equal(labelReferencedByWork))
+
+		r := label.Label{}
+		Expect(persistence.ActiveDataSourceManager.GormDB().Where("id = ?", l.ID).First(&r).Error).To(BeNil())
+		Expect(r).To(Equal(*l))
 	})
 }

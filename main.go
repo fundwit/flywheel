@@ -50,7 +50,7 @@ func main() {
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{},
 		&workcontribution.WorkContributionRecord{}, &event.EventRecord{},
 		&account.User{}, &domain.Project{}, &domain.ProjectMember{},
-		&account.Role{}, &account.Permission{},
+		&account.Role{}, &account.Permission{}, &label.Label{},
 		&account.UserRoleBinding{}, &account.RolePermissionBinding{}).Error
 	if err != nil {
 		logrus.Fatalf("database migration failed %v\n", err)

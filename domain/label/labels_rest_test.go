@@ -52,12 +52,13 @@ func TestQueryLabelsAPI(t *testing.T) {
 		var q1 label.LabelQuery
 		label.QueryLabelsFunc = func(q label.LabelQuery, ctx *session.Context) ([]label.Label, error) {
 			q1 = q
-			return []label.Label{{ID: 123, CreateTime: demoTime, CreatorID: 10, Name: "label123", ProjectID: 100}}, nil
+			return []label.Label{{ID: 123, CreateTime: demoTime, CreatorID: 10, Name: "label123", ThemeColor: "red", ProjectID: 100}}, nil
 		}
 		req := httptest.NewRequest(http.MethodGet, label.PathLabels+"?projectId=100", nil)
 		status, body, _ := testinfra.ExecuteRequest(req, router)
 		Expect(status).To(Equal(http.StatusOK))
-		Expect(body).To(MatchJSON(`[{"id": "123", "creatorId":"10", "createTime": "` + timeString + `", "name": "label123", "projectId": "100"}]`))
+		Expect(body).To(MatchJSON(`[{"id": "123", "creatorId":"10", "createTime": "` + timeString +
+			`", "name": "label123", "themeColor":"red", "projectId": "100"}]`))
 		Expect(q1).To(Equal(label.LabelQuery{ProjectID: 100}))
 	})
 }
@@ -75,6 +76,7 @@ func TestCreateLabelAPI(t *testing.T) {
 		Expect(status).To(Equal(http.StatusBadRequest))
 		Expect(body).To(MatchJSON(`{"code":"common.bad_param",
 		"message": "Key: 'LabelCreation.Name' Error:Field validation for 'Name' failed on the 'required' tag\n` +
+			`Key: 'LabelCreation.ThemeColor' Error:Field validation for 'ThemeColor' failed on the 'required' tag\n` +
 			`Key: 'LabelCreation.ProjectID' Error:Field validation for 'ProjectID' failed on the 'required' tag",
 		"data":null}`))
 
@@ -98,7 +100,7 @@ func TestCreateLabelAPI(t *testing.T) {
 		label.CreateLabelFunc = func(l label.LabelCreation, ctx *session.Context) (*label.Label, error) {
 			return nil, errors.New("some error")
 		}
-		reqBody := `{"name":"test-label", "projectId": "1234"}`
+		reqBody := `{"name":"test-label", "themeColor":"red", "projectId": "1234"}`
 		req := httptest.NewRequest(http.MethodPost, label.PathLabels, strings.NewReader(reqBody))
 		status, body, _ := testinfra.ExecuteRequest(req, router)
 		Expect(status).To(Equal(http.StatusInternalServerError))
@@ -112,13 +114,14 @@ func TestCreateLabelAPI(t *testing.T) {
 		timeString := strings.Trim(string(timeBytes), `"`)
 
 		label.CreateLabelFunc = func(l label.LabelCreation, ctx *session.Context) (*label.Label, error) {
-			return &label.Label{Name: l.Name, ProjectID: l.ProjectID, ID: 1111, CreatorID: 10, CreateTime: demoTime}, nil
+			return &label.Label{Name: l.Name, ThemeColor: l.ThemeColor, ProjectID: l.ProjectID, ID: 1111, CreatorID: 10, CreateTime: demoTime}, nil
 		}
-		reqBody := `{"name":"test-label", "projectId": "999"}`
+		reqBody := `{"name":"test-label", "themeColor":"red", "projectId": "999"}`
 		req := httptest.NewRequest(http.MethodPost, label.PathLabels, strings.NewReader(reqBody))
 		status, body, _ := testinfra.ExecuteRequest(req, router)
 		Expect(status).To(Equal(http.StatusOK))
-		Expect(body).To(MatchJSON(`{"id": "1111", "creatorId": "10", "createTime": "` + timeString + `", "name": "test-label", "projectId": "999"}`))
+		Expect(body).To(MatchJSON(`{"id": "1111", "creatorId": "10", "createTime": "` + timeString +
+			`", "name": "test-label", "themeColor":"red", "projectId": "999"}`))
 	})
 }
 

@@ -16,8 +16,9 @@ var (
 )
 
 type LabelCreation struct {
-	Name      string   `json:"name" binding:"required,lte=255"`
-	ProjectID types.ID `json:"projectId" binding:"required"`
+	Name       string   `json:"name" binding:"required,lte=255"`
+	ThemeColor string   `json:"themeColor" binding:"required,lte=64"`
+	ProjectID  types.ID `json:"projectId" binding:"required"`
 }
 
 type LabelQuery struct {
@@ -27,8 +28,9 @@ type LabelQuery struct {
 type Label struct {
 	ID types.ID `json:"id"`
 
-	Name      string   `json:"name" binding:"required,lte=255" gorm:"unique_index:uni_name_project"`
-	ProjectID types.ID `json:"projectId" binding:"required" gorm:"unique_index:uni_name_project"`
+	Name       string   `json:"name" binding:"required,lte=255" gorm:"unique_index:uni_name_project"`
+	ThemeColor string   `json:"themeColor" binding:"required,lte=64"`
+	ProjectID  types.ID `json:"projectId" binding:"required" gorm:"unique_index:uni_name_project"`
 
 	CreatorID  types.ID        `json:"creatorId"`
 	CreateTime types.Timestamp `json:"createTime" sql:"type:DATETIME(6) NOT NULL"`
@@ -47,7 +49,7 @@ func CreateLabel(l LabelCreation, ctx *session.Context) (*Label, error) {
 		return nil, bizerror.ErrForbidden
 	}
 
-	r := Label{Name: l.Name, ProjectID: l.ProjectID, ID: idgen.NextID(labelIdWorker),
+	r := Label{Name: l.Name, ThemeColor: l.ThemeColor, ProjectID: l.ProjectID, ID: idgen.NextID(labelIdWorker),
 		CreatorID:  ctx.Identity.ID,
 		CreateTime: types.CurrentTimestamp()}
 	if err := persistence.ActiveDataSourceManager.GormDB().Create(&r).Error; err != nil {

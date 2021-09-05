@@ -53,11 +53,11 @@ func TestQueryLabels(t *testing.T) {
 
 		c := &session.Context{Perms: authority.Permissions{"admin_100", "member_200", "admin_300"},
 			Identity: session.Identity{ID: 10, Name: "user 10"}}
-		l1, err := label.CreateLabel(label.LabelCreation{ProjectID: 100, Name: "test label 1"}, c)
+		l1, err := label.CreateLabel(label.LabelCreation{ProjectID: 100, Name: "test label 1", ThemeColor: "red"}, c)
 		Expect(err).To(BeNil())
-		l2, err := label.CreateLabel(label.LabelCreation{ProjectID: 100, Name: "test label 2"}, c)
+		l2, err := label.CreateLabel(label.LabelCreation{ProjectID: 100, Name: "test label 2", ThemeColor: "red"}, c)
 		Expect(err).To(BeNil())
-		_, err = label.CreateLabel(label.LabelCreation{ProjectID: 200, Name: "test label 3"}, c)
+		_, err = label.CreateLabel(label.LabelCreation{ProjectID: 200, Name: "test label 3", ThemeColor: "red"}, c)
 		Expect(err).To(BeNil())
 
 		r, err := label.QueryLabels(label.LabelQuery{ProjectID: 100}, c)
@@ -77,7 +77,7 @@ func TestCreateLabel(t *testing.T) {
 	var testDatabase *testinfra.TestDatabase
 
 	t.Run("only project member has permission to create label", func(t *testing.T) {
-		i := label.LabelCreation{ProjectID: 100, Name: "test label"}
+		i := label.LabelCreation{ProjectID: 100, Name: "test label", ThemeColor: "red"}
 		l, err := label.CreateLabel(i, &session.Context{Perms: authority.Permissions{
 			account.SystemAdminPermission.ID, "admin_101"}})
 		Expect(l).To(BeNil())
@@ -93,7 +93,7 @@ func TestCreateLabel(t *testing.T) {
 		setup(t, &testDatabase)
 
 		c := &session.Context{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
-		i := label.LabelCreation{ProjectID: 100, Name: "test label"}
+		i := label.LabelCreation{ProjectID: 100, Name: "test label", ThemeColor: "red"}
 		l, err := label.CreateLabel(i, c)
 		Expect(err).To(BeNil())
 
@@ -105,7 +105,7 @@ func TestCreateLabel(t *testing.T) {
 		Expect(l.ID > 0).To(BeTrue())
 		l.ID = 0
 		l.CreateTime = types.Timestamp{}
-		Expect(*l).To(Equal(label.Label{Name: i.Name, ProjectID: i.ProjectID, CreatorID: c.Identity.ID}))
+		Expect(*l).To(Equal(label.Label{Name: i.Name, ThemeColor: "red", ProjectID: i.ProjectID, CreatorID: c.Identity.ID}))
 	})
 
 	t.Run("label name should be unique in each project", func(t *testing.T) {
@@ -113,11 +113,11 @@ func TestCreateLabel(t *testing.T) {
 		setup(t, &testDatabase)
 
 		c := &session.Context{Perms: authority.Permissions{"admin_100", "admin_200"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
-		i := label.LabelCreation{ProjectID: 100, Name: "test label"}
+		i := label.LabelCreation{ProjectID: 100, Name: "test label", ThemeColor: "red"}
 		_, err := label.CreateLabel(i, c)
 		Expect(err).To(BeNil())
 
-		i = label.LabelCreation{ProjectID: 200, Name: "test label"}
+		i = label.LabelCreation{ProjectID: 200, Name: "test label", ThemeColor: "red"}
 		_, err = label.CreateLabel(i, c)
 		Expect(err).To(BeNil())
 
@@ -136,7 +136,7 @@ func TestDeleteLabel(t *testing.T) {
 		setup(t, &testDatabase)
 
 		c := &session.Context{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
-		i := label.LabelCreation{ProjectID: 100, Name: "test label"}
+		i := label.LabelCreation{ProjectID: 100, Name: "test label", ThemeColor: "red"}
 		l, err := label.CreateLabel(i, c)
 		Expect(err).To(BeNil())
 
@@ -153,7 +153,7 @@ func TestDeleteLabel(t *testing.T) {
 		setup(t, &testDatabase)
 
 		c := &session.Context{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
-		i := label.LabelCreation{ProjectID: 100, Name: "test label"}
+		i := label.LabelCreation{ProjectID: 100, Name: "test label", ThemeColor: "red"}
 		l, err := label.CreateLabel(i, c)
 		Expect(err).To(BeNil())
 
@@ -179,7 +179,7 @@ func TestDeleteLabel(t *testing.T) {
 		setup(t, &testDatabase)
 
 		c := &session.Context{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
-		i := label.LabelCreation{ProjectID: 100, Name: "test label"}
+		i := label.LabelCreation{ProjectID: 100, Name: "test label", ThemeColor: "red"}
 		l, err := label.CreateLabel(i, c)
 		Expect(err).To(BeNil())
 

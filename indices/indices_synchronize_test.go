@@ -85,8 +85,8 @@ func TestIndexWorkEventHandle(t *testing.T) {
 		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
 			return nil
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*domain.WorkDetail, error) {
-			return &domain.WorkDetail{}, nil
+		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*work.WorkDetail, error) {
+			return &work.WorkDetail{}, nil
 		}
 		ev := event.EventRecord{Event: event.Event{SourceType: "WORK", SourceId: 100, EventCategory: event.EventCategoryCreated}}
 
@@ -98,7 +98,7 @@ func TestIndexWorkEventHandle(t *testing.T) {
 		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
 			return nil
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*domain.WorkDetail, error) {
+		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*work.WorkDetail, error) {
 			return nil, errors.New("error on detail work")
 		}
 		ev := event.EventRecord{Event: event.Event{SourceType: "WORK", SourceId: 100, EventCategory: event.EventCategoryCreated}}
@@ -115,12 +115,12 @@ func TestIndexWorkEventHandle(t *testing.T) {
 		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
 			return errors.New("error on index document")
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*domain.WorkDetail, error) {
+		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*work.WorkDetail, error) {
 			id, err := types.ParseID(identifier)
 			if err != nil {
 				return nil, err
 			}
-			return &domain.WorkDetail{Work: domain.Work{ID: id}}, nil
+			return &work.WorkDetail{Work: domain.Work{ID: id}}, nil
 		}
 		ev := event.EventRecord{Event: event.Event{SourceType: "WORK", SourceId: 100, EventCategory: event.EventCategoryCreated}}
 

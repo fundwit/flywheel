@@ -7,11 +7,11 @@ import (
 )
 
 type WorkCreation struct {
-	Name      string   `json:"name" validate:"required"`
-	ProjectID types.ID `json:"projectId" validate:"required"`
-	FlowID    types.ID `json:"flowId" validate:"required"`
+	Name      string   `json:"name" binding:"required"`
+	ProjectID types.ID `json:"projectId" binding:"required"`
+	FlowID    types.ID `json:"flowId" binding:"required"`
 
-	InitialStateName string `json:"initialStateName" validate:"required"`
+	InitialStateName string `json:"initialStateName" binding:"required"`
 	PriorityLevel    int    `json:"priorityLevel"`
 }
 
@@ -20,14 +20,9 @@ type WorkUpdating struct {
 }
 
 type WorkOrderRangeUpdating struct {
-	ID       types.ID `json:"id" validate:"required"`
+	ID       types.ID `json:"id" binding:"required"`
 	NewOlder int64    `json:"newOrder"`
 	OldOlder int64    `json:"oldOrder"`
-}
-
-type WorkDetail struct {
-	Work
-	Type Workflow `json:"type"`
 }
 
 const (

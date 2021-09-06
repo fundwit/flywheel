@@ -36,6 +36,13 @@ type Label struct {
 	CreateTime types.Timestamp `json:"createTime" sql:"type:DATETIME(6) NOT NULL"`
 }
 
+type LabelBrief struct {
+	ID types.ID `json:"id"`
+
+	Name       string `json:"name"`
+	ThemeColor string `json:"themeColor"`
+}
+
 var (
 	labelIdWorker = sonyflake.NewSonyflake(sonyflake.Settings{})
 

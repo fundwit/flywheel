@@ -6,6 +6,7 @@ import (
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/flow"
+	"flywheel/domain/label"
 	"flywheel/domain/namespace"
 	"flywheel/domain/work"
 	"flywheel/event"
@@ -58,6 +59,9 @@ func setup(t *testing.T, testDatabase **testinfra.TestDatabase) (*domain.Workflo
 	event.InvokeHandlersFunc = func(record *event.EventRecord) []event.EventHandleResult {
 		handedEvents = append(handedEvents, *record)
 		return nil
+	}
+	work.QueryLabelBriefsOfWorkFunc = func(workId types.ID) ([]label.LabelBrief, error) {
+		return nil, nil
 	}
 	flow.DetailWorkflowFunc = flow.DetailWorkflow
 
@@ -140,6 +144,9 @@ func TestCreateWork(t *testing.T) {
 		Expect(time.Since((*persistedEvents)[0].Timestamp.Time()) < time.Second).To(BeTrue())
 		Expect(*handedEvents).To(Equal(*persistedEvents))
 
+		work.QueryLabelBriefsOfWorkFunc = func(workId types.ID) ([]label.LabelBrief, error) {
+			return []label.LabelBrief{{ID: 100, Name: "label100", ThemeColor: "red"}}, nil
+		}
 		detail, err := work.DetailWork(w.ID.String(), testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
 		Expect(err).To(BeNil())
 		Expect(detail).ToNot(BeNil())
@@ -155,6 +162,8 @@ func TestCreateWork(t *testing.T) {
 		Expect(detail.StateName).To(Equal(flowDetail.StateMachine.States[0].Name))
 		Expect(w.StateCategory).To(Equal(flowDetail.StateMachine.States[0].Category))
 		//Expect(len(work.Properties)).To(Equal(0))
+
+		Expect(detail.Labels).To(Equal([]label.LabelBrief{{ID: 100, Name: "label100", ThemeColor: "red"}}))
 
 		// should create init process step
 		var initProcessStep []domain.WorkProcessStep

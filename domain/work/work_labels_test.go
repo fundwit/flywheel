@@ -191,10 +191,18 @@ func TestDeleteWorkLabelRelation(t *testing.T) {
 		Expect(work.IsLabelReferencedByWork(*l, testDatabase.DS.GormDB())).To(Equal(bizerror.ErrLabelIsReferenced))
 		// assert LabelDeleteCheckFuncs is registered
 		Expect(label.DeleteLabel(l.ID, &c)).To(Equal(bizerror.ErrLabelIsReferenced))
+		// assert query label briefs of work
+		b, err := work.QueryLabelBriefsOfWork(w.ID)
+		Expect(err).To(BeNil())
+		Expect(b).To(Equal([]label.LabelBrief{{ID: l.ID, Name: l.Name, ThemeColor: l.ThemeColor}}))
 
 		// do delete work-label-relation
 		Expect(work.DeleteWorkLabelRelation(req, &c)).To(BeNil())
 		Expect(work.IsLabelReferencedByWork(*l, testDatabase.DS.GormDB())).To(BeNil())
+
+		b, err = work.QueryLabelBriefsOfWork(w.ID)
+		Expect(err).To(BeNil())
+		Expect(len(b)).To(BeZero())
 
 		// assert relation already been delete from database
 		q := work.WorkLabelRelation{}

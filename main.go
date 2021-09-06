@@ -9,6 +9,7 @@ import (
 	"flywheel/domain/label"
 	"flywheel/domain/namespace"
 	"flywheel/domain/work"
+	"flywheel/domain/work/workrest"
 	"flywheel/domain/workcontribution"
 	"flywheel/es"
 	"flywheel/event"
@@ -81,14 +82,13 @@ func main() {
 	label.RegisterLabelsRestAPI(engine, securityMiddle)
 	work.RegisterWorkLabelRelationsRestAPI(engine, securityMiddle)
 	label.LabelDeleteCheckFuncs = append(label.LabelDeleteCheckFuncs, work.IsLabelReferencedByWork)
+	workrest.RegisterWorksRestAPI(engine, securityMiddle)
 
 	flow.DetailWorkflowFunc = flow.DetailWorkflow
 
 	event.EventHandlers = append(event.EventHandlers, indices.IndexWorkEventHandle)
 
 	servehttp.RegisterWorkflowHandler(engine, securityMiddle)
-
-	servehttp.RegisterWorkHandler(engine, securityMiddle)
 
 	servehttp.RegisterWorkProcessStepHandler(engine, securityMiddle)
 	workcontribution.RegisterWorkContributionsHandlers(engine, securityMiddle)

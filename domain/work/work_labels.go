@@ -11,8 +11,8 @@ import (
 )
 
 type WorkLabelRelation struct {
-	WorkId  types.ID `json:"workId" gorm:"primary_key" sql:"type:BIGINT UNSIGNED NOT NULL" binding:"required"`
 	LabelId types.ID `json:"labelId" gorm:"primary_key" sql:"type:BIGINT UNSIGNED NOT NULL" binding:"required"`
+	WorkId  types.ID `json:"workId" gorm:"primary_key" sql:"type:BIGINT UNSIGNED NOT NULL" binding:"required"`
 
 	CreateTime types.Timestamp `json:"createTime" sql:"type:DATETIME(6)" binding:"required"`
 	CreatorId  types.ID        `json:"creatorId" binding:"required"`
@@ -36,6 +36,25 @@ func IsLabelReferencedByWork(l label.Label, tx *gorm.DB) error {
 		return err
 	}
 	return bizerror.ErrLabelIsReferenced
+}
+
+func QueryLabelBriefsOfWork(workId types.ID) ([]label.LabelBrief, error) {
+	var labelBriefs []label.LabelBrief
+	if workId.IsZero() {
+		return labelBriefs, nil
+	}
+
+	db := persistence.ActiveDataSourceManager.GormDB()
+
+	if err := db.LogMode(true).Model(&WorkLabelRelation{}).
+		Select("labels.id, labels.name, labels.theme_color").
+		Where(&WorkLabelRelation{WorkId: workId}).
+		Joins("INNER JOIN labels ON labels.id = work_label_relations.label_id").
+		Scan(&labelBriefs).Error; err != nil {
+		return nil, err
+	}
+
+	return labelBriefs, nil
 }
 
 func CreateWorkLabelRelation(req WorkLabelRelationReq, c *session.Context) (*WorkLabelRelation, error) {

@@ -5,6 +5,7 @@ import (
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/flow"
+	"flywheel/domain/label"
 	"flywheel/domain/namespace"
 	"flywheel/domain/state"
 	"flywheel/domain/work"
@@ -29,7 +30,8 @@ func workProgressTestSetup(t *testing.T, testDatabase **testinfra.TestDatabase) 
 	*testDatabase = db
 	// migration
 	Expect(db.DS.GormDB().AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
-		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error).To(BeNil())
+		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{},
+		&work.WorkLabelRelation{}, &label.Label{}).Error).To(BeNil())
 
 	persistence.ActiveDataSourceManager = db.DS
 	var err error
@@ -69,7 +71,7 @@ func workProgressTestTeardown(t *testing.T, testDatabase *testinfra.TestDatabase
 	}
 }
 
-func buildWork(workName string, flowId, gid types.ID, secCtx *session.Context) *domain.WorkDetail {
+func buildWork(workName string, flowId, gid types.ID, secCtx *session.Context) *work.WorkDetail {
 	workCreation := &domain.WorkCreation{
 		Name:             workName,
 		ProjectID:        gid,

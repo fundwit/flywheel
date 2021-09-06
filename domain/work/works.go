@@ -5,6 +5,7 @@ import (
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/flow"
+	"flywheel/domain/label"
 	"flywheel/domain/namespace"
 	"flywheel/domain/state"
 	"flywheel/event"
@@ -29,15 +30,22 @@ var (
 	ArchiveWorksFunc           = ArchiveWorks
 	DeleteWorkFunc             = DeleteWork
 	UpdateStateRangeOrdersFunc = UpdateStateRangeOrders
+	QueryLabelBriefsOfWorkFunc = QueryLabelBriefsOfWork
 )
 
-func CreateWork(c *domain.WorkCreation, sec *session.Context) (*domain.WorkDetail, error) {
+type WorkDetail struct {
+	domain.Work
+	Type   domain.Workflow    `json:"type"`
+	Labels []label.LabelBrief `json:"labels"`
+}
+
+func CreateWork(c *domain.WorkCreation, sec *session.Context) (*WorkDetail, error) {
 	if !sec.Perms.HasRoleSuffix("_" + c.ProjectID.String()) {
 		return nil, bizerror.ErrForbidden
 	}
 
 	db := persistence.ActiveDataSourceManager.GormDB()
-	var workDetail *domain.WorkDetail
+	var workDetail *WorkDetail
 	var ev *event.EventRecord
 
 	err1 := db.Transaction(func(tx *gorm.DB) error {
@@ -51,7 +59,7 @@ func CreateWork(c *domain.WorkCreation, sec *session.Context) (*domain.WorkDetai
 		}
 
 		now := types.CurrentTimestamp()
-		workDetail = &domain.WorkDetail{
+		workDetail = &WorkDetail{
 			Work: domain.Work{
 				ID:         idgen.NextID(workIdWorker),
 				Name:       c.Name,
@@ -114,9 +122,9 @@ func CreateWork(c *domain.WorkCreation, sec *session.Context) (*domain.WorkDetai
 	return workDetail, nil
 }
 
-func DetailWork(identifier string, sec *session.Context) (*domain.WorkDetail, error) {
+func DetailWork(identifier string, sec *session.Context) (*WorkDetail, error) {
 	id, _ := types.ParseID(identifier)
-	workDetail := domain.WorkDetail{}
+	workDetail := WorkDetail{}
 	db := persistence.ActiveDataSourceManager.GormDB()
 	if err := db.Where("id = ? OR identifier LIKE ?", id, identifier).First(&(workDetail.Work)).Error; err != nil {
 		return nil, err
@@ -136,6 +144,12 @@ func DetailWork(identifier string, sec *session.Context) (*domain.WorkDetail, er
 		return nil, bizerror.ErrStateInvalid
 	}
 	workDetail.State = stateFound
+
+	l, err := QueryLabelBriefsOfWorkFunc(workDetail.ID)
+	if err != nil {
+		return nil, err
+	}
+	workDetail.Labels = l
 
 	return &workDetail, nil
 }

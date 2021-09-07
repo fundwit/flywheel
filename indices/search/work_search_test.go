@@ -72,36 +72,36 @@ func TestSearchWorks(t *testing.T) {
 		works, err = SearchWorks(domain.WorkQuery{ProjectID: 200}, &session.Context{Perms: []string{"manager_200", "common_222"}})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(1))
-		Expect(works[0]).To(Equal(w2002))
+		Expect(works[0]).To(Equal(work.WorkDetail{Work: w2002}))
 
 		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100, Name: "demo1"}, &session.Context{Perms: []string{"manager_200", "common_100"}})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(1))
-		Expect(works[0]).To(Equal(w1001))
+		Expect(works[0]).To(Equal(work.WorkDetail{Work: w1001}))
 
 		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100, ArchiveState: "ALL",
 			StateCategories: []state.Category{state.InProcess, state.Done}},
 			&session.Context{Perms: []string{"common_100"}})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(3))
-		Expect(works[0]).To(Equal(w1001))
-		Expect(works[1]).To(Equal(w1002))
-		Expect(works[2]).To(Equal(w1003))
+		Expect(works[0]).To(Equal(work.WorkDetail{Work: w1001}))
+		Expect(works[1]).To(Equal(work.WorkDetail{Work: w1002}))
+		Expect(works[2]).To(Equal(work.WorkDetail{Work: w1003}))
 
 		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100, ArchiveState: "ON",
 			StateCategories: []state.Category{state.InProcess, state.Done}},
 			&session.Context{Perms: []string{"common_100"}})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(1))
-		Expect(works[0]).To(Equal(w1003))
+		Expect(works[0]).To(Equal(work.WorkDetail{Work: w1003}))
 
 		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100, ArchiveState: "OFF",
 			StateCategories: []state.Category{state.InProcess, state.Done}},
 			&session.Context{Perms: []string{"common_100"}})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(2))
-		Expect(works[0]).To(Equal(w1001))
-		Expect(works[1]).To(Equal(w1002))
+		Expect(works[0]).To(Equal(work.WorkDetail{Work: w1001}))
+		Expect(works[1]).To(Equal(work.WorkDetail{Work: w1002}))
 
 		// default archive state is OFF
 		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100,
@@ -109,16 +109,20 @@ func TestSearchWorks(t *testing.T) {
 			&session.Context{Perms: []string{"common_100"}})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(2))
-		Expect(works[0]).To(Equal(w1001))
-		Expect(works[1]).To(Equal(w1002))
+		Expect(works[0]).To(Equal(work.WorkDetail{Work: w1001}))
+		Expect(works[1]).To(Equal(work.WorkDetail{Work: w1002}))
 	})
 }
 
 func beforeEach(t *testing.T) {
 	es.CreateClientFromEnv()
 	es.IndexFunc = es.Index
-	indices.ExtendWorksFunc = func(works []domain.Work, sec *session.Context) error {
-		return nil
+	indices.ExtendWorksFunc = func(works []domain.Work, sec *session.Context) ([]work.WorkDetail, error) {
+		details := make([]work.WorkDetail, 0, len(works))
+		for _, w := range works {
+			details = append(details, work.WorkDetail{Work: w})
+		}
+		return details, nil
 	}
 	indices.WorkIndexName = "works_test_" + strings.ReplaceAll(uuid.New().String(), "-", "")
 }

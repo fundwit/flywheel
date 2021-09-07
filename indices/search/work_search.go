@@ -3,6 +3,7 @@ package search
 import (
 	"encoding/json"
 	"flywheel/domain"
+	"flywheel/domain/work"
 	"flywheel/es"
 	"flywheel/indices"
 	"flywheel/session"
@@ -14,10 +15,10 @@ var (
 	SearchWorksFunc = SearchWorks
 )
 
-func SearchWorks(q domain.WorkQuery, sec *session.Context) ([]domain.Work, error) {
+func SearchWorks(q domain.WorkQuery, sec *session.Context) ([]work.WorkDetail, error) {
 	visibleProjects := sec.VisibleProjects()
 	if len(visibleProjects) == 0 {
-		return []domain.Work{}, nil
+		return []work.WorkDetail{}, nil
 	}
 
 	/*
@@ -82,9 +83,10 @@ func SearchWorks(q domain.WorkQuery, sec *session.Context) ([]domain.Work, error
 		works = append(works, r)
 	}
 
-	if err := indices.ExtendWorksFunc(works, sec); err != nil {
+	worksExt, err := indices.ExtendWorksFunc(works, sec)
+	if err != nil {
 		return nil, err
 	}
 
-	return works, nil
+	return worksExt, nil
 }

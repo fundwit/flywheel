@@ -73,7 +73,7 @@ func TestCreateWorkAPI(t *testing.T) {
 					StateCategory: demoWorkflow.StateMachine.States[0].Category,
 					State:         demoWorkflow.StateMachine.States[0],
 				},
-				Type:   demoWorkflow.Workflow,
+				Type:   &demoWorkflow.Workflow,
 				Labels: []label.LabelBrief{{ID: 100, Name: "label100", ThemeColor: "red"}},
 			}
 			return &detail, nil
@@ -137,12 +137,16 @@ func TestQueryWorkAPI(t *testing.T) {
 	t.Run("should be able to serve query request", func(t *testing.T) {
 		beforeEach()
 
-		search.SearchWorksFunc = func(q domain.WorkQuery, sec *session.Context) ([]domain.Work, error) {
-			works := []domain.Work{
-				{ID: 1, Name: "work1", Identifier: "W-1", ProjectID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.Time().UnixNano() / 1e6,
-					StateName: "PENDING", State: domain.StatePending, StateCategory: state.InBacklog},
-				{ID: 2, Name: "work2", Identifier: "W-2", ProjectID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.Time().UnixNano() / 1e6,
-					StateName: "DONE", State: domain.StateDone, StateCategory: state.Done},
+		search.SearchWorksFunc = func(q domain.WorkQuery, sec *session.Context) ([]work.WorkDetail, error) {
+			works := []work.WorkDetail{
+				{
+					Work: domain.Work{ID: 1, Name: "work1", Identifier: "W-1", ProjectID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.Time().UnixNano() / 1e6,
+						StateName: "PENDING", State: domain.StatePending, StateCategory: state.InBacklog},
+				},
+				{
+					Work: domain.Work{ID: 2, Name: "work2", Identifier: "W-2", ProjectID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.Time().UnixNano() / 1e6,
+						StateName: "DONE", State: domain.StateDone, StateCategory: state.Done},
+				},
 			}
 			return works, nil
 		}
@@ -153,10 +157,10 @@ func TestQueryWorkAPI(t *testing.T) {
 		Expect(body).To(MatchJSON(`{"data":[{"id":"1","name":"work1","identifier":"W-1","projectId":"333","flowId":"1",
 			"createTime":"` + timeString + `","orderInState": ` + strconv.FormatInt(demoTime.Time().UnixNano()/1e6, 10) + ` ,
 			"stateName":"PENDING", "stateCategory": 1, "state":{"name":"PENDING", "category":1, "order": 1},
-			"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null}, 
+			"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null, "type":null, "labels":null }, 
 			{"id":"2","name":"work2","identifier":"W-2","projectId":"333","flowId":"1", "orderInState": ` + strconv.FormatInt(demoTime.Time().UnixNano()/1e6, 10) + `,
 			"createTime":"` + timeString + `","stateName":"DONE", "stateCategory": 3, "state":{"name":"DONE", "category":3, "order": 3},
-			"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null
+			"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null, "type":null, "labels":null 
 			}],"total": 2}`))
 	})
 
@@ -164,9 +168,9 @@ func TestQueryWorkAPI(t *testing.T) {
 		beforeEach()
 
 		query := &domain.WorkQuery{}
-		search.SearchWorksFunc = func(q domain.WorkQuery, sec *session.Context) ([]domain.Work, error) {
+		search.SearchWorksFunc = func(q domain.WorkQuery, sec *session.Context) ([]work.WorkDetail, error) {
 			*query = q
-			return []domain.Work{}, nil
+			return []work.WorkDetail{}, nil
 		}
 		req := httptest.NewRequest(http.MethodGet, "/v1/works?name=aaa&projectId=3&stateCategory=2&stateCategory=3", nil)
 		status, body, _ := testinfra.ExecuteRequest(req, router)
@@ -180,8 +184,8 @@ func TestQueryWorkAPI(t *testing.T) {
 	t.Run("should return 500 when service failed", func(t *testing.T) {
 		beforeEach()
 
-		search.SearchWorksFunc = func(q domain.WorkQuery, sec *session.Context) ([]domain.Work, error) {
-			return []domain.Work{}, errors.New("a mocked error")
+		search.SearchWorksFunc = func(q domain.WorkQuery, sec *session.Context) ([]work.WorkDetail, error) {
+			return []work.WorkDetail{}, errors.New("a mocked error")
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/works", nil)
@@ -216,7 +220,7 @@ func TestDetailWorkAPI(t *testing.T) {
 					StateName: "DOING", StateCategory: demoWorkflow.StateMachine.States[1].Category, State: demoWorkflow.StateMachine.States[1],
 					StateBeginTime: demoTime, ProcessBeginTime: demoTime, ProcessEndTime: demoTime,
 				},
-				Type:   demoWorkflow.Workflow,
+				Type:   &demoWorkflow.Workflow,
 				Labels: []label.LabelBrief{{ID: 100, Name: "label100", ThemeColor: "red"}},
 			}, nil
 		}

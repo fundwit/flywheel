@@ -59,8 +59,8 @@ func beforeEach(t *testing.T) {
 	es.CreateClientFromEnv()
 	es.IndexFunc = es.Index
 
-	indices.ExtendWorksFunc = func(works []domain.Work, sec *session.Context) error {
-		return nil
+	indices.ExtendWorksFunc = func(works []domain.Work, sec *session.Context) ([]work.WorkDetail, error) {
+		return nil, nil
 	}
 	indices.WorkIndexName = "works_test_" + strings.ReplaceAll(uuid.New().String(), "-", "")
 }

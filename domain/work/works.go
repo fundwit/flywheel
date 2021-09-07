@@ -35,7 +35,7 @@ var (
 
 type WorkDetail struct {
 	domain.Work
-	Type   domain.Workflow    `json:"type"`
+	Type   *domain.Workflow   `json:"type"`
 	Labels []label.LabelBrief `json:"labels"`
 }
 
@@ -73,7 +73,7 @@ func CreateWork(c *domain.WorkCreation, sec *session.Context) (*WorkDetail, erro
 				StateBeginTime: now,
 				State:          initialState,
 			},
-			Type: workflowDetail.Workflow,
+			Type: &workflowDetail.Workflow,
 		}
 		if c.PriorityLevel < 0 { // Highest: -1, lowest： 1
 			var highestPriorityWork domain.Work
@@ -124,58 +124,61 @@ func CreateWork(c *domain.WorkCreation, sec *session.Context) (*WorkDetail, erro
 
 func DetailWork(identifier string, sec *session.Context) (*WorkDetail, error) {
 	id, _ := types.ParseID(identifier)
-	workDetail := WorkDetail{}
+	w := domain.Work{}
 	db := persistence.ActiveDataSourceManager.GormDB()
-	if err := db.Where("id = ? OR identifier LIKE ?", id, identifier).First(&(workDetail.Work)).Error; err != nil {
+	if err := db.Where("id = ? OR identifier LIKE ?", id, identifier).First(&w).Error; err != nil {
 		return nil, err
 	}
 
-	if !sec.Perms.HasProjectViewPerm(workDetail.ProjectID) {
+	if !sec.Perms.HasProjectViewPerm(w.ProjectID) {
 		return nil, bizerror.ErrForbidden
 	}
 
-	workflowDetail, err := flow.DetailWorkflowFunc(workDetail.FlowID, sec)
+	ws, err := ExtendWorks([]domain.Work{w}, sec)
 	if err != nil {
 		return nil, err
 	}
-	workDetail.Type = workflowDetail.Workflow
-	stateFound, found := workflowDetail.FindState(workDetail.StateName)
-	if !found {
-		return nil, bizerror.ErrStateInvalid
-	}
-	workDetail.State = stateFound
 
-	l, err := QueryLabelBriefsOfWorkFunc(workDetail.ID)
-	if err != nil {
-		return nil, err
-	}
-	workDetail.Labels = l
-
-	return &workDetail, nil
+	return &ws[0], nil
 }
 
 // ExtendWorks append Work.state
-func ExtendWorks(works []domain.Work, sec *session.Context) error {
+func ExtendWorks(works []domain.Work, sec *session.Context) ([]WorkDetail, error) {
 	var err error
 	workflowCache := map[types.ID]*domain.WorkflowDetail{}
-	for i := len(works) - 1; i >= 0; i-- {
-		work := works[i]
-		workflow := workflowCache[work.FlowID]
-		if workflow == nil {
-			workflow, err = flow.DetailWorkflowFunc(work.FlowID, sec)
-			if err != nil {
-				return err
-			}
-			workflowCache[work.FlowID] = workflow
-		}
 
-		stateFound, found := workflow.FindState(work.StateName)
-		if !found {
-			return bizerror.ErrStateInvalid
+	details := make([]WorkDetail, 0, len(works))
+
+	for i := len(works) - 1; i >= 0; i-- {
+		w := WorkDetail{Work: works[i]}
+
+		// append: workflow and state
+		workflow := workflowCache[w.FlowID]
+		if workflow == nil {
+			workflow, err = flow.DetailWorkflowFunc(w.FlowID, sec)
+			if err != nil {
+				return nil, err
+			}
+			workflowCache[w.FlowID] = workflow
 		}
-		works[i].State = stateFound
+		w.Type = &workflow.Workflow
+
+		stateFound, found := workflow.FindState(w.StateName)
+		if !found {
+			return nil, bizerror.ErrStateInvalid
+		}
+		w.State = stateFound
+
+		// append: labels
+		wls, err := QueryLabelBriefsOfWorkFunc(w.ID)
+		if err != nil {
+			return nil, err
+		}
+		w.Labels = wls
+
+		details = append(details, w)
 	}
-	return nil
+	return details, nil
 }
 
 func ArchiveWorks(ids []types.ID, sec *session.Context) error {

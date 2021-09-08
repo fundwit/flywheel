@@ -36,12 +36,12 @@ func TestSearchWorks(t *testing.T) {
 
 		w1002 := domain.Work{ID: 1002, Name: "demo2-1002", ProjectID: 100, CreateTime: types.CurrentTimestamp(),
 			FlowID: 100, Identifier: "DEM-1002",
-			OrderInState: 1, StateName: "DONE", StateCategory: 3, State: domain.StateDone,
+			OrderInState: 1624588781665, StateName: "DONE", StateCategory: 3, State: domain.StateDone,
 			StateBeginTime: ts, ProcessBeginTime: ts, ProcessEndTime: ts, ArchiveTime: types.Timestamp{}}
 
 		w1003 := domain.Work{ID: 1003, Name: "demo3-1003", ProjectID: 100, CreateTime: types.CurrentTimestamp(),
 			FlowID: 100, Identifier: "DEM-1003",
-			OrderInState: 1, StateName: "DONE", StateCategory: 3, State: domain.StateDone,
+			OrderInState: 1624585966518, StateName: "DONE", StateCategory: 3, State: domain.StateDone,
 			StateBeginTime: ts, ProcessBeginTime: ts, ProcessEndTime: ts, ArchiveTime: ts}
 
 		w2002 := domain.Work{ID: 2002, Name: "test-2002", ProjectID: 200, CreateTime: types.CurrentTimestamp(),
@@ -85,8 +85,8 @@ func TestSearchWorks(t *testing.T) {
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(3))
 		Expect(works[0]).To(Equal(work.WorkDetail{Work: w1001}))
-		Expect(works[1]).To(Equal(work.WorkDetail{Work: w1002}))
-		Expect(works[2]).To(Equal(work.WorkDetail{Work: w1003}))
+		Expect(works[1]).To(Equal(work.WorkDetail{Work: w1003}))
+		Expect(works[2]).To(Equal(work.WorkDetail{Work: w1002}))
 
 		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100, ArchiveState: "ON",
 			StateCategories: []state.Category{state.InProcess, state.Done}},

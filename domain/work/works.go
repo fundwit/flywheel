@@ -149,7 +149,8 @@ func ExtendWorks(works []domain.Work, sec *session.Context) ([]WorkDetail, error
 
 	details := make([]WorkDetail, 0, len(works))
 
-	for i := len(works) - 1; i >= 0; i-- {
+	c := len(works)
+	for i := 0; i < c; i++ {
 		w := WorkDetail{Work: works[i]}
 
 		// append: workflow and state
@@ -168,6 +169,7 @@ func ExtendWorks(works []domain.Work, sec *session.Context) ([]WorkDetail, error
 			return nil, bizerror.ErrStateInvalid
 		}
 		w.State = stateFound
+		w.StateCategory = stateFound.Category
 
 		// append: labels
 		wls, err := QueryLabelBriefsOfWorkFunc(w.ID)

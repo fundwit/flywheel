@@ -8,9 +8,11 @@ import (
 	"flywheel/domain/flow"
 	"flywheel/domain/label"
 	"flywheel/domain/namespace"
+	"flywheel/domain/state"
 	"flywheel/domain/work"
 	"flywheel/event"
 	"flywheel/persistence"
+	"flywheel/session"
 	"flywheel/testinfra"
 	"fmt"
 	"strconv"
@@ -145,7 +147,10 @@ func TestCreateWork(t *testing.T) {
 		Expect(*handedEvents).To(Equal(*persistedEvents))
 
 		work.QueryLabelBriefsOfWorkFunc = func(workId types.ID) ([]label.LabelBrief, error) {
-			return []label.LabelBrief{{ID: 100, Name: "label100", ThemeColor: "red"}}, nil
+			return []label.LabelBrief{
+				{ID: 100, Name: "label100", ThemeColor: "red"},
+				{ID: 200, Name: "label200", ThemeColor: "green"},
+			}, nil
 		}
 		detail, err := work.DetailWork(w.ID.String(), testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
 		Expect(err).To(BeNil())
@@ -163,7 +168,10 @@ func TestCreateWork(t *testing.T) {
 		Expect(w.StateCategory).To(Equal(flowDetail.StateMachine.States[0].Category))
 		//Expect(len(work.Properties)).To(Equal(0))
 
-		Expect(detail.Labels).To(Equal([]label.LabelBrief{{ID: 100, Name: "label100", ThemeColor: "red"}}))
+		Expect(detail.Labels).To(Equal([]label.LabelBrief{
+			{ID: 100, Name: "label100", ThemeColor: "red"},
+			{ID: 200, Name: "label200", ThemeColor: "green"},
+		}))
 
 		// should create init process step
 		var initProcessStep []domain.WorkProcessStep
@@ -688,6 +696,46 @@ func TestUpdateStateRangeOrders(t *testing.T) {
 		Expect(len(list)).To(Equal(3))
 		Expect([]string{list[0].Name, list[1].Name, list[2].Name}).To(Equal([]string{"w3", "w2", "w1"}))
 		Expect(list[0].OrderInState < list[1].OrderInState && list[1].OrderInState < list[2].OrderInState).To(BeTrue())
+	})
+}
+
+func TestExtendWorks(t *testing.T) {
+	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
+
+	t.Run("should be able to extend works with original order", func(t *testing.T) {
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
+
+		flowMap := map[types.ID]domain.Workflow{}
+		flow.DetailWorkflowFunc = func(id types.ID, sec *session.Context) (*domain.WorkflowDetail, error) {
+			flowMap[id] = domain.Workflow{ID: id, Name: "flow-" + id.String()}
+			return &domain.WorkflowDetail{
+				Workflow: flowMap[id],
+				StateMachine: state.StateMachine{States: []state.State{
+					{Name: "PENDING", Category: state.InBacklog},
+					{Name: "DONE", Category: state.Done},
+				}},
+			}, nil
+		}
+		work.QueryLabelBriefsOfWorkFunc = func(workId types.ID) ([]label.LabelBrief, error) {
+			return nil, nil
+		}
+
+		ws := []domain.Work{
+			{ID: 100, FlowID: 2, StateName: "PENDING"},
+			{ID: 200, FlowID: 3, StateName: "DONE"},
+		}
+		ds, err := work.ExtendWorks(ws, nil)
+		Expect(err).To(BeNil())
+		t2 := flowMap[types.ID(2)]
+		t3 := flowMap[types.ID(3)]
+		Expect(ds).To(Equal([]work.WorkDetail{
+			{Work: domain.Work{ID: 100, FlowID: 2, StateName: "PENDING", StateCategory: state.InBacklog,
+				State: state.State{Name: "PENDING", Category: state.InBacklog}}, Type: &t2},
+			{Work: domain.Work{ID: 200, FlowID: 3, StateName: "DONE", StateCategory: state.Done,
+				State: state.State{Name: "DONE", Category: state.Done}}, Type: &t3},
+		}))
 	})
 }
 

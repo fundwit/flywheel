@@ -168,7 +168,6 @@ func Search(index string, query interface{}) (*ESSearchResult, error) {
 	if err := json.NewEncoder(&q).Encode(query); err != nil {
 		return nil, err
 	}
-	fmt.Println(q.String())
 
 	res, err := ActiveESClient.Search(
 		ActiveESClient.Search.WithContext(context.Background()),

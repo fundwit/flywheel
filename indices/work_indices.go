@@ -1,7 +1,6 @@
 package indices
 
 import (
-	"flywheel/domain"
 	"flywheel/domain/work"
 	"flywheel/es"
 	"fmt"
@@ -11,12 +10,11 @@ import (
 )
 
 var (
-	WorkIndexName   = "works"
-	ExtendWorksFunc = work.ExtendWorks
+	WorkIndexName = "works"
 )
 
 type WorkDocument struct {
-	domain.Work
+	work.WorkDetail
 }
 
 type BatchActionError map[types.ID]error
@@ -25,10 +23,11 @@ func (e BatchActionError) Error() string {
 	return fmt.Sprintf("%v", map[types.ID]error(e))
 }
 
-func IndexWorks(works []domain.Work) error {
+func IndexWorks(works []work.WorkDetail) error {
 	docs := make([]WorkDocument, 0, len(works))
 	for _, work := range works {
-		docs = append(docs, WorkDocument{Work: work})
+
+		docs = append(docs, WorkDocument{WorkDetail: work})
 	}
 
 	if err := saveWorkDocuments(docs); err != nil {

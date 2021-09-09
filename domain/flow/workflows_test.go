@@ -242,7 +242,7 @@ func TestDeleteWorkflow(t *testing.T) {
 		Expect(err).To(BeNil())
 
 		testDatabase.DS.GormDB().Save(&domain.Work{ID: 1, Name: "test", ProjectID: 100, CreateTime: types.CurrentTimestamp(), FlowID: workflow.ID,
-			OrderInState: 1, StateName: "PENDING", StateCategory: 0, State: domain.StatePending,
+			OrderInState: 1, StateName: "PENDING", StateCategory: 0,
 			StateBeginTime: types.Timestamp{}, ProcessBeginTime: types.Timestamp{}, ProcessEndTime: types.Timestamp{}})
 
 		err = flow.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(200, domain.ProjectRoleManager+"_1"))
@@ -710,7 +710,7 @@ func TestUpdateWorkflowState(t *testing.T) {
 		Expect(testDatabase.DS.GormDB().Create(domain.Work{
 			ID: 1, Name: "test work", ProjectID: 100, CreateTime: types.Timestamp(now),
 			FlowID: workflow.ID, OrderInState: 1, StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category,
-			State: domain.StatePending, StateBeginTime: now}).Error).To(BeNil())
+			StateBeginTime: now}).Error).To(BeNil())
 
 		// create work_process_steps
 		Expect(testDatabase.DS.GormDB().Create(domain.WorkProcessStep{WorkID: 1, FlowID: workflow.ID,

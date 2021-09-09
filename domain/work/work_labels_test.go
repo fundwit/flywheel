@@ -9,6 +9,7 @@ import (
 	"flywheel/domain/label"
 	"flywheel/domain/namespace"
 	"flywheel/domain/work"
+	"flywheel/domain/work/checklist"
 	"flywheel/event"
 	"flywheel/persistence"
 	"flywheel/session"
@@ -28,7 +29,7 @@ func workLabelsTestSetup(t *testing.T, testDatabase **testinfra.TestDatabase) (*
 	*testDatabase = db
 	// migration
 	Expect(db.DS.GormDB().AutoMigrate(&work.WorkLabelRelation{}, &label.Label{}, &domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
-		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error).To(BeNil())
+		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}, &checklist.CheckItem{}).Error).To(BeNil())
 
 	persistence.ActiveDataSourceManager = db.DS
 

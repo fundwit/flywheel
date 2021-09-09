@@ -8,6 +8,7 @@ import (
 	"flywheel/domain/label"
 	"flywheel/domain/namespace"
 	"flywheel/domain/state"
+	"flywheel/domain/work/checklist"
 	"flywheel/event"
 	"flywheel/idgen"
 	"flywheel/persistence"
@@ -31,12 +32,17 @@ var (
 	DeleteWorkFunc             = DeleteWork
 	UpdateStateRangeOrdersFunc = UpdateStateRangeOrders
 	QueryLabelBriefsOfWorkFunc = QueryLabelBriefsOfWork
+
+	ExtendWorksFunc = ExtendWorks
 )
 
 type WorkDetail struct {
 	domain.Work
-	Type   *domain.Workflow   `json:"type"`
-	Labels []label.LabelBrief `json:"labels"`
+
+	State     state.State           `json:"state"`
+	Type      *domain.Workflow      `json:"type"`
+	Labels    []label.LabelBrief    `json:"labels"`
+	CheckList []checklist.CheckItem `json:"checklist"`
 }
 
 func CreateWork(c *domain.WorkCreation, sec *session.Context) (*WorkDetail, error) {
@@ -71,9 +77,9 @@ func CreateWork(c *domain.WorkCreation, sec *session.Context) (*WorkDetail, erro
 				StateName:      initialState.Name,
 				StateCategory:  initialState.Category,
 				StateBeginTime: now,
-				State:          initialState,
 			},
-			Type: &workflowDetail.Workflow,
+			State: initialState,
+			Type:  &workflowDetail.Workflow,
 		}
 		if c.PriorityLevel < 0 { // Highest: -1, lowest： 1
 			var highestPriorityWork domain.Work
@@ -139,10 +145,25 @@ func DetailWork(identifier string, sec *session.Context) (*WorkDetail, error) {
 		return nil, err
 	}
 
-	return &ws[0], nil
+	wd := &ws[0]
+	if err := extendWorks1(wd, sec); err != nil {
+		return nil, err
+	}
+
+	return wd, nil
 }
 
-// ExtendWorks append Work.state
+func extendWorks1(w *WorkDetail, c *session.Context) error {
+	// append checklist
+	cl, err := checklist.ListCheckItemsFunc(w.ID, c)
+	if err != nil {
+		return err
+	}
+	w.CheckList = cl
+	return nil
+}
+
+// ExtendWorks append Work.state type and labels
 func ExtendWorks(works []domain.Work, sec *session.Context) ([]WorkDetail, error) {
 	var err error
 	workflowCache := map[types.ID]*domain.WorkflowDetail{}
@@ -153,7 +174,7 @@ func ExtendWorks(works []domain.Work, sec *session.Context) ([]WorkDetail, error
 	for i := 0; i < c; i++ {
 		w := WorkDetail{Work: works[i]}
 
-		// append: workflow and state
+		// append workflow and state
 		workflow := workflowCache[w.FlowID]
 		if workflow == nil {
 			workflow, err = flow.DetailWorkflowFunc(w.FlowID, sec)
@@ -171,13 +192,14 @@ func ExtendWorks(works []domain.Work, sec *session.Context) ([]WorkDetail, error
 		w.State = stateFound
 		w.StateCategory = stateFound.Category
 
-		// append: labels
+		// append labels
 		wls, err := QueryLabelBriefsOfWorkFunc(w.ID)
 		if err != nil {
 			return nil, err
 		}
 		w.Labels = wls
 
+		// at last, push work detail to slice
 		details = append(details, w)
 	}
 	return details, nil
@@ -274,20 +296,9 @@ func UpdateWork(id types.ID, u *domain.WorkUpdating, sec *session.Context) (*dom
 			return err
 		}
 
-		// append detail
 		if err := tx.Where(&domain.Work{ID: id}).First(&updatedWork).Error; err != nil {
 			return err
 		}
-		workflowDetail, err := flow.DetailWorkflow(updatedWork.FlowID, sec)
-		if err != nil {
-			return err
-		}
-		stateFound, found := workflowDetail.FindState(updatedWork.StateName)
-		if !found {
-			return bizerror.ErrStateInvalid
-		}
-		updatedWork.State = stateFound
-
 		return nil
 	})
 	if err1 != nil {
@@ -323,6 +334,9 @@ func DeleteWork(id types.ID, sec *session.Context) error {
 			return err
 		}
 		if err := tx.Delete(domain.WorkProcessStep{}, "work_id = ?", id).Error; err != nil {
+			return err
+		}
+		if err := checklist.CleanWorkCheckItemsDirectlyFunc(id, tx); err != nil {
 			return err
 		}
 		return nil

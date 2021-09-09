@@ -26,35 +26,35 @@ func TestSearchWorks(t *testing.T) {
 		ts := types.TimestampOfDate(2020, 1, 2, 3, 4, 5, 0, time.Local)
 		w1000 := domain.Work{ID: 1000, Name: "test", ProjectID: 100, CreateTime: types.CurrentTimestamp(),
 			FlowID: 100, Identifier: "DEM-1000",
-			OrderInState: 1, StateName: "PENDING", StateCategory: 1, State: domain.StatePending,
+			OrderInState: 1, StateName: "PENDING", StateCategory: 1,
 			StateBeginTime: ts, ProcessBeginTime: ts, ProcessEndTime: ts, ArchiveTime: types.Timestamp{}}
 
 		w1001 := domain.Work{ID: 1001, Name: "demo1-1001", ProjectID: 100, CreateTime: types.CurrentTimestamp(),
 			FlowID: 100, Identifier: "DEM-1001",
-			OrderInState: 1, StateName: "DOING", StateCategory: 2, State: domain.StateDoing,
+			OrderInState: 1, StateName: "DOING", StateCategory: 2,
 			StateBeginTime: ts, ProcessBeginTime: ts, ProcessEndTime: ts, ArchiveTime: types.Timestamp{}}
 
 		w1002 := domain.Work{ID: 1002, Name: "demo2-1002", ProjectID: 100, CreateTime: types.CurrentTimestamp(),
 			FlowID: 100, Identifier: "DEM-1002",
-			OrderInState: 1624588781665, StateName: "DONE", StateCategory: 3, State: domain.StateDone,
+			OrderInState: 1624588781665, StateName: "DONE", StateCategory: 3,
 			StateBeginTime: ts, ProcessBeginTime: ts, ProcessEndTime: ts, ArchiveTime: types.Timestamp{}}
 
 		w1003 := domain.Work{ID: 1003, Name: "demo3-1003", ProjectID: 100, CreateTime: types.CurrentTimestamp(),
 			FlowID: 100, Identifier: "DEM-1003",
-			OrderInState: 1624585966518, StateName: "DONE", StateCategory: 3, State: domain.StateDone,
+			OrderInState: 1624585966518, StateName: "DONE", StateCategory: 3,
 			StateBeginTime: ts, ProcessBeginTime: ts, ProcessEndTime: ts, ArchiveTime: ts}
 
 		w2002 := domain.Work{ID: 2002, Name: "test-2002", ProjectID: 200, CreateTime: types.CurrentTimestamp(),
 			FlowID: 100, Identifier: "DEM-2002",
-			OrderInState: 1, StateName: "PENDING", StateCategory: 1, State: domain.StatePending,
+			OrderInState: 1, StateName: "PENDING", StateCategory: 1,
 			StateBeginTime: ts, ProcessBeginTime: ts, ProcessEndTime: ts, ArchiveTime: types.Timestamp{}}
 
 		// do: create doc
-		Expect(indices.IndexWorks([]domain.Work{w1000})).To(BeNil())
-		Expect(indices.IndexWorks([]domain.Work{w1001})).To(BeNil())
-		Expect(indices.IndexWorks([]domain.Work{w1002})).To(BeNil())
-		Expect(indices.IndexWorks([]domain.Work{w1003})).To(BeNil()) // archived
-		Expect(indices.IndexWorks([]domain.Work{w2002})).To(BeNil())
+		Expect(indices.IndexWorks([]work.WorkDetail{{Work: w1000}})).To(BeNil())
+		Expect(indices.IndexWorks([]work.WorkDetail{{Work: w1001}})).To(BeNil())
+		Expect(indices.IndexWorks([]work.WorkDetail{{Work: w1002}})).To(BeNil())
+		Expect(indices.IndexWorks([]work.WorkDetail{{Work: w1003}})).To(BeNil()) // archived
+		Expect(indices.IndexWorks([]work.WorkDetail{{Work: w2002}})).To(BeNil())
 
 		// assert: visible project limit
 		works, err := SearchWorks(domain.WorkQuery{}, &session.Context{})
@@ -117,18 +117,19 @@ func TestSearchWorks(t *testing.T) {
 func beforeEach(t *testing.T) {
 	es.CreateClientFromEnv()
 	es.IndexFunc = es.Index
-	indices.ExtendWorksFunc = func(works []domain.Work, sec *session.Context) ([]work.WorkDetail, error) {
+	work.ExtendWorksFunc = func(works []domain.Work, sec *session.Context) ([]work.WorkDetail, error) {
 		details := make([]work.WorkDetail, 0, len(works))
 		for _, w := range works {
 			details = append(details, work.WorkDetail{Work: w})
 		}
 		return details, nil
 	}
+
 	indices.WorkIndexName = "works_test_" + strings.ReplaceAll(uuid.New().String(), "-", "")
 }
 
 func afterEach(t *testing.T) {
-	indices.ExtendWorksFunc = work.ExtendWorks
+	work.ExtendWorksFunc = work.ExtendWorks
 	if strings.Contains(indices.WorkIndexName, "_test_") {
 		Expect(es.DropIndex(indices.WorkIndexName)).To(BeNil())
 	}

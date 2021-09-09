@@ -10,6 +10,7 @@ import (
 	"flywheel/domain/namespace"
 	"flywheel/domain/state"
 	"flywheel/domain/work"
+	"flywheel/domain/work/checklist"
 	"flywheel/event"
 	"flywheel/persistence"
 	"flywheel/session"
@@ -31,7 +32,7 @@ func setup(t *testing.T, testDatabase **testinfra.TestDatabase) (*domain.Workflo
 	db := testinfra.StartMysqlTestDatabase("flywheel")
 	*testDatabase = db
 	Expect(db.DS.GormDB().AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
-		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error).To(BeNil())
+		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}, &checklist.CheckItem{}).Error).To(BeNil())
 
 	persistence.ActiveDataSourceManager = db.DS
 	var err error
@@ -152,6 +153,10 @@ func TestCreateWork(t *testing.T) {
 				{ID: 200, Name: "label200", ThemeColor: "green"},
 			}, nil
 		}
+		checklist.ListCheckItemsFunc = func(workId types.ID, c *session.Context) ([]checklist.CheckItem, error) {
+			return []checklist.CheckItem{{Name: "test1"}}, nil
+		}
+
 		detail, err := work.DetailWork(w.ID.String(), testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
 		Expect(err).To(BeNil())
 		Expect(detail).ToNot(BeNil())
@@ -172,6 +177,7 @@ func TestCreateWork(t *testing.T) {
 			{ID: 100, Name: "label100", ThemeColor: "red"},
 			{ID: 200, Name: "label200", ThemeColor: "green"},
 		}))
+		Expect(detail.CheckList).To(Equal([]checklist.CheckItem{{Name: "test1"}}))
 
 		// should create init process step
 		var initProcessStep []domain.WorkProcessStep
@@ -426,7 +432,6 @@ func TestUpdateWork(t *testing.T) {
 		Expect(updatedWork).ToNot(BeNil())
 		Expect(updatedWork.ID).To(Equal(detail.ID))
 		Expect(updatedWork.Name).To(Equal("test work1 new"))
-		Expect(updatedWork.State).To(Equal(flowDetail.StateMachine.States[0]))
 
 		// event handler should be invoked for updating
 		Expect(len(*persistedEvents)).To(Equal(2))
@@ -502,21 +507,6 @@ func TestUpdateWork(t *testing.T) {
 		Expect(*handedEvents).To(Equal(*persistedEvents))
 	})
 
-	t.Run("should return error if failed to find state", func(t *testing.T) {
-		defer teardown(t, testDatabase)
-		flowDetail, _, project1, _, _, _ := setup(t, &testDatabase)
-
-		now := types.CurrentTimestamp()
-		Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", ProjectID: project1.ID,
-			CreateTime: now, FlowID: flowDetail.ID, OrderInState: 2, StateName: "UNKNOWN", StateBeginTime: now}).Error).To(BeNil())
-		updatedWork, err := work.UpdateWork(2,
-			&domain.WorkUpdating{Name: "test work1 new"},
-			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
-		Expect(err).ToNot(BeNil())
-		Expect(updatedWork).To(BeNil())
-		Expect(err).To(Equal(bizerror.ErrStateInvalid))
-	})
-
 	t.Run("should failed when work is archived when update work", func(t *testing.T) {
 		defer teardown(t, testDatabase)
 		flowDetail, _, project1, _, _, _ := setup(t, &testDatabase)
@@ -559,15 +549,27 @@ func TestDeleteWork(t *testing.T) {
 		Expect(works).ToNot(BeNil())
 		Expect(len(works)).To(Equal(2))
 
+		sec := testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String())
+		workToDelete := (works)[0]
+
 		*persistedEvents = []event.EventRecord{}
 		*handedEvents = []event.EventRecord{}
+
+		var checklistCleanInvokedId types.ID
+		checklist.CleanWorkCheckItemsDirectlyFunc = func(workId types.ID, tx *gorm.DB) error {
+			checklistCleanInvokedId = workId
+			Expect(tx).ToNot(BeNil())
+			return nil
+		}
+
 		// do delete work
-		workToDelete := (works)[0]
-		sec := testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String())
 		err = work.DeleteWork(workToDelete.ID, sec)
 		Expect(err).To(BeNil())
 
-		// event handler should be invoked for deleting
+		// assert cleanWorkCheckitemDirectlyFunc has been invoked
+		Expect(checklistCleanInvokedId).To(Equal(workToDelete.ID))
+
+		// assert event handler should be invoked for deleting
 		Expect(len(*persistedEvents)).To(Equal(1))
 		Expect((*persistedEvents)[0].Event).To(Equal(event.Event{SourceId: workToDelete.ID, SourceType: "WORK", SourceDesc: workToDelete.Identifier,
 			CreatorId: sec.Identity.ID, CreatorName: sec.Identity.Name, EventCategory: event.EventCategoryDeleted}))
@@ -579,7 +581,7 @@ func TestDeleteWork(t *testing.T) {
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(1))
 
-		// work process steps should also be deleted
+		// assert work process steps should also be deleted
 		processStep := domain.WorkProcessStep{}
 		Expect(testDatabase.DS.GormDB().First(&processStep, domain.WorkProcessStep{WorkID: workToDelete.ID}).Error).To(Equal(gorm.ErrRecordNotFound))
 		processStep = domain.WorkProcessStep{}
@@ -731,10 +733,16 @@ func TestExtendWorks(t *testing.T) {
 		t2 := flowMap[types.ID(2)]
 		t3 := flowMap[types.ID(3)]
 		Expect(ds).To(Equal([]work.WorkDetail{
-			{Work: domain.Work{ID: 100, FlowID: 2, StateName: "PENDING", StateCategory: state.InBacklog,
-				State: state.State{Name: "PENDING", Category: state.InBacklog}}, Type: &t2},
-			{Work: domain.Work{ID: 200, FlowID: 3, StateName: "DONE", StateCategory: state.Done,
-				State: state.State{Name: "DONE", Category: state.Done}}, Type: &t3},
+			{
+				Work:  domain.Work{ID: 100, FlowID: 2, StateName: "PENDING", StateCategory: state.InBacklog},
+				Type:  &t2,
+				State: state.State{Name: "PENDING", Category: state.InBacklog},
+			},
+			{
+				Work:  domain.Work{ID: 200, FlowID: 3, StateName: "DONE", StateCategory: state.Done},
+				Type:  &t3,
+				State: state.State{Name: "DONE", Category: state.Done},
+			},
 		}))
 	})
 }

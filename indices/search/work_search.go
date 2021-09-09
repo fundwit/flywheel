@@ -83,7 +83,7 @@ func SearchWorks(q domain.WorkQuery, sec *session.Context) ([]work.WorkDetail, e
 		works = append(works, r)
 	}
 
-	worksExt, err := indices.ExtendWorksFunc(works, sec)
+	worksExt, err := work.ExtendWorksFunc(works, sec)
 	if err != nil {
 		return nil, err
 	}

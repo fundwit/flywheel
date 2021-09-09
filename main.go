@@ -9,6 +9,7 @@ import (
 	"flywheel/domain/label"
 	"flywheel/domain/namespace"
 	"flywheel/domain/work"
+	"flywheel/domain/work/checklist"
 	"flywheel/domain/work/workrest"
 	"flywheel/domain/workcontribution"
 	"flywheel/es"
@@ -48,7 +49,7 @@ func main() {
 	persistence.ActiveDataSourceManager = ds
 
 	// database migration (race condition)
-	err = ds.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{},
+	err = ds.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{}, &checklist.CheckItem{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{},
 		&workcontribution.WorkContributionRecord{}, &event.EventRecord{},
 		&account.User{}, &domain.Project{}, &domain.ProjectMember{},
@@ -83,6 +84,7 @@ func main() {
 	work.RegisterWorkLabelRelationsRestAPI(engine, securityMiddle)
 	label.LabelDeleteCheckFuncs = append(label.LabelDeleteCheckFuncs, work.IsLabelReferencedByWork)
 	workrest.RegisterWorksRestAPI(engine, securityMiddle)
+	checklist.RegisterCheckItemsRestAPI(engine, securityMiddle)
 
 	flow.DetailWorkflowFunc = flow.DetailWorkflow
 

@@ -71,9 +71,9 @@ func TestCreateWorkAPI(t *testing.T) {
 					CreateTime:    demoTime,
 					StateName:     demoWorkflow.StateMachine.States[0].Name,
 					StateCategory: demoWorkflow.StateMachine.States[0].Category,
-					State:         demoWorkflow.StateMachine.States[0],
 				},
 				Type:   &demoWorkflow.Workflow,
+				State:  demoWorkflow.StateMachine.States[0],
 				Labels: []label.LabelBrief{{ID: 100, Name: "label100", ThemeColor: "red"}},
 			}
 			return &detail, nil
@@ -87,7 +87,7 @@ func TestCreateWorkAPI(t *testing.T) {
 		Expect(status).To(Equal(http.StatusCreated))
 		Expect(body).To(MatchJSON(`{"id":"123","name":"test work", "identifier":"TEST-1","projectId":"333","flowId":"` + demoWorkflow.ID.String() + `", "orderInState": ` +
 			strconv.FormatInt(demoTime.Time().UnixNano()/1e6, 10) + `, "createTime":"` + timeString + `",
-			"labels": [{"id":"100", "name":"label100", "themeColor":"red"}],
+			"labels": [{"id":"100", "name":"label100", "themeColor":"red"}], "checklist":null,
 			"stateName":"PENDING", "stateCategory": 1, "type": ` + demoWorkflowJson + `,"state":{"name": "PENDING", "category": 1, "order": 1},
 			"stateBeginTime": null,"processBeginTime":null, "processEndTime":null, "archivedTime": null}`))
 	})
@@ -141,11 +141,13 @@ func TestQueryWorkAPI(t *testing.T) {
 			works := []work.WorkDetail{
 				{
 					Work: domain.Work{ID: 1, Name: "work1", Identifier: "W-1", ProjectID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.Time().UnixNano() / 1e6,
-						StateName: "PENDING", State: domain.StatePending, StateCategory: state.InBacklog},
+						StateName: "PENDING", StateCategory: state.InBacklog},
+					State: domain.StatePending,
 				},
 				{
 					Work: domain.Work{ID: 2, Name: "work2", Identifier: "W-2", ProjectID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.Time().UnixNano() / 1e6,
-						StateName: "DONE", State: domain.StateDone, StateCategory: state.Done},
+						StateName: "DONE", StateCategory: state.Done},
+					State: domain.StateDone,
 				},
 			}
 			return works, nil
@@ -156,11 +158,12 @@ func TestQueryWorkAPI(t *testing.T) {
 		Expect(status).To(Equal(http.StatusOK))
 		Expect(body).To(MatchJSON(`{"data":[{"id":"1","name":"work1","identifier":"W-1","projectId":"333","flowId":"1",
 			"createTime":"` + timeString + `","orderInState": ` + strconv.FormatInt(demoTime.Time().UnixNano()/1e6, 10) + ` ,
-			"stateName":"PENDING", "stateCategory": 1, "state":{"name":"PENDING", "category":1, "order": 1},
+			"stateName":"PENDING", "stateCategory": 1, "state":{"name":"PENDING", "category":1, "order": 1},"checklist":null,
 			"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null, "type":null, "labels":null }, 
 			{"id":"2","name":"work2","identifier":"W-2","projectId":"333","flowId":"1", "orderInState": ` + strconv.FormatInt(demoTime.Time().UnixNano()/1e6, 10) + `,
 			"createTime":"` + timeString + `","stateName":"DONE", "stateCategory": 3, "state":{"name":"DONE", "category":3, "order": 3},
-			"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null, "type":null, "labels":null 
+			"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null,
+			"type":null, "labels":null,"checklist":null
 			}],"total": 2}`))
 	})
 
@@ -217,9 +220,10 @@ func TestDetailWorkAPI(t *testing.T) {
 			return &work.WorkDetail{
 				Work: domain.Work{
 					ID: 123, Name: "test work", Identifier: "W-1", ProjectID: 100, CreateTime: demoTime, FlowID: demoWorkflow.ID, OrderInState: 999,
-					StateName: "DOING", StateCategory: demoWorkflow.StateMachine.States[1].Category, State: demoWorkflow.StateMachine.States[1],
+					StateName: "DOING", StateCategory: demoWorkflow.StateMachine.States[1].Category,
 					StateBeginTime: demoTime, ProcessBeginTime: demoTime, ProcessEndTime: demoTime,
 				},
+				State:  demoWorkflow.StateMachine.States[1],
 				Type:   &demoWorkflow.Workflow,
 				Labels: []label.LabelBrief{{ID: 100, Name: "label100", ThemeColor: "red"}},
 			}, nil
@@ -232,7 +236,7 @@ func TestDetailWorkAPI(t *testing.T) {
 			"labels": [{"id":"100", "name":"label100", "themeColor":"red"}],
 			"stateName":"DOING", "stateCategory": 2, "state":{"name":"DOING", "category":2, "order": 2},
 			"stateBeginTime": "` + timeString + `", "processBeginTime": "` + timeString + `", "processEndTime": "` + timeString + `",
-			"type": ` + demoWorkflowJson + `, "archivedTime": null}`))
+			"type": ` + demoWorkflowJson + `, "archivedTime": null,"checklist":null}`))
 	})
 }
 
@@ -276,7 +280,7 @@ func TestUpdateWorkAPI(t *testing.T) {
 		work.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *session.Context) (*domain.Work, error) {
 			return &domain.Work{ID: 100, Name: "new-name", Identifier: "W-1", ProjectID: types.ID(333), CreateTime: demoTime,
 				FlowID: 1, OrderInState: demoTime.Time().UnixNano() / 1e6,
-				StateName: "PENDING", StateCategory: domain.StatePending.Category, State: domain.StatePending}, nil
+				StateName: "PENDING", StateCategory: domain.StatePending.Category}, nil
 		}
 		req := httptest.NewRequest(http.MethodPut, "/v1/works/100", bytes.NewReader([]byte(
 			`{"name": "new-name"}`)))
@@ -284,7 +288,7 @@ func TestUpdateWorkAPI(t *testing.T) {
 		Expect(status).To(Equal(http.StatusOK))
 		Expect(body).To(MatchJSON(`{"id":"100","name":"new-name","identifier":"W-1","stateName":"PENDING", "stateCategory": 1,
 			"stateBeginTime": null, "processBeginTime": null, "processEndTime": null, "archivedTime": null,
-			"state":{"name":"PENDING", "category":1, "order": 1},"projectId":"333","flowId":"1","createTime":"` +
+			"projectId":"333","flowId":"1","createTime":"` +
 			timeString + `", "orderInState": ` + strconv.FormatInt(demoTime.Time().UnixNano()/1e6, 10) + `}`))
 	})
 }

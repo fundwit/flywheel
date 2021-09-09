@@ -4,7 +4,6 @@ import (
 	"flywheel/account"
 	"flywheel/authority"
 	"flywheel/bizerror"
-	"flywheel/domain"
 	"flywheel/domain/work"
 	"flywheel/es"
 	"flywheel/event"
@@ -87,8 +86,15 @@ func IndicesFullSync() (err error) {
 			return nil // loop exit
 		}
 
+		details, err := work.ExtendWorksFunc(works, indexRobot)
+		if err != nil {
+			logrus.Warnf("indices fully sync: error on detail works(page = %d, pageSize = %d): %v", page, SyncBatchSize, err)
+			page++
+			continue
+		}
+
 		// IndexFunc will be invoked
-		if err := IndexWorks(works); err != nil {
+		if err := IndexWorks(details); err != nil {
 			logrus.Warnf("indices fully sync: error on index works(page = %d, pageSize = %d): %v", page, SyncBatchSize, err)
 		}
 		page++
@@ -118,7 +124,7 @@ func IndexWorkEventHandle(e *event.EventRecord) *event.EventHandleResult {
 			}
 		}
 		// IndexWorks will invoke es.IndexFunc
-		if err := IndexWorks([]domain.Work{w.Work}); err != nil {
+		if err := IndexWorks([]work.WorkDetail{*w}); err != nil {
 			return &event.EventHandleResult{
 				Message:           fmt.Sprintf("index work %d, %v", e.Event.SourceId, err),
 				HandlerIdentifier: WorkIndexEventHandlerName,

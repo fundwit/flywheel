@@ -25,11 +25,11 @@ func TestIndexWorks(t *testing.T) {
 
 		ts := types.TimestampOfDate(2020, 1, 2, 3, 4, 5, 0, time.Local)
 		w := domain.Work{ID: 1, Name: "test", ProjectID: 100, CreateTime: types.CurrentTimestamp(), FlowID: 100, Identifier: "DEM-1",
-			OrderInState: 1, StateName: "PENDING", StateCategory: 1, State: domain.StatePending,
+			OrderInState: 1, StateName: "PENDING", StateCategory: 1,
 			StateBeginTime: ts, ProcessBeginTime: ts, ProcessEndTime: ts, ArchiveTime: ts}
 
 		// do: create doc
-		Expect(indices.IndexWorks([]domain.Work{w})).To(BeNil())
+		Expect(indices.IndexWorks([]work.WorkDetail{{Work: w}})).To(BeNil())
 
 		// assert: doc existed
 		source, err := es.GetDocument(indices.WorkIndexName, 1)
@@ -41,9 +41,9 @@ func TestIndexWorks(t *testing.T) {
 
 		// do: update doc
 		w1 := domain.Work{ID: 1, Name: "test-updated", ProjectID: 100, CreateTime: types.CurrentTimestamp(), FlowID: 100, Identifier: "DEM-1",
-			OrderInState: 2, StateName: "DOING", StateCategory: 2, State: domain.StateDoing,
+			OrderInState: 2, StateName: "DOING", StateCategory: 2,
 			StateBeginTime: ts, ProcessBeginTime: ts, ProcessEndTime: ts, ArchiveTime: ts}
-		Expect(indices.IndexWorks([]domain.Work{w1})).To(BeNil())
+		Expect(indices.IndexWorks([]work.WorkDetail{{Work: w1}})).To(BeNil())
 
 		// assert: doc existed
 		source, err = es.GetDocument(indices.WorkIndexName, 1)
@@ -59,14 +59,14 @@ func beforeEach(t *testing.T) {
 	es.CreateClientFromEnv()
 	es.IndexFunc = es.Index
 
-	indices.ExtendWorksFunc = func(works []domain.Work, sec *session.Context) ([]work.WorkDetail, error) {
+	work.ExtendWorksFunc = func(works []domain.Work, sec *session.Context) ([]work.WorkDetail, error) {
 		return nil, nil
 	}
 	indices.WorkIndexName = "works_test_" + strings.ReplaceAll(uuid.New().String(), "-", "")
 }
 
 func afterEach(t *testing.T) {
-	indices.ExtendWorksFunc = work.ExtendWorks
+	work.ExtendWorksFunc = work.ExtendWorks
 	if strings.Contains(indices.WorkIndexName, "_test_") {
 		Expect(es.DropIndex(indices.WorkIndexName)).To(BeNil())
 	}

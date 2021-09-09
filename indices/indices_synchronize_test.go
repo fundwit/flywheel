@@ -6,6 +6,7 @@ import (
 	"flywheel/authority"
 	"flywheel/bizerror"
 	"flywheel/domain"
+	"flywheel/domain/state"
 	"flywheel/domain/work"
 	"flywheel/es"
 	"flywheel/event"
@@ -176,14 +177,22 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return works, nil
 		}
+		work.ExtendWorksFunc = func(works []domain.Work, sec *session.Context) ([]work.WorkDetail, error) {
+			details := []work.WorkDetail{}
+			for _, w := range works {
+				details = append(details, work.WorkDetail{Work: w, State: state.State{Name: "test"}})
+			}
+			return details, nil
+		}
 
 		indices.SyncBatchSize = 2
 		Expect(indices.IndicesFullSync()).To(BeNil())
 
 		wantedDocs := []indexResult{}
 		for i := 0; i < total; i++ {
+			d := work.WorkDetail{Work: domain.Work{ID: types.ID(i + 1)}, State: state.State{Name: "test"}}
 			wantedDocs = append(wantedDocs, indexResult{indices.WorkIndexName, types.ID(i + 1),
-				indices.WorkDocument{domain.Work{ID: types.ID(i + 1)}},
+				indices.WorkDocument{d},
 			})
 		}
 		Expect(len(docs)).To(Equal(5))
@@ -212,6 +221,13 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return works, nil
 		}
+		work.ExtendWorksFunc = func(works []domain.Work, sec *session.Context) ([]work.WorkDetail, error) {
+			details := []work.WorkDetail{}
+			for _, w := range works {
+				details = append(details, work.WorkDetail{Work: w, State: state.State{Name: "test"}})
+			}
+			return details, nil
+		}
 
 		indices.SyncBatchSize = 2
 		Expect(indices.IndicesFullSync()).To(BeNil())
@@ -221,8 +237,9 @@ func TestIndicesFullSync(t *testing.T) {
 			if i/indices.SyncBatchSize == 1 {
 				continue
 			}
+			d := work.WorkDetail{Work: domain.Work{ID: types.ID(i + 1)}, State: state.State{Name: "test"}}
 			wantedDocs = append(wantedDocs, indexResult{indices.WorkIndexName, types.ID(i + 1),
-				indices.WorkDocument{domain.Work{ID: types.ID(i + 1)}},
+				indices.WorkDocument{d},
 			})
 		}
 		Expect(len(docs)).To(Equal(3))
@@ -251,6 +268,13 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return works, nil
 		}
+		work.ExtendWorksFunc = func(works []domain.Work, sec *session.Context) ([]work.WorkDetail, error) {
+			details := []work.WorkDetail{}
+			for _, w := range works {
+				details = append(details, work.WorkDetail{Work: w, State: state.State{Name: "test"}})
+			}
+			return details, nil
+		}
 
 		indices.SyncBatchSize = 2
 		Expect(indices.IndicesFullSync()).To(BeNil())
@@ -260,8 +284,9 @@ func TestIndicesFullSync(t *testing.T) {
 			if i/indices.SyncBatchSize == 1 {
 				continue
 			}
+			d := work.WorkDetail{Work: domain.Work{ID: types.ID(i + 1)}, State: state.State{Name: "test"}}
 			wantedDocs = append(wantedDocs, indexResult{indices.WorkIndexName, types.ID(i + 1),
-				indices.WorkDocument{domain.Work{ID: types.ID(i + 1)}},
+				indices.WorkDocument{d},
 			})
 		}
 		Expect(len(docs)).To(Equal(3))

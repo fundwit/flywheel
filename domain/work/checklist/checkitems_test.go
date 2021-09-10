@@ -196,6 +196,14 @@ func TestListCheckitems(t *testing.T) {
 		Expect(err).To(BeNil())
 		Expect(len(cs2)).To(Equal(1))
 		Expect(cs2[0]).To(Equal(*ci2))
+
+		// be able to list checkitems with system permissions
+		cs2, err = checklist.ListCheckItems(w2.ID, &session.Context{
+			Identity: session.Identity{ID: 10, Name: "index-robot"},
+			Perms:    authority.Permissions{account.SystemViewPermission.ID}})
+		Expect(err).To(BeNil())
+		Expect(len(cs2)).To(Equal(1))
+		Expect(cs2[0]).To(Equal(*ci2))
 	})
 }
 

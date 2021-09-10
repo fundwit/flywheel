@@ -146,14 +146,14 @@ func DetailWork(identifier string, sec *session.Context) (*WorkDetail, error) {
 	}
 
 	wd := &ws[0]
-	if err := extendWorks1(wd, sec); err != nil {
+	if err := extendWorkIndexedInfo(wd, sec); err != nil {
 		return nil, err
 	}
 
 	return wd, nil
 }
 
-func extendWorks1(w *WorkDetail, c *session.Context) error {
+func extendWorkIndexedInfo(w *WorkDetail, c *session.Context) error {
 	// append checklist
 	cl, err := checklist.ListCheckItemsFunc(w.ID, c)
 	if err != nil {

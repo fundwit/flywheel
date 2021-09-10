@@ -119,7 +119,7 @@ func IndexWorkEventHandle(e *event.EventRecord) *event.EventHandleResult {
 		w, err := work.DetailWorkFunc(e.Event.SourceId.String(), indexRobot)
 		if err != nil {
 			return &event.EventHandleResult{
-				Message:           fmt.Sprintf("detail work when index work %d, %v", e.Event.SourceId, err),
+				Message:           fmt.Sprintf("detail work %d which will be indexed, %v", e.Event.SourceId, err),
 				HandlerIdentifier: WorkIndexEventHandlerName,
 			}
 		}

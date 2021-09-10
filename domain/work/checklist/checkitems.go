@@ -195,7 +195,8 @@ func findWorkAndCheckPerms(db *gorm.DB, id types.ID, sec *session.Context) (*dom
 	if err := db.Where("id = ?", id).First(&work).Error; err != nil {
 		return nil, err
 	}
-	if sec == nil || !sec.Perms.HasRoleSuffix("_"+work.ProjectID.String()) {
+
+	if sec == nil || !sec.Perms.HasProjectViewPerm(work.ProjectID) {
 		return nil, bizerror.ErrForbidden
 	}
 	return &work, nil

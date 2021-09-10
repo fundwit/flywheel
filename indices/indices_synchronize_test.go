@@ -107,7 +107,7 @@ func TestIndexWorkEventHandle(t *testing.T) {
 		expectedResult := event.EventHandleResult{
 			Success:           false,
 			HandlerIdentifier: indices.WorkIndexEventHandlerName,
-			Message:           "detail work when index work 100, error on detail work",
+			Message:           "detail work 100 which will be indexed, error on detail work",
 		}
 		Expect(*indices.IndexWorkEventHandle(&ev)).To(Equal(expectedResult))
 	})

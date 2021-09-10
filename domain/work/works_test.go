@@ -3,6 +3,7 @@ package work_test
 import (
 	"errors"
 	"flywheel/account"
+	"flywheel/authority"
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/flow"
@@ -193,6 +194,12 @@ func TestCreateWork(t *testing.T) {
 		Expect(err).To(BeNil())
 		Expect(detail).ToNot(BeNil())
 		Expect(detail.ID).To(Equal(w.ID))
+
+		// should be visible to system permissions
+		detail, err = work.DetailWork(w.ID.String(), &session.Context{
+			Identity: session.Identity{ID: 10, Name: "index-robot"}, Perms: authority.Permissions{account.SystemViewPermission.ID}})
+		Expect(err).To(BeNil())
+		Expect(detail).ToNot(BeNil())
 	})
 
 	t.Run("should create new work with highest priority successfully", func(t *testing.T) {

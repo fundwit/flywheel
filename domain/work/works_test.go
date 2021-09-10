@@ -731,9 +731,9 @@ func TestExtendWorks(t *testing.T) {
 			return nil, nil
 		}
 
-		ws := []domain.Work{
-			{ID: 100, FlowID: 2, StateName: "PENDING"},
-			{ID: 200, FlowID: 3, StateName: "DONE"},
+		ws := []work.WorkDetail{
+			{Work: domain.Work{ID: 100, FlowID: 2, StateName: "PENDING"}},
+			{Work: domain.Work{ID: 200, FlowID: 3, StateName: "DONE"}},
 		}
 		ds, err := work.ExtendWorks(ws, nil)
 		Expect(err).To(BeNil())

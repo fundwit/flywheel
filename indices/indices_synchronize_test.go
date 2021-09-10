@@ -177,10 +177,10 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return works, nil
 		}
-		work.ExtendWorksFunc = func(works []domain.Work, sec *session.Context) ([]work.WorkDetail, error) {
-			details := []work.WorkDetail{}
-			for _, w := range works {
-				details = append(details, work.WorkDetail{Work: w, State: state.State{Name: "test"}})
+		work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Context) ([]work.WorkDetail, error) {
+			c := len(details)
+			for i := 0; i < c; i++ {
+				details[i].State = state.State{Name: "test"}
 			}
 			return details, nil
 		}
@@ -221,10 +221,10 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return works, nil
 		}
-		work.ExtendWorksFunc = func(works []domain.Work, sec *session.Context) ([]work.WorkDetail, error) {
-			details := []work.WorkDetail{}
-			for _, w := range works {
-				details = append(details, work.WorkDetail{Work: w, State: state.State{Name: "test"}})
+		work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Context) ([]work.WorkDetail, error) {
+			c := len(details)
+			for i := 0; i < c; i++ {
+				details[i].State = state.State{Name: "test"}
 			}
 			return details, nil
 		}
@@ -268,10 +268,10 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return works, nil
 		}
-		work.ExtendWorksFunc = func(works []domain.Work, sec *session.Context) ([]work.WorkDetail, error) {
-			details := []work.WorkDetail{}
-			for _, w := range works {
-				details = append(details, work.WorkDetail{Work: w, State: state.State{Name: "test"}})
+		work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Context) ([]work.WorkDetail, error) {
+			c := len(details)
+			for i := 0; i < c; i++ {
+				details[i].State = state.State{Name: "test"}
 			}
 			return details, nil
 		}

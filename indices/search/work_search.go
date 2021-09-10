@@ -74,19 +74,21 @@ func SearchWorks(q domain.WorkQuery, sec *session.Context) ([]work.WorkDetail, e
 	if err != nil {
 		return nil, err
 	}
-	works := make([]domain.Work, 0, len(r.Hits.Hits))
+	// indies properties:  work, checklist
+	workDetails := make([]work.WorkDetail, 0, len(r.Hits.Hits))
 	for _, hit := range r.Hits.Hits {
-		r := domain.Work{}
+		r := work.WorkDetail{}
 		if err := json.NewDecoder(strings.NewReader(string(hit.Source))).Decode(&r); err != nil {
 			return nil, fmt.Errorf(string(hit.Source))
 		}
-		works = append(works, r)
+		workDetails = append(workDetails, r)
 	}
 
-	worksExt, err := work.ExtendWorksFunc(works, sec)
+	// non indexed properties:  type, state, stateCategory, labels
+	worksExts, err := work.ExtendWorksFunc(workDetails, sec)
 	if err != nil {
 		return nil, err
 	}
 
-	return worksExt, nil
+	return worksExts, nil
 }

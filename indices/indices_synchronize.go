@@ -86,7 +86,12 @@ func IndicesFullSync() (err error) {
 			return nil // loop exit
 		}
 
-		details, err := work.ExtendWorksFunc(works, indexRobot)
+		workDetails := make([]work.WorkDetail, 0, len(works))
+		for _, w := range works {
+			workDetails = append(workDetails, work.WorkDetail{Work: w})
+		}
+
+		details, err := work.ExtendWorksFunc(workDetails, indexRobot)
 		if err != nil {
 			logrus.Warnf("indices fully sync: error on detail works(page = %d, pageSize = %d): %v", page, SyncBatchSize, err)
 			page++

@@ -140,7 +140,7 @@ func DetailWork(identifier string, sec *session.Context) (*WorkDetail, error) {
 		return nil, bizerror.ErrForbidden
 	}
 
-	ws, err := ExtendWorks([]domain.Work{w}, sec)
+	ws, err := ExtendWorks([]WorkDetail{{Work: w}}, sec)
 	if err != nil {
 		return nil, err
 	}
@@ -164,17 +164,14 @@ func extendWorkIndexedInfo(w *WorkDetail, c *session.Context) error {
 }
 
 // ExtendWorks append Work.state type and labels
-func ExtendWorks(works []domain.Work, sec *session.Context) ([]WorkDetail, error) {
+func ExtendWorks(workDetails []WorkDetail, sec *session.Context) ([]WorkDetail, error) {
 	var err error
 	workflowCache := map[types.ID]*domain.WorkflowDetail{}
-
-	details := make([]WorkDetail, 0, len(works))
-
-	c := len(works)
+	c := len(workDetails)
 	for i := 0; i < c; i++ {
-		w := WorkDetail{Work: works[i]}
+		w := workDetails[i] // w is a copy, not a reference
 
-		// append workflow and state
+		// using w.FlowID to append workflow, state, stateCategory
 		workflow := workflowCache[w.FlowID]
 		if workflow == nil {
 			workflow, err = flow.DetailWorkflowFunc(w.FlowID, sec)
@@ -192,17 +189,17 @@ func ExtendWorks(works []domain.Work, sec *session.Context) ([]WorkDetail, error
 		w.State = stateFound
 		w.StateCategory = stateFound.Category
 
-		// append labels
+		// using w.ID to append labels
 		wls, err := QueryLabelBriefsOfWorkFunc(w.ID)
 		if err != nil {
 			return nil, err
 		}
 		w.Labels = wls
 
-		// at last, push work detail to slice
-		details = append(details, w)
+		// at last, put the copy w into slice
+		workDetails[i] = w
 	}
-	return details, nil
+	return workDetails, nil
 }
 
 func ArchiveWorks(ids []types.ID, sec *session.Context) error {

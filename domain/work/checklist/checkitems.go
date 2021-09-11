@@ -27,18 +27,12 @@ var (
 
 type CheckItemState string
 
-const (
-	CheckItemStatePending = CheckItemState("PENDING")
-	CheckItemStateDoning  = CheckItemState("DOING")
-	CheckItemStateDone    = CheckItemState("DONE")
-)
-
 type CheckItem struct {
 	ID     types.ID `json:"id" gorm:"primary_key"`
 	Name   string   `json:"name"`
 	WorkId types.ID `json:"workId"`
 
-	State CheckItemState `json:"state"`
+	Done bool `json:"done"`
 
 	CreateTime types.Timestamp `json:"createTime" sql:"type:DATETIME(6) NOT NULL"`
 }
@@ -62,7 +56,7 @@ func CreateCheckItem(req CheckItemCreation, c *session.Context) (*CheckItem, err
 			Name:       req.Name,
 			WorkId:     w.ID,
 			CreateTime: types.CurrentTimestamp(),
-			State:      CheckItemStatePending,
+			Done:       false,
 		}
 		if err := tx.Save(&i).Error; err != nil {
 			return err

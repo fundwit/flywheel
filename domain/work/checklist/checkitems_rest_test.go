@@ -69,14 +69,14 @@ func TestCreateCheckItemAPI(t *testing.T) {
 
 		checklist.CreateCheckItemFunc = func(req checklist.CheckItemCreation, c *session.Context) (*checklist.CheckItem, error) {
 			return &checklist.CheckItem{ID: 1000, WorkId: req.WorkId, Name: req.Name,
-				State: checklist.CheckItemStatePending, CreateTime: demoTime}, nil
+				Done: true, CreateTime: demoTime}, nil
 		}
 
 		reqBody := `{"workId":"100", "name":"test"}`
 		req := httptest.NewRequest(http.MethodPost, checklist.PathCheckItems, strings.NewReader(reqBody))
 		status, body, _ := testinfra.ExecuteRequest(req, router)
 		Expect(status).To(Equal(http.StatusOK))
-		Expect(body).To(MatchJSON(`{"id": "1000", "workId": "100", "name": "test", "state": "PENDING", "createTime": "` + timeString + `"}`))
+		Expect(body).To(MatchJSON(`{"id": "1000", "workId": "100", "name": "test", "done": true, "createTime": "` + timeString + `"}`))
 	})
 }
 

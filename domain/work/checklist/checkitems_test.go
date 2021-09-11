@@ -115,7 +115,7 @@ func TestCreateCheckitem(t *testing.T) {
 		Expect(time.Since(ci.CreateTime.Time()) < time.Second).To(BeTrue())
 		Expect(ci.WorkId).To(Equal(w1.ID))
 		Expect(ci.Name).To(Equal("item1"))
-		Expect(ci.State).To(Equal(checklist.CheckItemStatePending))
+		Expect(ci.Done).To(Equal(false))
 
 		r := checklist.CheckItem{}
 		Expect(persistence.ActiveDataSourceManager.GormDB().

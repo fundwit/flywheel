@@ -80,6 +80,87 @@ func TestCreateCheckItemAPI(t *testing.T) {
 	})
 }
 
+func TestUpdateCheckItemAPI(t *testing.T) {
+	RegisterTestingT(t)
+	router := gin.Default()
+	router.Use(bizerror.ErrorHandling())
+	checklist.RegisterCheckItemsRestAPI(router)
+
+	t.Run("should be able to handle update check item", func(t *testing.T) {
+		var r checklist.CheckItemUpdate
+		var cid types.ID
+		checklist.UpdateCheckItemFunc = func(id types.ID, req checklist.CheckItemUpdate, c *session.Context) error {
+			r = req
+			cid = id
+			return nil
+		}
+
+		// case1
+		reqBody := `{"name":"aaa", "done": true}`
+		req := httptest.NewRequest(http.MethodPatch, checklist.PathCheckItems+"/123", strings.NewReader(reqBody))
+		status, body, _ := testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusOK))
+		Expect(len(body)).To(Equal(0))
+
+		Expect(cid).To(Equal(types.ID(123)))
+		Expect(*r.Done).To(BeTrue())
+		Expect(r).To(Equal(checklist.CheckItemUpdate{Name: "aaa", Done: r.Done}))
+
+		// case2
+		reqBody = `{"name":"aaa", "done": false}`
+		req = httptest.NewRequest(http.MethodPatch, checklist.PathCheckItems+"/123", strings.NewReader(reqBody))
+		status, _, _ = testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusOK))
+		Expect(*r.Done).To(BeFalse())
+
+		reqBody = `{}`
+		req = httptest.NewRequest(http.MethodPatch, checklist.PathCheckItems+"/123", strings.NewReader(reqBody))
+		status, _, _ = testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusOK))
+		Expect(r.Done).To(BeNil())
+		Expect(r.Name).To(BeZero())
+	})
+
+	t.Run("should be able to handle exception of invalid request", func(t *testing.T) {
+		// case1
+		req := httptest.NewRequest(http.MethodPatch, checklist.PathCheckItems+"/abc", nil)
+		status, body, _ := testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusBadRequest))
+
+		Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid id 'abc'","data":null}`))
+
+		// case2
+		req = httptest.NewRequest(http.MethodPatch, checklist.PathCheckItems+"/123", nil)
+		status, body, _ = testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusBadRequest))
+		Expect(body).To(MatchJSON(`{"code":"common.bad_param", "message":"EOF", "data":null}`))
+
+		// case3
+		req = httptest.NewRequest(http.MethodPatch, checklist.PathCheckItems+"/123", strings.NewReader(" \t "))
+		status, body, _ = testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusBadRequest))
+		Expect(body).To(MatchJSON(`{"code": "common.bad_param", "message": "EOF", "data": null}`))
+
+		// case4
+		req = httptest.NewRequest(http.MethodPatch, checklist.PathCheckItems+"/123", strings.NewReader(" xx "))
+		status, body, _ = testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusBadRequest))
+		Expect(body).To(MatchJSON(`{"code": "common.bad_param", "message": "invalid character 'x' looking for beginning of value", "data": null}`))
+	})
+
+	t.Run("should be able to handle exception of unexpected", func(t *testing.T) {
+		checklist.UpdateCheckItemFunc = func(id types.ID, req checklist.CheckItemUpdate, c *session.Context) error {
+			return errors.New("error on update check item")
+		}
+
+		reqBody := `{"name":"aaa", "done": false}`
+		req := httptest.NewRequest(http.MethodPatch, checklist.PathCheckItems+"/123", strings.NewReader(reqBody))
+		status, body, _ := testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusInternalServerError))
+		Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"error on update check item","data":null}`))
+	})
+}
+
 func TestDeleteCheckItemAPI(t *testing.T) {
 	RegisterTestingT(t)
 	router := gin.Default()

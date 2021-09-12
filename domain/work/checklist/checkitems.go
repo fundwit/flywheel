@@ -19,6 +19,7 @@ var (
 
 	CreateCheckItemFunc     = CreateCheckItem
 	ListCheckItemsFunc      = ListCheckItems
+	UpdateCheckItemFunc     = UpdateCheckItem
 	DeleteCheckItemFunc     = DeleteCheckItem
 	CleanWorkCheckItemsFunc = CleanWorkCheckItems
 
@@ -40,6 +41,11 @@ type CheckItem struct {
 type CheckItemCreation struct {
 	Name   string   `json:"name" binding:"required"`
 	WorkId types.ID `json:"workId" binding:"required"`
+}
+
+type CheckItemUpdate struct {
+	Name string `json:"name"`
+	Done *bool  `json:"done"`
 }
 
 func CreateCheckItem(req CheckItemCreation, c *session.Context) (*CheckItem, error) {
@@ -102,6 +108,55 @@ func ListCheckItems(workId types.ID, c *session.Context) ([]CheckItem, error) {
 		return nil, txErr
 	}
 	return r, nil
+}
+
+func UpdateCheckItem(id types.ID, req CheckItemUpdate, c *session.Context) error {
+	var ev *event.EventRecord
+	txErr := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+		// find checkitem
+		ci := CheckItem{}
+		if err := tx.Where("id = ?", id).First(&ci).Error; err != nil {
+			return err
+		}
+		// check permission against to work
+		w, err := findWorkAndCheckPerms(tx, ci.WorkId, c)
+		if err != nil {
+			return err
+		}
+
+		changes := map[string]interface{}{}
+		if req.Name != "" && req.Name != ci.Name {
+			changes["name"] = req.Name
+		}
+		if req.Done != nil && *req.Done != ci.Done {
+			changes["done"] = *req.Done
+		}
+		if len(changes) == 0 {
+			return nil
+		}
+		if err := tx.Model(&CheckItem{}).Where("id = ?", ci.ID).Updates(changes).Error; err != nil {
+			return err
+		}
+
+		ev, err = event.CreateEvent("WORK", w.ID, w.Identifier, event.EventCategoryExtensionUpdated,
+			[]event.UpdatedProperty{{
+				PropertyName: "Checklist", PropertyDesc: "Checklist",
+			}}, nil, &c.Identity, types.CurrentTimestamp(), tx)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if txErr != nil {
+		return txErr
+	}
+
+	if event.InvokeHandlersFunc != nil && ev != nil {
+		event.InvokeHandlersFunc(ev)
+	}
+
+	return nil
 }
 
 func DeleteCheckItem(id types.ID, c *session.Context) error {

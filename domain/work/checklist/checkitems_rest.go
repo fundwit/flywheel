@@ -19,12 +19,12 @@ func RegisterCheckItemsRestAPI(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 	g := r.Group(PathCheckItems, middleWares...)
 	g.POST("", handleCreateCheckItem)
 	g.DELETE(":id", handleDeleteCheckItem)
+	g.PATCH(":id", handleUpdateCheckItem)
 }
 
 func handleCreateCheckItem(c *gin.Context) {
 	req := CheckItemCreation{}
-	err := c.ShouldBindBodyWith(&req, binding.JSON)
-	if err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 	record, err := CreateCheckItemFunc(req, session.FindSecurityContext(c))
@@ -34,14 +34,29 @@ func handleCreateCheckItem(c *gin.Context) {
 	c.JSON(http.StatusOK, record)
 }
 
+func handleUpdateCheckItem(c *gin.Context) {
+	parsedId, err := types.ParseID(c.Param("id"))
+	if err != nil {
+		panic(&bizerror.ErrBadParam{Cause: errors.New("invalid id '" + c.Param("id") + "'")})
+	}
+	req := CheckItemUpdate{}
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		panic(&bizerror.ErrBadParam{Cause: err})
+	}
+
+	if err := UpdateCheckItemFunc(parsedId, req, session.FindSecurityContext(c)); err != nil {
+		panic(err)
+	}
+	c.Status(http.StatusOK)
+}
+
 func handleDeleteCheckItem(c *gin.Context) {
 	parsedId, err := types.ParseID(c.Param("id"))
 	if err != nil {
 		panic(&bizerror.ErrBadParam{Cause: errors.New("invalid id '" + c.Param("id") + "'")})
 	}
 
-	err = DeleteCheckItemFunc(parsedId, session.FindSecurityContext(c))
-	if err != nil {
+	if err := DeleteCheckItemFunc(parsedId, session.FindSecurityContext(c)); err != nil {
 		panic(err)
 	}
 	c.Status(http.StatusNoContent)

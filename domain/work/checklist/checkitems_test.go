@@ -207,6 +207,111 @@ func TestListCheckitems(t *testing.T) {
 	})
 }
 
+func TestUpdateCheckitem(t *testing.T) {
+	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
+
+	t.Run("should block users who are not be able to view project of work", func(t *testing.T) {
+		defer checkitemsTestTeardown(t, testDatabase)
+		workflow1, p1, p2, _, _ := checkitemsTestSetup(t, &testDatabase)
+
+		c1 := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
+		c2 := session.Context{Identity: session.Identity{ID: 20, Name: "user 20"},
+			Perms: authority.Permissions{"manager_" + p2.ID.String()}}
+
+		// prepare work
+		w1 := buildWork("test work 1", workflow1.ID, p1.ID, &c1)
+		// prepare checkitem
+		ci1, err := checklist.CreateCheckItem(checklist.CheckItemCreation{WorkId: w1.ID, Name: "item1"}, &c1)
+		Expect(err).To(BeNil())
+
+		// delete check item with forbidden user
+		err = checklist.UpdateCheckItem(ci1.ID, checklist.CheckItemUpdate{Name: "time1-update"}, &c2)
+		// case1: assert access is forbidden
+		Expect(err).To(Equal(bizerror.ErrForbidden))
+
+		// case2: should be failed if work is not found
+		persistence.ActiveDataSourceManager.GormDB().Delete(&domain.Work{ID: w1.ID})
+		Expect(checklist.UpdateCheckItem(ci1.ID, checklist.CheckItemUpdate{Name: "item1-update"}, &c1)).
+			To(Equal(gorm.ErrRecordNotFound))
+
+		// case2: should be failed if check item is not found
+		Expect(checklist.UpdateCheckItem(404, checklist.CheckItemUpdate{Name: "item1-update"}, &c1)).
+			To(Equal(gorm.ErrRecordNotFound))
+	})
+
+	t.Run("should be able to update check items for work", func(t *testing.T) {
+		defer checkitemsTestTeardown(t, testDatabase)
+		workflow1, p1, _, persistedEvents, handedEvents := checkitemsTestSetup(t, &testDatabase)
+
+		c1 := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
+
+		// prepare work
+		w1 := buildWork("test work 1", workflow1.ID, p1.ID, &c1)
+
+		// prepare check items
+		ci1, err := checklist.CreateCheckItem(checklist.CheckItemCreation{WorkId: w1.ID, Name: "item1"}, &c1)
+		Expect(err).To(BeNil())
+		ci3, err := checklist.CreateCheckItem(checklist.CheckItemCreation{WorkId: w1.ID, Name: "item2"}, &c1)
+		Expect(err).To(BeNil())
+
+		// reset events history to exclude create event
+		*persistedEvents = []event.EventRecord{}
+		*handedEvents = []event.EventRecord{}
+
+		// case1: update with nothing changed request
+		Expect(checklist.UpdateCheckItem(ci1.ID, checklist.CheckItemUpdate{}, &c1)).To(BeNil())
+		Expect(len(*persistedEvents)).To(BeZero())
+		Expect(len(*handedEvents)).To(BeZero())
+
+		// case2: update name and done state
+		// update with name and done state
+		doneState := true
+		Expect(checklist.UpdateCheckItem(ci1.ID, checklist.CheckItemUpdate{Name: "updated-name", Done: &doneState}, &c1)).To(BeNil())
+
+		// assert item changed
+		cs1, err := checklist.ListCheckItems(w1.ID, &c1)
+		Expect(err).To(BeNil())
+		Expect(len(cs1)).To(Equal(2))
+		ci1Updated := ci1
+		ci1Updated.Name = "updated-name"
+		ci1Updated.Done = true
+		Expect(cs1[0]).To(Equal(*ci1Updated))
+		Expect(cs1[1]).To(Equal(*ci3))
+
+		// assert event handed
+		Expect(len(*persistedEvents)).To(Equal(1))
+		Expect((*persistedEvents)[0].Event).To(Equal(event.Event{SourceId: w1.ID, SourceType: "WORK", SourceDesc: w1.Identifier,
+			CreatorId: c1.Identity.ID, CreatorName: c1.Identity.Name, EventCategory: event.EventCategoryExtensionUpdated,
+			UpdatedProperties: event.UpdatedProperties{
+				{PropertyName: "Checklist", PropertyDesc: "Checklist"},
+			},
+		}))
+		Expect(time.Since((*persistedEvents)[0].Timestamp.Time()) < time.Second).To(BeTrue())
+		Expect(*handedEvents).To(Equal(*persistedEvents))
+
+		// case3: update done state to false
+		doneState = false
+		Expect(checklist.UpdateCheckItem(ci1.ID, checklist.CheckItemUpdate{Done: &doneState}, &c1)).To(BeNil())
+
+		// assert item changed
+		cs1, err = checklist.ListCheckItems(w1.ID, &c1)
+		Expect(err).To(BeNil())
+		Expect(len(cs1)).To(Equal(2))
+		ci1Updated = ci1
+		ci1Updated.Name = "updated-name"
+		ci1Updated.Done = false
+		Expect(cs1[0]).To(Equal(*ci1Updated))
+		Expect(cs1[1]).To(Equal(*ci3))
+
+		// assert new event generated
+		Expect(len(*persistedEvents)).To(Equal(2))
+		Expect(*handedEvents).To(Equal(*persistedEvents))
+	})
+}
+
 func TestDeleteCheckitems(t *testing.T) {
 	RegisterTestingT(t)
 	var testDatabase *testinfra.TestDatabase

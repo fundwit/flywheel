@@ -60,7 +60,7 @@ func HandleBeginContribution(c *gin.Context) {
 }
 
 func HandleFinishContribution(c *gin.Context) {
-	body := WorkContribuitonFinishBody{}
+	body := WorkContributionFinishBody{}
 	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil {
 		panic(err)
 	}

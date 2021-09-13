@@ -9,6 +9,7 @@ import (
 	"flywheel/testinfra"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"time"
 
 	"github.com/fundwit/go-commons/types"
@@ -46,7 +47,7 @@ var _ = Describe("WorkContributionAPI", func() {
 			status, respbody, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(respbody).To(MatchJSON(`[{"id": "100", "workKey": "TEST-1", "contributorId": "1000", "contributorName":"user 1000", "workProjectId": "100",
-				"beginTime": "2021-01-01T12:00:00Z", "endTime":"2021-01-01T12:01:00Z", "effective": true}]`))
+				"checkitemId":"0", "beginTime": "2021-01-01T12:00:00Z", "endTime":"2021-01-01T12:01:00Z", "effective": true}]`))
 
 			Expect(*reqBody).To(Equal(workcontribution.WorkContributionsQuery{WorkKeys: []string{"TEST-1", "TEST-2", "TEST-3", "TEST-4"}}))
 		})
@@ -60,26 +61,25 @@ var _ = Describe("WorkContributionAPI", func() {
 				return 12345, nil
 			}
 
-			creation := workcontribution.WorkContribution{WorkKey: "TEST-1", ContributorId: 200}
-			reqBodyJson, _ := json.Marshal(creation)
-			req := httptest.NewRequest(http.MethodPost, workcontribution.PathWorkContributionsRoot, bytes.NewReader(reqBodyJson))
+			reqBodyJson := `{"workKey": "TEST-1", "contributorId": 200, "checkitemId": 300}`
+			req := httptest.NewRequest(http.MethodPost, workcontribution.PathWorkContributionsRoot, strings.NewReader(reqBodyJson))
 			status, respbody, _ := testinfra.ExecuteRequest(req, router)
 			Expect(status).To(Equal(http.StatusCreated))
 			Expect(respbody).To(MatchJSON(`{"id": "12345"}`))
 
-			Expect(*reqBody).To(Equal(creation))
+			Expect(*reqBody).To(Equal(workcontribution.WorkContribution{WorkKey: "TEST-1", ContributorId: 200, CheckitemId: 300}))
 		})
 	})
 
 	Describe("HandleFinishContribution", func() {
 		It("should be able to handle work contribution finish rest api request and response", func() {
-			var reqBody *workcontribution.WorkContribuitonFinishBody
-			workcontribution.FinishWorkContributionFunc = func(d *workcontribution.WorkContribuitonFinishBody, sec *session.Context) error {
+			var reqBody *workcontribution.WorkContributionFinishBody
+			workcontribution.FinishWorkContributionFunc = func(d *workcontribution.WorkContributionFinishBody, sec *session.Context) error {
 				reqBody = d
 				return nil
 			}
 
-			originBody := workcontribution.WorkContribuitonFinishBody{
+			originBody := workcontribution.WorkContributionFinishBody{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: "TEST-1", ContributorId: 200}, Effective: true}
 			reqBodyJson, _ := json.Marshal(originBody)
 			req := httptest.NewRequest(http.MethodPut, workcontribution.PathWorkContributionsRoot, bytes.NewReader(reqBodyJson))

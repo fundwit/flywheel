@@ -23,11 +23,12 @@ func (r *WorkContributionRecord) TableName() string {
 }
 
 type WorkContribution struct {
-	WorkKey       string   `json:"workKey" binding:"required" gorm:"unique_index:work_contributor_unique"`
-	ContributorId types.ID `json:"contributorId" binding:"required" gorm:"unique_index:work_contributor_unique"`
+	WorkKey       string   `json:"workKey" binding:"required" gorm:"unique_index:work_contributor_checkitem_unique"`
+	ContributorId types.ID `json:"contributorId" binding:"required" gorm:"unique_index:work_contributor_checkitem_unique"`
+	CheckitemId   types.ID `json:"checkitemId" gorm:"unique_index:work_contributor_checkitem_unique"`
 }
 
-type WorkContribuitonFinishBody struct {
+type WorkContributionFinishBody struct {
 	WorkContribution
 	Effective bool `json:"effective"`
 }

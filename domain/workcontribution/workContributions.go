@@ -119,7 +119,7 @@ func BeginWorkContribution(d *WorkContribution, sec *session.Context) (types.ID,
 	return record.ID, nil
 }
 
-func FinishWorkContribution(d *WorkContribuitonFinishBody, sec *session.Context) error {
+func FinishWorkContribution(d *WorkContributionFinishBody, sec *session.Context) error {
 	work, user, err := CheckContributorWorkPermissionFunc(d.WorkKey, d.ContributorId, sec)
 	if err != nil {
 		return err

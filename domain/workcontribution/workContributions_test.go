@@ -288,13 +288,13 @@ var _ = Describe("WorkContributions", func() {
 			workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
 				return nil, nil, testErr
 			}
-			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{Effective: true,
+			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{Effective: true,
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
 				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(Equal(testErr))
 		})
-		It("should faild to finish work contribution when work contribution is not exist", func() {
-			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{Effective: true,
+		It("should failed to finish work contribution when work contribution is not exist", func() {
+			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{Effective: true,
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
 				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(Equal(gorm.ErrRecordNotFound))
@@ -308,7 +308,7 @@ var _ = Describe("WorkContributions", func() {
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
 			begin := time.Now()
-			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{Effective: true,
+			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{Effective: true,
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
 				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())
@@ -332,7 +332,7 @@ var _ = Describe("WorkContributions", func() {
 				EndTime: types.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: true,
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
-			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{Effective: true,
+			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{Effective: true,
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
 				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())
@@ -356,7 +356,7 @@ var _ = Describe("WorkContributions", func() {
 				EndTime: types.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: false,
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
-			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{Effective: true,
+			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{Effective: true,
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
 				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())
@@ -384,13 +384,13 @@ var _ = Describe("WorkContributions", func() {
 			workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
 				return nil, nil, testErr
 			}
-			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{
+			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
 				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(Equal(testErr))
 		})
 		It("should faild to discard work contribution when work contribution is not exist", func() {
-			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{
+			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
 				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(Equal(gorm.ErrRecordNotFound))
@@ -404,7 +404,7 @@ var _ = Describe("WorkContributions", func() {
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
 			begin := time.Now()
-			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{
+			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
 				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())
@@ -428,7 +428,7 @@ var _ = Describe("WorkContributions", func() {
 				EndTime: types.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: true,
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
-			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{
+			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
 				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())
@@ -452,7 +452,7 @@ var _ = Describe("WorkContributions", func() {
 				EndTime: types.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: false,
 			}
 			Expect(db.Save(&givenReocrd).Error).To(BeNil())
-			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContribuitonFinishBody{
+			err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
 				&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
 			Expect(err).To(BeNil())

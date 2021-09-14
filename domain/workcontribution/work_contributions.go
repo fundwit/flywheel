@@ -90,7 +90,12 @@ func BeginWorkContribution(d *WorkContribution, sec *session.Context) (types.ID,
 
 	var record WorkContributionRecord
 	err = persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
-		err := tx.Where(&WorkContributionRecord{WorkContribution: *d}).First(&record).Error
+		condition := map[string]interface{}{
+			"work_key":       d.WorkKey,
+			"contributor_id": d.ContributorId,
+			"checkitem_id":   d.CheckitemId,
+		}
+		err := tx.Where(condition).First(&record).Error
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			record = WorkContributionRecord{
 				ID:               idgen.NextID(idWorker),
@@ -127,7 +132,12 @@ func FinishWorkContribution(d *WorkContributionFinishBody, sec *session.Context)
 
 	return persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
 		var record WorkContributionRecord
-		if err := tx.Where(&WorkContributionRecord{WorkContribution: d.WorkContribution}).First(&record).Error; err != nil {
+		condition := map[string]interface{}{
+			"work_key":       d.WorkContribution.WorkKey,
+			"contributor_id": d.WorkContribution.ContributorId,
+			"checkitem_id":   d.WorkContribution.CheckitemId,
+		}
+		if err := tx.Where(condition).First(&record).Error; err != nil {
 			return err
 		}
 

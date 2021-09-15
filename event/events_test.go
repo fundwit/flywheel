@@ -56,8 +56,10 @@ func TestCreateEvent(t *testing.T) {
 			tx,
 		)
 		Expect(err).To(BeNil())
+		Expect(ret.ID).ToNot(BeZero())
 
 		expectEvent := event.EventRecord{
+			ID: ret.ID,
 			Event: event.Event{
 				SourceType: "WORK",
 				SourceId:   1234,
@@ -74,7 +76,6 @@ func TestCreateEvent(t *testing.T) {
 				CreatorName: "user333",
 			},
 			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
-			Synced:    false,
 		}
 
 		Expect(*ret).To(Equal(expectEvent))

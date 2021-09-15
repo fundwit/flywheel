@@ -9,11 +9,11 @@ import (
 )
 
 const (
-	EventCategoryCreated          = "CREATED"
-	EventCategoryDeleted          = "DELETED"
-	EventCategoryPropertyUpdated  = "PROPERTY_UPDATED"
-	EventCategoryRelationUpdated  = "RELATION_UPDATED"
-	EventCategoryExtensionUpdated = "EXTENSION_UPDATED"
+	EventCategoryCreated          = EventCategory("CREATED")
+	EventCategoryDeleted          = EventCategory("DELETED")
+	EventCategoryPropertyUpdated  = EventCategory("PROPERTY_UPDATED")
+	EventCategoryRelationUpdated  = EventCategory("RELATION_UPDATED")
+	EventCategoryExtensionUpdated = EventCategory("EXTENSION_UPDATED")
 )
 
 type EventCategory string
@@ -33,9 +33,8 @@ type Event struct {
 
 type EventRecord struct {
 	Event
-
+	ID        types.ID        `json:"id" gorm:"primary_key"`
 	Timestamp types.Timestamp `json:"timestamp" sql:"type:DATETIME(6)"`
-	Synced    bool            `json:"synced"`
 }
 
 func (r *EventRecord) TableName() string {

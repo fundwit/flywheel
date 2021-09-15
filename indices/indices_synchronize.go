@@ -7,6 +7,7 @@ import (
 	"flywheel/domain/work"
 	"flywheel/es"
 	"flywheel/event"
+	"flywheel/indices/indexlog"
 	"flywheel/session"
 	"fmt"
 	"sync"
@@ -119,7 +120,6 @@ func IndexWorkEventHandle(e *event.EventRecord) *event.EventHandleResult {
 				HandlerIdentifier: WorkIndexEventHandlerName,
 			}
 		}
-		return &event.EventHandleResult{Success: true, HandlerIdentifier: WorkIndexEventHandlerName}
 	} else {
 		w, err := work.DetailWorkFunc(e.Event.SourceId.String(), indexRobot)
 		if err != nil {
@@ -134,6 +134,13 @@ func IndexWorkEventHandle(e *event.EventRecord) *event.EventHandleResult {
 				Message:           fmt.Sprintf("index work %d, %v", e.Event.SourceId, err),
 				HandlerIdentifier: WorkIndexEventHandlerName,
 			}
+		}
+	}
+
+	if err := indexlog.FinishIndexLogFunc(e.ID); err != nil {
+		return &event.EventHandleResult{
+			Message:           fmt.Sprintf("error on finish index log %d of work %s, %v", e.ID, e.Event.SourceDesc, err),
+			HandlerIdentifier: WorkIndexEventHandlerName,
 		}
 	}
 	return &event.EventHandleResult{Success: true, HandlerIdentifier: WorkIndexEventHandlerName}

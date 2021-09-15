@@ -40,7 +40,6 @@ func TestInvokeHandlers(t *testing.T) {
 				CreatorName: "user333",
 			},
 			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
-			Synced:    true,
 		}
 
 		ret := event.InvokeHandlersFunc(&ev)

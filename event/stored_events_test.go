@@ -1,12 +1,14 @@
 package event
 
 import (
+	"flywheel/indices/indexlog"
 	"flywheel/persistence"
 	"flywheel/testinfra"
 	"testing"
 	"time"
 
 	"github.com/fundwit/go-commons/types"
+	"github.com/jinzhu/gorm"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 )
@@ -33,6 +35,11 @@ func TestEventPersistCreate(t *testing.T) {
 		setup(t)
 		defer teardown(t)
 
+		indexlog.CreateIndexLogFunc = func(id types.ID, sourceType string, sourceId types.ID, sourceDesc string,
+			deletion bool, timestamp types.Timestamp, tx *gorm.DB) (*indexlog.IndexLogRecord, error) {
+			return nil, nil
+		}
+
 		event := EventRecord{
 			Event: Event{
 				SourceType: "WORK",
@@ -50,7 +57,6 @@ func TestEventPersistCreate(t *testing.T) {
 				CreatorName: "user333",
 			},
 			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
-			Synced:    true,
 		}
 
 		assert.Nil(t, eventPersistCreate(&event, testDatabase.DS.GormDB()))

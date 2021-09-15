@@ -11,6 +11,7 @@ import (
 	"flywheel/es"
 	"flywheel/event"
 	"flywheel/indices"
+	"flywheel/indices/indexlog"
 	"flywheel/session"
 	"testing"
 	"time"
@@ -63,6 +64,9 @@ func TestIndexWorkEventHandle(t *testing.T) {
 		es.DeleteDocumentByIdFunc = func(index string, id types.ID) error {
 			return nil
 		}
+		indexlog.FinishIndexLogFunc = func(id types.ID) error {
+			return nil
+		}
 		ev := event.EventRecord{Event: event.Event{SourceType: "WORK", SourceId: 100, EventCategory: event.EventCategoryDeleted}}
 
 		expectedResult := event.EventHandleResult{Success: true, HandlerIdentifier: indices.WorkIndexEventHandlerName}
@@ -89,10 +93,16 @@ func TestIndexWorkEventHandle(t *testing.T) {
 		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*work.WorkDetail, error) {
 			return &work.WorkDetail{}, nil
 		}
-		ev := event.EventRecord{Event: event.Event{SourceType: "WORK", SourceId: 100, EventCategory: event.EventCategoryCreated}}
+		var finishedIndexLogId types.ID
+		indexlog.FinishIndexLogFunc = func(id types.ID) error {
+			finishedIndexLogId = id
+			return nil
+		}
+		ev := event.EventRecord{ID: 123, Event: event.Event{SourceType: "WORK", SourceId: 100, EventCategory: event.EventCategoryCreated}}
 
 		expectedResult := event.EventHandleResult{Success: true, HandlerIdentifier: indices.WorkIndexEventHandlerName}
 		Expect(*indices.IndexWorkEventHandle(&ev)).To(Equal(expectedResult))
+		Expect(finishedIndexLogId).To(Equal(types.ID(123)))
 	})
 
 	t.Run("failed in detail work progress for work creation event or work updating event", func(t *testing.T) {
@@ -129,6 +139,31 @@ func TestIndexWorkEventHandle(t *testing.T) {
 			Success:           false,
 			HandlerIdentifier: indices.WorkIndexEventHandlerName,
 			Message:           "index work 100, map[100:error on index document]",
+		}
+		Expect(*indices.IndexWorkEventHandle(&ev)).To(Equal(expectedResult))
+	})
+
+	t.Run("failed in finish index log for work creation event or work updating event", func(t *testing.T) {
+		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
+			return nil
+		}
+		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*work.WorkDetail, error) {
+			id, err := types.ParseID(identifier)
+			if err != nil {
+				return nil, err
+			}
+			return &work.WorkDetail{Work: domain.Work{ID: id}}, nil
+		}
+		indexlog.FinishIndexLogFunc = func(id types.ID) error {
+			return errors.New("error on finish index log")
+		}
+		ev := event.EventRecord{ID: 100, Event: event.Event{
+			SourceType: "WORK", SourceDesc: "work1000", SourceId: 1000, EventCategory: event.EventCategoryCreated}}
+
+		expectedResult := event.EventHandleResult{
+			Success:           false,
+			HandlerIdentifier: indices.WorkIndexEventHandlerName,
+			Message:           "error on finish index log " + ev.ID.String() + " of work work1000, error on finish index log",
 		}
 		Expect(*indices.IndexWorkEventHandle(&ev)).To(Equal(expectedResult))
 	})

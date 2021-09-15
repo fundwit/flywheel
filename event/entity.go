@@ -32,8 +32,8 @@ type Event struct {
 }
 
 type EventRecord struct {
+	ID types.ID `json:"id" gorm:"primary_key"`
 	Event
-	ID        types.ID        `json:"id" gorm:"primary_key"`
 	Timestamp types.Timestamp `json:"timestamp" sql:"type:DATETIME(6)"`
 }
 

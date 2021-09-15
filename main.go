@@ -15,6 +15,7 @@ import (
 	"flywheel/es"
 	"flywheel/event"
 	"flywheel/indices"
+	"flywheel/indices/indexlog"
 	"flywheel/persistence"
 	"flywheel/servehttp"
 	"flywheel/session"
@@ -51,7 +52,7 @@ func main() {
 	// database migration (race condition)
 	err = ds.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{}, &checklist.CheckItem{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{},
-		&workcontribution.WorkContributionRecord{}, &event.EventRecord{},
+		&workcontribution.WorkContributionRecord{}, &event.EventRecord{}, &indexlog.IndexLogRecord{},
 		&account.User{}, &domain.Project{}, &domain.ProjectMember{},
 		&account.Role{}, &account.Permission{}, &label.Label{}, &work.WorkLabelRelation{},
 		&account.UserRoleBinding{}, &account.RolePermissionBinding{}).Error

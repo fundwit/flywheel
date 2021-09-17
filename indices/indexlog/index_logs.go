@@ -32,7 +32,9 @@ func (r *IndexLogRecord) TableName() string {
 var (
 	CreateIndexLogFunc        = CreateIndexLog
 	FinishIndexLogFunc        = FinishIndexLog
+	ObsoleteIndexLogFunc      = ObsoleteIndexLog
 	IndexLogPersistCreateFunc = indexLogPersistCreate
+	LoadPendingIndexLogFunc   = LoadPendingIndexLog
 )
 
 func CreateIndexLog(id types.ID, sourceType string, sourceId types.ID, sourceDesc string, deletion bool,
@@ -63,9 +65,32 @@ func FinishIndexLog(id types.ID) error {
 	return nil
 }
 
+func ObsoleteIndexLog(id types.ID) error {
+	changes := map[string]interface{}{"obsolete": true}
+	if err := persistence.ActiveDataSourceManager.GormDB().Model(&IndexLogRecord{}).Where("id = ?", id).Update(changes).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+func LoadPendingIndexLog(page, size int) ([]IndexLogRecord, error) {
+	indexLogs := []IndexLogRecord{}
+	db := persistence.ActiveDataSourceManager.GormDB()
+	offset := (page - 1) * size
+	if offset < 0 {
+		offset = 0
+	}
+	if err := db.LogMode(true).Where("indexed_time <= ? AND obsolete != ?", types.Timestamp{}, true).
+		Offset(offset).Limit(size).Find(&indexLogs).Error; err != nil {
+		return nil, err
+	}
+	return indexLogs, nil
+}
+
 func indexLogPersistCreate(record *IndexLogRecord, tx *gorm.DB) error {
 	// obsolete all old record
-	if err := tx.Model(&IndexLogRecord{}).Where("source_type LIKE ? AND source_id = ? AND indexed_time <= '0001-01-01 00:00:00.000000'",
+	if err := tx.Model(&IndexLogRecord{}).Where(
+		"source_type LIKE ? AND source_id = ? AND indexed_time <= '0001-01-01 00:00:00.000000'",
 		record.SourceType, record.SourceId).Update("obsolete", true).Error; err != nil {
 		return err
 	}

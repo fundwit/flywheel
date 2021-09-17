@@ -170,3 +170,96 @@ func TestFinishIndexLog(t *testing.T) {
 		Expect(records[0].Obsolete).To(BeFalse())
 	})
 }
+
+func TestObsoleteIndexLog(t *testing.T) {
+	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
+
+	t.Run("should be able to obsolete index log", func(t *testing.T) {
+		defer indexLogPersistTestTeardownTeardown(t, testDatabase)
+		indexLogPersistTestSetup(t, &testDatabase)
+
+		indexlog1 := IndexLogRecord{
+			IndexLog:  IndexLog{SourceType: "WORK", SourceId: 1000, SourceDesc: "work1000", Deletion: false},
+			ID:        110,
+			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
+		}
+		assert.Nil(t, indexLogPersistCreate(&indexlog1, testDatabase.DS.GormDB()))
+		Expect(ObsoleteIndexLog(indexlog1.ID)).To(BeNil())
+		records := []IndexLogRecord{}
+		Expect(testDatabase.DS.GormDB().Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
+		Expect(records[0].IndexedTime).To(BeZero())
+		Expect(records[0].Obsolete).To(BeTrue())
+
+		// obsoleted record still be able to updated indexed time
+		time.Sleep(10 * time.Millisecond)
+		Expect(ObsoleteIndexLog(indexlog1.ID)).To(BeNil())
+		records = []IndexLogRecord{}
+		Expect(testDatabase.DS.GormDB().Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
+		Expect(records[0].IndexedTime).To(BeZero())
+		Expect(records[0].Obsolete).To(BeTrue())
+	})
+}
+
+func TestLoadPendingIndexLog(t *testing.T) {
+	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
+
+	t.Run("should be able to load pendinged index log", func(t *testing.T) {
+		defer indexLogPersistTestTeardownTeardown(t, testDatabase)
+		indexLogPersistTestSetup(t, &testDatabase)
+
+		indexlog1 := IndexLogRecord{
+			IndexLog:  IndexLog{SourceType: "WORK", SourceId: 10001, SourceDesc: "work10001", Deletion: false},
+			ID:        101,
+			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
+		}
+		Expect(indexLogPersistCreate(&indexlog1, testDatabase.DS.GormDB())).To(BeNil())
+
+		indexlog2 := IndexLogRecord{
+			IndexLog:    IndexLog{SourceType: "WORK", SourceId: 10002, SourceDesc: "work10002", Deletion: false},
+			ID:          102,
+			Timestamp:   types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
+			IndexedTime: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
+		}
+		Expect(indexLogPersistCreate(&indexlog2, testDatabase.DS.GormDB())).To(BeNil())
+
+		indexlog3 := IndexLogRecord{
+			IndexLog:  IndexLog{SourceType: "WORK", SourceId: 10003, SourceDesc: "work10003", Deletion: false},
+			ID:        103,
+			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
+			Obsolete:  true,
+		}
+		Expect(indexLogPersistCreate(&indexlog3, testDatabase.DS.GormDB())).To(BeNil())
+
+		indexlog4 := IndexLogRecord{
+			IndexLog:  IndexLog{SourceType: "WORK", SourceId: 10004, SourceDesc: "work10004", Deletion: false},
+			ID:        104,
+			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
+		}
+		Expect(indexLogPersistCreate(&indexlog4, testDatabase.DS.GormDB())).To(BeNil())
+
+		indexlog5 := IndexLogRecord{
+			IndexLog:  IndexLog{SourceType: "WORK", SourceId: 10005, SourceDesc: "work10005", Deletion: false},
+			ID:        105,
+			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
+		}
+		Expect(indexLogPersistCreate(&indexlog5, testDatabase.DS.GormDB())).To(BeNil())
+
+		ret, err := LoadPendingIndexLog(1, 2)
+		Expect(err).To(BeNil())
+		Expect(len(ret)).To(Equal(2))
+		Expect(ret[0]).To(Equal(indexlog1))
+		Expect(ret[1]).To(Equal(indexlog4))
+
+		ret, err = LoadPendingIndexLog(2, 2)
+		Expect(err).To(BeNil())
+		Expect(len(ret)).To(Equal(1))
+		Expect(ret[0]).To(Equal(indexlog5))
+
+		ret, err = LoadPendingIndexLog(0, 1)
+		Expect(err).To(BeNil())
+		Expect(len(ret)).To(Equal(1))
+		Expect(ret[0]).To(Equal(indexlog1))
+	})
+}

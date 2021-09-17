@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/fundwit/go-commons/types"
+	"github.com/jinzhu/gorm"
 	. "github.com/onsi/gomega"
 )
 
@@ -325,6 +326,152 @@ func TestIndicesFullSync(t *testing.T) {
 			})
 		}
 		Expect(len(docs)).To(Equal(3))
+		Expect(docs).To(Equal(wantedDocs))
+	})
+}
+
+func TestIndexlogRecoverRoutine(t *testing.T) {
+	RegisterTestingT(t)
+
+	type indexResult struct {
+		index string
+		id    types.ID
+		doc   interface{}
+	}
+	c := &session.Context{Perms: authority.Permissions{account.SystemAdminPermission.ID}}
+
+	t.Run("only system admin can invoke IndexlogRecoveryRoutine", func(t *testing.T) {
+		sec := session.Context{Perms: authority.Permissions{account.SystemViewPermission.ID}}
+		err := indices.IndexlogRecoveryRoutine(&sec)
+		Expect(err).To(Equal(bizerror.ErrForbidden))
+	})
+
+	t.Run("should recover panic to error", func(t *testing.T) {
+		raisedErr := errors.New("error on load pending index logs")
+		indexlog.LoadPendingIndexLogFunc = func(page, size int) ([]indexlog.IndexLogRecord, error) {
+			panic(raisedErr)
+		}
+		err := indices.IndexlogRecoveryRoutine(c)
+		Expect(err).To(Equal(raisedErr))
+
+		indexlog.LoadPendingIndexLogFunc = func(page, size int) ([]indexlog.IndexLogRecord, error) {
+			panic("error on load pending index logs")
+		}
+		err = indices.IndexlogRecoveryRoutine(c)
+		Expect(err).To(Equal(errors.New("error on index log recovery routine: error on load pending index logs")))
+	})
+
+	t.Run("should be able to index all pending index log", func(t *testing.T) {
+		docs := []indexResult{}
+
+		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
+			docs = append(docs, indexResult{index, id, doc})
+			return nil
+		}
+		total := 5
+		indexlog.LoadPendingIndexLogFunc = func(page, size int) ([]indexlog.IndexLogRecord, error) {
+			logs := []indexlog.IndexLogRecord{}
+			cur := size * (page - 1)
+			n := 0
+			for cur < total && n < size {
+				logs = append(logs, indexlog.IndexLogRecord{ID: types.ID(cur + 1),
+					IndexLog: indexlog.IndexLog{SourceId: types.ID(cur + 1)}})
+				cur++
+				n++
+			}
+			return logs, nil
+		}
+		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*work.WorkDetail, error) {
+			if identifier == "3" {
+				return nil, gorm.ErrRecordNotFound
+			}
+			id, err := types.ParseID(identifier)
+			if err != nil {
+				return nil, err
+			}
+			return &work.WorkDetail{Work: domain.Work{ID: id}, State: state.State{Name: "test"}}, nil
+		}
+		var obsoleteIndexLogs []types.ID
+		indexlog.ObsoleteIndexLogFunc = func(id types.ID) error {
+			obsoleteIndexLogs = append(obsoleteIndexLogs, id)
+			return nil
+		}
+
+		indices.SyncBatchSize = 2
+		Expect(indices.IndexlogRecoveryRoutine(c)).To(BeNil())
+
+		wantedDocs := []indexResult{}
+		for i := 0; i < total; i++ {
+			if i == 2 {
+				continue // obsoleted
+			}
+			d := work.WorkDetail{Work: domain.Work{ID: types.ID(i + 1)}, State: state.State{Name: "test"}}
+			wantedDocs = append(wantedDocs, indexResult{indices.WorkIndexName, types.ID(i + 1),
+				indices.WorkDocument{d},
+			})
+		}
+		Expect(len(docs)).To(Equal(4))
+		Expect(docs).To(Equal(wantedDocs))
+		Expect(obsoleteIndexLogs).To(Equal([]types.ID{3}))
+	})
+
+	t.Run("should continue to next batch when failed in: load index logs, detail work, obsolete index log, index work", func(t *testing.T) {
+		docs := []indexResult{}
+
+		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
+			docs = append(docs, indexResult{index, id, doc})
+			return nil
+		}
+		total := 7
+		indexlog.LoadPendingIndexLogFunc = func(page, size int) ([]indexlog.IndexLogRecord, error) {
+			if page == 1 {
+				return nil, errors.New("error on load pending index logs")
+			}
+			logs := []indexlog.IndexLogRecord{}
+			cur := size * (page - 1)
+			n := 0
+			for cur < total && n < size {
+				logs = append(logs, indexlog.IndexLogRecord{ID: types.ID(cur + 1),
+					IndexLog: indexlog.IndexLog{SourceId: types.ID(cur + 1)}})
+				cur++
+				n++
+			}
+			return logs, nil
+		}
+		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*work.WorkDetail, error) {
+			if identifier == "3" {
+				return nil, gorm.ErrRecordNotFound
+			}
+			if identifier == "4" {
+				return nil, errors.New("error on detail work")
+			}
+			id, err := types.ParseID(identifier)
+			if err != nil {
+				return nil, err
+			}
+			return &work.WorkDetail{Work: domain.Work{ID: id}, State: state.State{Name: "test"}}, nil
+		}
+		indexlog.ObsoleteIndexLogFunc = func(id types.ID) error {
+			return errors.New("error on obsolete index log")
+		}
+		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
+			if int(id-1)/indices.SyncBatchSize == 2 {
+				return errors.New("error on load works")
+			}
+			docs = append(docs, indexResult{index, id, doc})
+			return nil
+		}
+
+		indices.SyncBatchSize = 2
+		Expect(indices.IndexlogRecoveryRoutine(c)).To(BeNil())
+
+		wantedDocs := []indexResult{}
+		d := work.WorkDetail{Work: domain.Work{ID: types.ID(7)}, State: state.State{Name: "test"}}
+		wantedDocs = append(wantedDocs, indexResult{indices.WorkIndexName, types.ID(7),
+			indices.WorkDocument{d},
+		})
+
+		Expect(len(docs)).To(Equal(1))
 		Expect(docs).To(Equal(wantedDocs))
 	})
 }

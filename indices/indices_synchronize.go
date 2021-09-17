@@ -1,6 +1,7 @@
 package indices
 
 import (
+	"errors"
 	"flywheel/account"
 	"flywheel/authority"
 	"flywheel/bizerror"
@@ -12,6 +13,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,8 +27,9 @@ var (
 	lock    sync.Mutex
 	running bool
 
-	IndicesFullSyncFunc    = IndicesFullSync
-	ScheduleNewSyncRunFunc = ScheduleNewSyncRun
+	IndicesFullSyncFunc         = IndicesFullSync
+	ScheduleNewSyncRunFunc      = ScheduleNewSyncRun
+	IndexlogRecoveryRoutineFunc = IndexlogRecoveryRoutine
 )
 
 func ScheduleNewSyncRun(sec *session.Context) (bool, error) {
@@ -60,6 +63,59 @@ func ScheduleNewSyncRun(sec *session.Context) (bool, error) {
 var (
 	SyncBatchSize = 500
 )
+
+func IndexlogRecoveryRoutine(sec *session.Context) (err error) {
+	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
+		return bizerror.ErrForbidden
+	}
+
+	defer func() {
+		if ret := recover(); ret != nil {
+			e, ok := ret.(error)
+			if ok {
+				err = e
+			} else {
+				err = fmt.Errorf("error on index log recovery routine: %v", ret)
+			}
+		}
+	}()
+
+	page := 1
+	for {
+		indexLogs, err := indexlog.LoadPendingIndexLogFunc(page, SyncBatchSize)
+		if err != nil {
+			logrus.Warnf("pending index log sync: error on retrive index logs(page = %d, pageSize = %d): %v", page, SyncBatchSize, err)
+			page++
+			continue
+		}
+
+		if len(indexLogs) == 0 {
+			logrus.Infof("pending index log sync: there are no more index log to index")
+			return nil // loop exit
+		}
+
+		workDetails := make([]work.WorkDetail, 0, len(indexLogs))
+		for _, w := range indexLogs {
+			d, err := work.DetailWorkFunc(w.SourceId.String(), indexRobot)
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				if err := indexlog.ObsoleteIndexLogFunc(w.ID); err != nil {
+					logrus.Warnf("pending index log sync: failed to obsolete index log %s, %v", w.ID, err)
+				}
+				continue
+			} else if err != nil {
+				logrus.Warnf("pending index log sync: failed to detail work %s, %v", w.ID, err)
+				continue
+			}
+			workDetails = append(workDetails, *d)
+		}
+
+		// IndexFunc will be invoked
+		if err := IndexWorks(workDetails); err != nil {
+			logrus.Warnf("indices fully sync: error on index works(page = %d, pageSize = %d): %v", page, SyncBatchSize, err)
+		}
+		page++
+	}
+}
 
 func IndicesFullSync() (err error) {
 	defer func() {

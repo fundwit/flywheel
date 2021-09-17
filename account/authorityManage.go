@@ -17,7 +17,8 @@ var (
 	SystemAdminPermission  = Permission{ID: "system:admin", Title: "System Administration"}
 	systemAdminRoleBinding = RolePermissionBinding{ID: 1, RoleID: systemAdminRole.ID, PermissionID: SystemAdminPermission.ID}
 
-	SystemViewPermission = Permission{ID: "system:view", Title: "System View"}
+	SystemViewPermission     = Permission{ID: "system:view", Title: "System View"}
+	SystemRecoveryPermission = Permission{ID: "system:recovery", Title: "System Recovery"}
 
 	projectAdminRole               = Role{ID: "project-admin", Title: "project-admin"}
 	projectAdminPermissionTemplate = Permission{ID: "project_%d:admin", Title: "Project %d Administration"}

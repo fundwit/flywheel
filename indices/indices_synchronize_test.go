@@ -332,15 +332,15 @@ func TestIndicesFullSync(t *testing.T) {
 
 func TestIndexlogRecoverRoutine(t *testing.T) {
 	RegisterTestingT(t)
+	c := &session.Context{Perms: authority.Permissions{account.SystemRecoveryPermission.ID}}
 
 	type indexResult struct {
 		index string
 		id    types.ID
 		doc   interface{}
 	}
-	c := &session.Context{Perms: authority.Permissions{account.SystemAdminPermission.ID}}
 
-	t.Run("only system admin can invoke IndexlogRecoveryRoutine", func(t *testing.T) {
+	t.Run("only system recovery permission or can invoke IndexlogRecoveryRoutine", func(t *testing.T) {
 		sec := session.Context{Perms: authority.Permissions{account.SystemViewPermission.ID}}
 		err := indices.IndexlogRecoveryRoutine(&sec)
 		Expect(err).To(Equal(bizerror.ErrForbidden))
@@ -351,13 +351,15 @@ func TestIndexlogRecoverRoutine(t *testing.T) {
 		indexlog.LoadPendingIndexLogFunc = func(page, size int) ([]indexlog.IndexLogRecord, error) {
 			panic(raisedErr)
 		}
-		err := indices.IndexlogRecoveryRoutine(c)
+		err := indices.IndexlogRecoveryRoutine(
+			&session.Context{Perms: authority.Permissions{account.SystemAdminPermission.ID}})
 		Expect(err).To(Equal(raisedErr))
 
 		indexlog.LoadPendingIndexLogFunc = func(page, size int) ([]indexlog.IndexLogRecord, error) {
 			panic("error on load pending index logs")
 		}
-		err = indices.IndexlogRecoveryRoutine(c)
+		err = indices.IndexlogRecoveryRoutine(
+			&session.Context{Perms: authority.Permissions{account.SystemAdminPermission.ID}})
 		Expect(err).To(Equal(errors.New("error on index log recovery routine: error on load pending index logs")))
 	})
 

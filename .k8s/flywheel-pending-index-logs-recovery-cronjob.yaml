@@ -6,7 +6,7 @@ metadata:
 spec:
   schedule: "*/1 * * * *"
   successfulJobsHistoryLimit: 0
-  failedJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
   concurrencyPolicy: Replace
   jobTemplate:
     spec:
@@ -18,5 +18,7 @@ spec:
             command:
             - curl
             - -v
-            - http://flywheel/v1/
+            - -X
+            - POST
+            - http://flywheel/v1/pending-index-log-recovery
           restartPolicy: Never

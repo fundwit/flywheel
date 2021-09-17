@@ -20,7 +20,7 @@ func RegisterIndicesRestAPI(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 	g := r.Group(PathIndexRequests, middleWares...)
 	g.POST("", handleIndexRequest)
 
-	h := r.Group(PathPendingIndexRecovery, middleWares...)
+	h := r.Group(PathPendingIndexRecovery)
 	h.POST("", handleCreatePendingIndexLogsRecovery)
 }
 

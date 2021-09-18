@@ -80,7 +80,7 @@ func LoadPendingIndexLog(page, size int) ([]IndexLogRecord, error) {
 	if offset < 0 {
 		offset = 0
 	}
-	if err := db.LogMode(true).Where("indexed_time <= ? AND obsolete != ?", types.Timestamp{}, true).
+	if err := db.Where("indexed_time <= ? AND obsolete != ?", types.Timestamp{}, true).
 		Offset(offset).Limit(size).Find(&indexLogs).Error; err != nil {
 		return nil, err
 	}

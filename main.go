@@ -16,6 +16,7 @@ import (
 	"flywheel/event"
 	"flywheel/indices"
 	"flywheel/indices/indexlog"
+	"flywheel/infra/tracing"
 	"flywheel/persistence"
 	"flywheel/servehttp"
 	"flywheel/session"
@@ -23,11 +24,19 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/opentracing/opentracing-go"
 	"github.com/sirupsen/logrus"
 )
 
 func main() {
 	logrus.Infoln("service start")
+
+	tracer, closer, err := tracing.NewTracer()
+	if err != nil {
+		logrus.Fatalf("failed to build tracer %v\n", err)
+	}
+	opentracing.SetGlobalTracer(tracer)
+	defer closer.Close() // flush spans
 
 	dbConfig, err := persistence.ParseDatabaseConfigFromEnv()
 	if err != nil {
@@ -68,6 +77,8 @@ func main() {
 
 	engine := gin.Default()
 	engine.Use(bizerror.ErrorHandling())
+	engine.Use(tracing.TracingIngress())
+
 	engine.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "flywheel")
 	})

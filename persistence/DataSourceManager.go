@@ -5,6 +5,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
+	tracingGorm "github.com/smacker/opentracing-gorm"
 )
 
 var ActiveDataSourceManager *DataSourceManager
@@ -38,7 +39,9 @@ func (m *DataSourceManager) Stop() {
 
 func (m *DataSourceManager) GormDB() *gorm.DB {
 	if m.gormDB != nil {
-		return m.gormDB.New()
+		d := m.gormDB.New()
+		tracingGorm.AddGormCallbacks(d)
+		return d
 	}
 	return nil
 }

@@ -25,6 +25,8 @@ spec:
           image: registry.cn-beijing.aliyuncs.com/fundwit/flywheel:sha-498d460
           imagePullPolicy: IfNotPresent
           env:
+          - name: JAEGER_ENDPOINT
+            value: http://jaeger:14268/api/traces
           - name: MYSQL_PASSWORD
             valueFrom:
               secretKeyRef:

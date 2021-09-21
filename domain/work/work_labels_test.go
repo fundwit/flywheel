@@ -78,9 +78,9 @@ func TestCreateWorkLabelRelation(t *testing.T) {
 		defer workLabelsTestTeardown(t, testDatabase)
 		workflow1, p1, p2, _, _ := workLabelsTestSetup(t, &testDatabase)
 
-		c1 := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+		c1 := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
 			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
-		c2 := session.Context{Identity: session.Identity{ID: 20, Name: "user 20"},
+		c2 := session.Session{Identity: session.Identity{ID: 20, Name: "user 20"},
 			Perms: authority.Permissions{"manager_" + p2.ID.String()}}
 
 		// case1: assert resource not found if work is not found
@@ -109,7 +109,7 @@ func TestCreateWorkLabelRelation(t *testing.T) {
 		workflow1, p1, _, _, _ := workLabelsTestSetup(t, &testDatabase)
 
 		// prepare work
-		c := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+		c := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
 			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
 		w := buildWork("test work", workflow1.ID, p1.ID, &c)
 
@@ -140,9 +140,9 @@ func TestDeleteWorkLabelRelation(t *testing.T) {
 		defer workLabelsTestTeardown(t, testDatabase)
 		workflow1, p1, p2, _, _ := workLabelsTestSetup(t, &testDatabase)
 
-		c1 := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+		c1 := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
 			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
-		c2 := session.Context{Identity: session.Identity{ID: 20, Name: "user 20"},
+		c2 := session.Session{Identity: session.Identity{ID: 20, Name: "user 20"},
 			Perms: authority.Permissions{"manager_" + p2.ID.String()}}
 
 		// case1: assert param errors
@@ -176,7 +176,7 @@ func TestDeleteWorkLabelRelation(t *testing.T) {
 		label.LabelDeleteCheckFuncs = append(label.LabelDeleteCheckFuncs, work.IsLabelReferencedByWork)
 
 		// prepare work
-		c := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+		c := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
 			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
 		w := buildWork("test work", workflow1.ID, p1.ID, &c)
 

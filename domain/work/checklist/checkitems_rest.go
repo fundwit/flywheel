@@ -27,7 +27,7 @@ func handleCreateCheckItem(c *gin.Context) {
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
-	record, err := CreateCheckItemFunc(req, session.FindSecurityContext(c))
+	record, err := CreateCheckItemFunc(req, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -44,7 +44,7 @@ func handleUpdateCheckItem(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	if err := UpdateCheckItemFunc(parsedId, req, session.FindSecurityContext(c)); err != nil {
+	if err := UpdateCheckItemFunc(parsedId, req, session.ExtractSessionFromGinContext(c)); err != nil {
 		panic(err)
 	}
 	c.Status(http.StatusOK)
@@ -56,7 +56,7 @@ func handleDeleteCheckItem(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: errors.New("invalid id '" + c.Param("id") + "'")})
 	}
 
-	if err := DeleteCheckItemFunc(parsedId, session.FindSecurityContext(c)); err != nil {
+	if err := DeleteCheckItemFunc(parsedId, session.ExtractSessionFromGinContext(c)); err != nil {
 		panic(err)
 	}
 	c.Status(http.StatusNoContent)

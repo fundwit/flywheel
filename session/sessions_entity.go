@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"flywheel/authority"
 	"strings"
 	"time"
@@ -8,13 +9,15 @@ import (
 	"github.com/fundwit/go-commons/types"
 )
 
-type Context struct {
+type Session struct {
 	Token        string                 `json:"token"`
 	Identity     Identity               `json:"identity"`
 	Perms        authority.Permissions  `json:"perms"`
 	ProjectRoles authority.ProjectRoles `json:"projectRoles"`
 
 	SigningTime time.Time `json:"-"`
+
+	Context context.Context `json:"-"`
 }
 
 type Identity struct {
@@ -23,8 +26,19 @@ type Identity struct {
 	Nickname string   `json:"nickname"`
 }
 
+func (c *Session) Clone() Session {
+	return Session{
+		Token:        c.Token,
+		Identity:     c.Identity,
+		Perms:        c.Perms,
+		ProjectRoles: c.ProjectRoles,
+		SigningTime:  c.SigningTime,
+		Context:      c.Context,
+	}
+}
+
 // VisibleProjects  parse visible project ids from Context.Perms
-func (c *Context) VisibleProjects() []types.ID {
+func (c *Session) VisibleProjects() []types.ID {
 	var projectIds []types.ID
 	for _, v := range c.Perms {
 		pairs := strings.Split(v, "_")

@@ -41,7 +41,7 @@ var _ = Describe("WorkflowHandler", func() {
 			Expect(err).To(BeNil())
 			timeString := strings.Trim(string(timeBytes), `"`)
 			flow.QueryWorkflowsFunc =
-				func(query *domain.WorkflowQuery, sec *session.Context) (*[]domain.Workflow, error) {
+				func(query *domain.WorkflowQuery, sec *session.Session) (*[]domain.Workflow, error) {
 					return &[]domain.Workflow{{ID: types.ID(10), Name: "test workflow", ProjectID: types.ID(100),
 						ThemeColor: "blue", ThemeIcon: "some-icon", CreateTime: t}}, nil
 				}
@@ -53,7 +53,7 @@ var _ = Describe("WorkflowHandler", func() {
 				timeString + `"}]`))
 		})
 		It("should be able to handle error when query workflows", func() {
-			flow.QueryWorkflowsFunc = func(query *domain.WorkflowQuery, sec *session.Context) (*[]domain.Workflow, error) {
+			flow.QueryWorkflowsFunc = func(query *domain.WorkflowQuery, sec *session.Session) (*[]domain.Workflow, error) {
 				return nil, errors.New("a mocked error")
 			}
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows", nil)
@@ -85,7 +85,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should be able to handle error when create workflow", func() {
-			flow.CreateWorkflowFunc = func(creation *flow.WorkflowCreation, sec *session.Context) (*domain.WorkflowDetail, error) {
+			flow.CreateWorkflowFunc = func(creation *flow.WorkflowCreation, sec *session.Session) (*domain.WorkflowDetail, error) {
 				return nil, errors.New("a mocked error")
 			}
 			creation := buildDemoWorkflowCreation()
@@ -102,7 +102,7 @@ var _ = Describe("WorkflowHandler", func() {
 			timeBytes, err := t.MarshalJSON()
 			timeString := strings.Trim(string(timeBytes), `"`)
 			Expect(err).To(BeNil())
-			flow.CreateWorkflowFunc = func(creation *flow.WorkflowCreation, sec *session.Context) (*domain.WorkflowDetail, error) {
+			flow.CreateWorkflowFunc = func(creation *flow.WorkflowCreation, sec *session.Session) (*domain.WorkflowDetail, error) {
 				detail := domain.WorkflowDetail{
 					Workflow:     domain.Workflow{ID: 123, Name: creation.Name, ThemeColor: "blue", ThemeIcon: "some-icon", ProjectID: creation.ProjectID, CreateTime: t},
 					StateMachine: creation.StateMachine,
@@ -134,7 +134,7 @@ var _ = Describe("WorkflowHandler", func() {
 			timeBytes, err := t.MarshalJSON()
 			Expect(err).To(BeNil())
 			timeString := strings.Trim(string(timeBytes), `"`)
-			flow.DetailWorkflowFunc = func(ID types.ID, sec *session.Context) (*domain.WorkflowDetail, error) {
+			flow.DetailWorkflowFunc = func(ID types.ID, sec *session.Session) (*domain.WorkflowDetail, error) {
 				return &domain.WorkflowDetail{
 					Workflow:            domain.Workflow{ID: types.ID(10), Name: "test workflow", ThemeColor: "blue", ThemeIcon: "some-icon", ProjectID: types.ID(100), CreateTime: t},
 					PropertyDefinitions: []domain.PropertyDefinition{{Name: "description"}, {Name: "creatorId"}},
@@ -168,7 +168,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 404 when workflow is not exist", func() {
-			flow.DetailWorkflowFunc = func(ID types.ID, sec *session.Context) (*domain.WorkflowDetail, error) {
+			flow.DetailWorkflowFunc = func(ID types.ID, sec *session.Session) (*domain.WorkflowDetail, error) {
 				return nil, bizerror.ErrNotFound
 			}
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/2", nil)
@@ -178,7 +178,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should be able to handle error when detail workflows", func() {
-			flow.DetailWorkflowFunc = func(ID types.ID, sec *session.Context) (*domain.WorkflowDetail, error) {
+			flow.DetailWorkflowFunc = func(ID types.ID, sec *session.Session) (*domain.WorkflowDetail, error) {
 				return nil, errors.New("a mocked error")
 			}
 			req := httptest.NewRequest(http.MethodGet, "/v1/workflows/1", nil)
@@ -217,7 +217,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 404 when workflow is not exist", func() {
-			flow.UpdateWorkflowBaseFunc = func(ID types.ID, updating *flow.WorkflowBaseUpdation, sec *session.Context) (*domain.Workflow, error) {
+			flow.UpdateWorkflowBaseFunc = func(ID types.ID, updating *flow.WorkflowBaseUpdation, sec *session.Session) (*domain.Workflow, error) {
 				return nil, bizerror.ErrNotFound
 			}
 
@@ -230,7 +230,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should be able to handle error when detail workflows", func() {
-			flow.UpdateWorkflowBaseFunc = func(ID types.ID, updating *flow.WorkflowBaseUpdation, sec *session.Context) (*domain.Workflow, error) {
+			flow.UpdateWorkflowBaseFunc = func(ID types.ID, updating *flow.WorkflowBaseUpdation, sec *session.Session) (*domain.Workflow, error) {
 				return nil, errors.New("a mocked error")
 			}
 
@@ -247,7 +247,7 @@ var _ = Describe("WorkflowHandler", func() {
 			timeBytes, err := t.MarshalJSON()
 			Expect(err).To(BeNil())
 			timeString := strings.Trim(string(timeBytes), `"`)
-			flow.UpdateWorkflowBaseFunc = func(ID types.ID, updating *flow.WorkflowBaseUpdation, sec *session.Context) (*domain.Workflow, error) {
+			flow.UpdateWorkflowBaseFunc = func(ID types.ID, updating *flow.WorkflowBaseUpdation, sec *session.Session) (*domain.Workflow, error) {
 				return &domain.Workflow{ID: types.ID(10), Name: updating.Name, ThemeColor: updating.ThemeColor, ThemeIcon: updating.ThemeIcon,
 					ProjectID: types.ID(100), CreateTime: t}, nil
 			}
@@ -264,7 +264,7 @@ var _ = Describe("WorkflowHandler", func() {
 
 	Describe("handleDeleteWorkflow", func() {
 		It("should return 204 when workflow delete successfully", func() {
-			flow.DeleteWorkflowFunc = func(ID types.ID, sec *session.Context) error {
+			flow.DeleteWorkflowFunc = func(ID types.ID, sec *session.Session) error {
 				return nil
 			}
 			req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/1", nil)
@@ -281,7 +281,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should be able to handle error when delete workflow", func() {
-			flow.DeleteWorkflowFunc = func(ID types.ID, sec *session.Context) error {
+			flow.DeleteWorkflowFunc = func(ID types.ID, sec *session.Session) error {
 				return errors.New("a mocked error")
 			}
 			req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/1", nil)
@@ -293,7 +293,7 @@ var _ = Describe("WorkflowHandler", func() {
 
 	Describe("handleQueryTransitions", func() {
 		It("should be able to query transitions with query: fromState", func() {
-			flow.DetailWorkflowFunc = func(ID types.ID, sec *session.Context) (*domain.WorkflowDetail, error) {
+			flow.DetailWorkflowFunc = func(ID types.ID, sec *session.Session) (*domain.WorkflowDetail, error) {
 				return &domain.WorkflowDetail{
 					Workflow:            domain.Workflow{ID: types.ID(10), Name: "test workflow", ProjectID: types.ID(100), CreateTime: time.Now()},
 					PropertyDefinitions: []domain.PropertyDefinition{{Name: "description"}, {Name: "creatorId"}},
@@ -309,7 +309,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should be able to query transitions with query: fromState and toState", func() {
-			flow.DetailWorkflowFunc = func(ID types.ID, sec *session.Context) (*domain.WorkflowDetail, error) {
+			flow.DetailWorkflowFunc = func(ID types.ID, sec *session.Session) (*domain.WorkflowDetail, error) {
 				return &domain.WorkflowDetail{
 					Workflow:            domain.Workflow{ID: types.ID(10), Name: "test workflow", ProjectID: types.ID(100), CreateTime: time.Now()},
 					PropertyDefinitions: []domain.PropertyDefinition{{Name: "description"}, {Name: "creatorId"}},
@@ -324,7 +324,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should be able to query transitions with unknown state", func() {
-			flow.DetailWorkflowFunc = func(ID types.ID, sec *session.Context) (*domain.WorkflowDetail, error) {
+			flow.DetailWorkflowFunc = func(ID types.ID, sec *session.Session) (*domain.WorkflowDetail, error) {
 				return &domain.WorkflowDetail{
 					Workflow:            domain.Workflow{ID: types.ID(10), Name: "test workflow", ProjectID: types.ID(100), CreateTime: time.Now()},
 					PropertyDefinitions: []domain.PropertyDefinition{{Name: "description"}, {Name: "creatorId"}},
@@ -339,7 +339,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 404 when workflow is not exists", func() {
-			flow.DetailWorkflowFunc = func(ID types.ID, sec *session.Context) (*domain.WorkflowDetail, error) {
+			flow.DetailWorkflowFunc = func(ID types.ID, sec *session.Session) (*domain.WorkflowDetail, error) {
 				return nil, bizerror.ErrNotFound
 			}
 
@@ -408,7 +408,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 404 when workflow is not exist", func() {
-			flow.CreateWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *session.Context) error {
+			flow.CreateWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *session.Session) error {
 				return bizerror.ErrNotFound
 			}
 
@@ -421,7 +421,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 400 state is unknown", func() {
-			flow.CreateWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *session.Context) error {
+			flow.CreateWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *session.Session) error {
 				return bizerror.ErrUnknownState
 			}
 
@@ -434,7 +434,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should be able to handle unexpected error", func() {
-			flow.CreateWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *session.Context) error {
+			flow.CreateWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *session.Session) error {
 				return errors.New("a mocked error")
 			}
 			reqBody, err := json.Marshal(&[]state.Transition{{Name: "test", From: "PENDING", To: "DOING"}})
@@ -446,7 +446,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 200 when everything is ok", func() {
-			flow.CreateWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *session.Context) error {
+			flow.CreateWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *session.Session) error {
 				return nil
 			}
 
@@ -499,7 +499,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 404 when workflow is not exist", func() {
-			flow.DeleteWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *session.Context) error {
+			flow.DeleteWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *session.Session) error {
 				return bizerror.ErrNotFound
 			}
 
@@ -512,7 +512,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should be able to handle unexpected error", func() {
-			flow.DeleteWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *session.Context) error {
+			flow.DeleteWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *session.Session) error {
 				return errors.New("a mocked error")
 			}
 			reqBody, err := json.Marshal(&[]state.Transition{{Name: "test", From: "PENDING", To: "DOING"}})
@@ -524,7 +524,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 200 when everything is ok", func() {
-			flow.DeleteWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *session.Context) error {
+			flow.DeleteWorkflowStateTransitionsFunc = func(id types.ID, transitions []state.Transition, sec *session.Session) error {
 				return nil
 			}
 
@@ -564,7 +564,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 404 when workflow is not exist", func() {
-			flow.UpdateWorkflowStateFunc = func(id types.ID, updating flow.WorkflowStateUpdating, sec *session.Context) error {
+			flow.UpdateWorkflowStateFunc = func(id types.ID, updating flow.WorkflowStateUpdating, sec *session.Session) error {
 				return bizerror.ErrNotFound
 			}
 
@@ -577,7 +577,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 400 when new state is exist", func() {
-			flow.UpdateWorkflowStateFunc = func(id types.ID, updating flow.WorkflowStateUpdating, sec *session.Context) error {
+			flow.UpdateWorkflowStateFunc = func(id types.ID, updating flow.WorkflowStateUpdating, sec *session.Session) error {
 				return bizerror.ErrStateExisted
 			}
 
@@ -590,7 +590,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should be able to handle unexpected error", func() {
-			flow.UpdateWorkflowStateFunc = func(id types.ID, updating flow.WorkflowStateUpdating, sec *session.Context) error {
+			flow.UpdateWorkflowStateFunc = func(id types.ID, updating flow.WorkflowStateUpdating, sec *session.Session) error {
 				return errors.New("a mocked error")
 			}
 			reqBody, err := json.Marshal(&flow.WorkflowStateUpdating{OriginName: "PENDING", Name: "QUEUED", Order: 2000})
@@ -602,7 +602,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 2xx when everything is ok", func() {
-			flow.UpdateWorkflowStateFunc = func(id types.ID, updating flow.WorkflowStateUpdating, sec *session.Context) error {
+			flow.UpdateWorkflowStateFunc = func(id types.ID, updating flow.WorkflowStateUpdating, sec *session.Session) error {
 				return nil
 			}
 
@@ -653,7 +653,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 404 when workflow is not exist", func() {
-			flow.UpdateStateRangeOrdersFunc = func(workflowID types.ID, wantedOrders *[]flow.StateOrderRangeUpdating, sec *session.Context) error {
+			flow.UpdateStateRangeOrdersFunc = func(workflowID types.ID, wantedOrders *[]flow.StateOrderRangeUpdating, sec *session.Session) error {
 				return bizerror.ErrNotFound
 			}
 
@@ -666,7 +666,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should be able to handle unexpected error", func() {
-			flow.UpdateStateRangeOrdersFunc = func(workflowID types.ID, wantedOrders *[]flow.StateOrderRangeUpdating, sec *session.Context) error {
+			flow.UpdateStateRangeOrdersFunc = func(workflowID types.ID, wantedOrders *[]flow.StateOrderRangeUpdating, sec *session.Session) error {
 				return errors.New("a mocked error")
 			}
 			reqBody, err := json.Marshal(&[]flow.StateOrderRangeUpdating{})
@@ -678,7 +678,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 2xx when everything is ok", func() {
-			flow.UpdateStateRangeOrdersFunc = func(workflowID types.ID, wantedOrders *[]flow.StateOrderRangeUpdating, sec *session.Context) error {
+			flow.UpdateStateRangeOrdersFunc = func(workflowID types.ID, wantedOrders *[]flow.StateOrderRangeUpdating, sec *session.Session) error {
 				return nil
 			}
 			reqBody, err := json.Marshal(&[]flow.StateOrderRangeUpdating{})
@@ -732,7 +732,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 404 when workflow is not exist when creating state", func() {
-			flow.CreateStateFunc = func(workflowID types.ID, creating *flow.StateCreating, sec *session.Context) error {
+			flow.CreateStateFunc = func(workflowID types.ID, creating *flow.StateCreating, sec *session.Session) error {
 				return bizerror.ErrNotFound
 			}
 
@@ -745,7 +745,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should be able to handle unexpected error when creating state", func() {
-			flow.CreateStateFunc = func(workflowID types.ID, creating *flow.StateCreating, sec *session.Context) error {
+			flow.CreateStateFunc = func(workflowID types.ID, creating *flow.StateCreating, sec *session.Session) error {
 				return errors.New("a mocked error")
 			}
 			reqBody, err := json.Marshal(&flow.StateCreating{Name: "test", Category: 1, Order: 20001})
@@ -757,7 +757,7 @@ var _ = Describe("WorkflowHandler", func() {
 		})
 
 		It("should return 2xx when everything is ok when creating state", func() {
-			flow.CreateStateFunc = func(workflowID types.ID, creating *flow.StateCreating, sec *session.Context) error {
+			flow.CreateStateFunc = func(workflowID types.ID, creating *flow.StateCreating, sec *session.Session) error {
 				return nil
 			}
 			reqBody, err := json.Marshal(&flow.StateCreating{Name: "test", Category: 1, Order: 20001})
@@ -781,5 +781,5 @@ func buildDemoWorkflowCreation() *flow.WorkflowCreation {
 }
 
 type workflowManagerMock struct {
-	CreateWorkStateTransitionFunc func(t *domain.WorkProcessStepCreation, sec *session.Context) error
+	CreateWorkStateTransitionFunc func(t *domain.WorkProcessStepCreation, sec *session.Session) error
 }

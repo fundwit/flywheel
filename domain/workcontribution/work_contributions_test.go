@@ -63,7 +63,7 @@ func TestCheckContributorWorkPermission(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		sec := &session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}}
+		sec := &session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}}
 
 		// work not exist
 		work, user, err := workcontribution.CheckContributorWorkPermission("TES-404", grantedUser.ID, sec)
@@ -85,7 +85,7 @@ func TestCheckContributorWorkPermission(t *testing.T) {
 		// session user: neither admin nor member of work's project    => Forbidden
 		// contributor : -
 		work, user, err := workcontribution.CheckContributorWorkPermission(givenWork.Identifier, ungrantedUser.ID,
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{}})
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 		Expect(work).To(BeNil())
 		Expect(user).To(BeNil())
@@ -93,7 +93,7 @@ func TestCheckContributorWorkPermission(t *testing.T) {
 		// session user: neither admin nor manager of work's project     => Forbidden
 		// contributor : -
 		work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, ungrantedUser.ID,
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{"guest_" + givenWork.ProjectID.String()}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{"guest_" + givenWork.ProjectID.String()}})
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 		Expect(work).To(BeNil())
 		Expect(user).To(BeNil())
@@ -101,7 +101,7 @@ func TestCheckContributorWorkPermission(t *testing.T) {
 		// session user: admin                          => OK
 		// contributor : not member of work's project   => NoContent
 		work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, ungrantedUser.ID,
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
 		Expect(err).To(Equal(bizerror.ErrNoContent))
 		Expect(work).To(BeNil())
 		Expect(user).To(BeNil())
@@ -109,7 +109,7 @@ func TestCheckContributorWorkPermission(t *testing.T) {
 		// session user: manager of work's project        => OK
 		// contributor : not member of work's project   => NoContent
 		work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, ungrantedUser.ID,
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}})
 		Expect(err).To(Equal(bizerror.ErrNoContent))
 		Expect(work).To(BeNil())
 		Expect(user).To(BeNil())
@@ -121,7 +121,7 @@ func TestCheckContributorWorkPermission(t *testing.T) {
 				authority.ProjectRoles{{ProjectID: givenWork.ProjectID, ProjectName: "demo project", ProjectIdentifier: "TES", Role: domain.ProjectRoleManager + ""}}
 		}
 		work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, grantedUser.ID,
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
 		Expect(err).To(BeNil())
 		Expect(*work).To(Equal(*givenWork))
 		Expect(*user).To(Equal(*grantedUser))
@@ -129,7 +129,7 @@ func TestCheckContributorWorkPermission(t *testing.T) {
 		// session user: manager of work's project             => OK
 		// contributor : member of work's project            => OK
 		work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, grantedUser.ID,
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{domain.ProjectRoleManager + "_" + givenWork.ProjectID.String()}})
 		Expect(err).To(BeNil())
 		Expect(*work).To(Equal(*givenWork))
 		Expect(*user).To(Equal(*grantedUser))
@@ -141,21 +141,21 @@ func TestCheckContributorWorkPermission(t *testing.T) {
 
 		// session user(contributor): neithr admin nor member of work's project
 		work, user, err := workcontribution.CheckContributorWorkPermission(givenWork.Identifier, sessionUser.ID,
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{}})
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 		Expect(work).To(BeNil())
 		Expect(user).To(BeNil())
 
 		// session user(contributor): admin
 		work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, sessionUser.ID,
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 		Expect(work).To(BeNil())
 		Expect(user).To(BeNil())
 
 		// session user(contributor): member of project
 		work, user, err = workcontribution.CheckContributorWorkPermission(givenWork.Identifier, sessionUser.ID,
-			&session.Context{
+			&session.Session{
 				Identity:     session.Identity{ID: sessionUser.ID},
 				Perms:        []string{"guest_" + givenWork.ProjectID.String()},
 				ProjectRoles: []domain.ProjectRole{{ProjectID: givenWork.ProjectID, ProjectName: "demo project", ProjectIdentifier: "TES", Role: "guest"}},
@@ -175,12 +175,12 @@ func TestBeginWorkContribution(t *testing.T) {
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 		testErr := errors.New("test error")
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return nil, nil, testErr
 		}
 		id, err := workcontribution.BeginWorkContribution(
 			&workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(id).To(BeZero())
 		Expect(err).To(Equal(testErr))
 	})
@@ -189,11 +189,11 @@ func TestBeginWorkContribution(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 
-		sec := &session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}}
+		sec := &session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}}
 
 		// prepare contribution of work
 		givenRecord1 := workcontribution.WorkContributionRecord{
@@ -253,11 +253,11 @@ func TestBeginWorkContribution(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 
-		sec := &session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}}
+		sec := &session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}}
 
 		givenRecord2 := workcontribution.WorkContributionRecord{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: "TEST-100", CheckitemId: 2, ContributorId: 200},
@@ -299,12 +299,12 @@ func TestBeginWorkContribution(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 
 		db := testDatabase.DS.GormDB()
-		sec := &session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}}
+		sec := &session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}}
 
 		givenRecord2 := workcontribution.WorkContributionRecord{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: "TEST-100", CheckitemId: 2, ContributorId: 200},
@@ -347,12 +347,12 @@ func TestBeginWorkContribution(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 
 		db := testDatabase.DS.GormDB()
-		sec := &session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}}
+		sec := &session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}}
 
 		givenRecord2 := workcontribution.WorkContributionRecord{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: "TEST-100", CheckitemId: 2, ContributorId: 200},
@@ -403,12 +403,12 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 		testErr := errors.New("test error")
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return nil, nil, testErr
 		}
 		err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{Effective: true,
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(Equal(testErr))
 	})
 
@@ -416,7 +416,7 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 		db := testDatabase.DS.GormDB()
@@ -431,7 +431,7 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 
 		err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{Effective: true,
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(Equal(gorm.ErrRecordNotFound))
 
 		// case2
@@ -444,7 +444,7 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 
 		err = workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{Effective: true,
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, CheckitemId: 3, ContributorId: grantedUser.ID}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(Equal(gorm.ErrRecordNotFound))
 	})
 
@@ -452,7 +452,7 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 		db := testDatabase.DS.GormDB()
@@ -472,7 +472,7 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 		begin := time.Now()
 		err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{Effective: true,
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(BeNil())
 
 		record := workcontribution.WorkContributionRecord{ID: givenRecord1.ID}
@@ -496,7 +496,7 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 		db := testDatabase.DS.GormDB()
@@ -509,7 +509,7 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 		Expect(db.Save(&givenRecord2).Error).To(BeNil())
 		err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{Effective: true,
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, CheckitemId: 2, ContributorId: grantedUser.ID}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(BeNil())
 
 		record := workcontribution.WorkContributionRecord{ID: givenRecord2.ID}
@@ -528,7 +528,7 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 		db := testDatabase.DS.GormDB()
@@ -547,7 +547,7 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 		Expect(db.Save(&givenRecord1).Error).To(BeNil())
 		err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{Effective: true,
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(BeNil())
 
 		record := workcontribution.WorkContributionRecord{ID: givenRecord1.ID}
@@ -577,12 +577,12 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 		testErr := errors.New("test error")
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return nil, nil, testErr
 		}
 		err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(Equal(testErr))
 	})
 
@@ -590,7 +590,7 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 		db := testDatabase.DS.GormDB()
@@ -605,7 +605,7 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 
 		err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(Equal(gorm.ErrRecordNotFound))
 
 		// case2
@@ -617,7 +617,7 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 		Expect(db.Save(&givenRecord2).Error).To(BeNil())
 		err = workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, CheckitemId: 3, ContributorId: grantedUser.ID}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(Equal(gorm.ErrRecordNotFound))
 	})
 
@@ -625,7 +625,7 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 		db := testDatabase.DS.GormDB()
@@ -645,7 +645,7 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 		begin := time.Now()
 		err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(BeNil())
 
 		record := workcontribution.WorkContributionRecord{ID: givenRecord1.ID}
@@ -669,7 +669,7 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 		db := testDatabase.DS.GormDB()
@@ -688,7 +688,7 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 		Expect(db.Save(&givenRecord1).Error).To(BeNil())
 		err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, CheckitemId: 2, ContributorId: grantedUser.ID}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(BeNil())
 
 		record := workcontribution.WorkContributionRecord{ID: givenRecord2.ID}
@@ -712,7 +712,7 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 		db := testDatabase.DS.GormDB()
@@ -724,7 +724,7 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 		Expect(db.Save(&givenRecord1).Error).To(BeNil())
 		err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(BeNil())
 
 		record := workcontribution.WorkContributionRecord{ID: givenRecord1.ID}
@@ -749,13 +749,13 @@ func TestQueryWorkContributions(t *testing.T) {
 		_, _, _, sessionUser := workContributionTestSetup(t, &testDatabase)
 
 		result, err := workcontribution.QueryWorkContributions(
-			workcontribution.WorkContributionsQuery{}, &session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			workcontribution.WorkContributionsQuery{}, &session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(BeNil())
 		Expect(result).ToNot(BeNil())
 		Expect(len(*result)).To(BeZero())
 
 		result, err = workcontribution.QueryWorkContributions(
-			workcontribution.WorkContributionsQuery{WorkKeys: []string{}}, &session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			workcontribution.WorkContributionsQuery{WorkKeys: []string{}}, &session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(BeNil())
 		Expect(result).ToNot(BeNil())
 		Expect(len(*result)).To(BeZero())
@@ -766,7 +766,7 @@ func TestQueryWorkContributions(t *testing.T) {
 		_, _, _, sessionUser := workContributionTestSetup(t, &testDatabase)
 
 		result, err := workcontribution.QueryWorkContributions(
-			workcontribution.WorkContributionsQuery{WorkKeys: []string{"TEST_404"}}, &session.Context{Identity: session.Identity{ID: sessionUser.ID}})
+			workcontribution.WorkContributionsQuery{WorkKeys: []string{"TEST_404"}}, &session.Session{Identity: session.Identity{ID: sessionUser.ID}})
 		Expect(err).To(BeNil())
 		Expect(result).ToNot(BeNil())
 		Expect(len(*result)).To(BeZero())
@@ -775,7 +775,7 @@ func TestQueryWorkContributions(t *testing.T) {
 	t.Run("should be able to get correct result", func(t *testing.T) {
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 		db := testDatabase.DS.GormDB()
@@ -798,7 +798,7 @@ func TestQueryWorkContributions(t *testing.T) {
 		// should be able to get result of all project for system admin
 		result, err := workcontribution.QueryWorkContributions(
 			workcontribution.WorkContributionsQuery{WorkKeys: []string{givenRecord1.WorkKey, givenRecord2.WorkKey}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
 		Expect(err).To(BeNil())
 		Expect(len(*result)).To(Equal(2))
 		Expect((*result)[0]).To(Equal(givenRecord1))
@@ -806,7 +806,7 @@ func TestQueryWorkContributions(t *testing.T) {
 
 		result, err = workcontribution.QueryWorkContributions(
 			workcontribution.WorkContributionsQuery{WorkKeys: []string{givenRecord2.WorkKey}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}})
 		Expect(err).To(BeNil())
 		Expect(len(*result)).To(Equal(1))
 		Expect((*result)[0]).To(Equal(givenRecord2))
@@ -815,7 +815,7 @@ func TestQueryWorkContributions(t *testing.T) {
 		// session.Context.VisibleProjects()
 		result, err = workcontribution.QueryWorkContributions(
 			workcontribution.WorkContributionsQuery{WorkKeys: []string{givenRecord1.WorkKey, givenRecord2.WorkKey}},
-			&session.Context{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{"guest_404"}})
+			&session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{"guest_404"}})
 		Expect(err).To(BeNil())
 		Expect(len(*result)).To(Equal(1))
 		Expect((*result)[0]).To(Equal(givenRecord2))

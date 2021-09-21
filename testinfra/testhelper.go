@@ -9,7 +9,7 @@ import (
 )
 
 // BuildSecCtx build session context
-func BuildSecCtx(uid types.ID, perms ...string) *session.Context {
+func BuildSecCtx(uid types.ID, perms ...string) *session.Session {
 	visiableProjects := []domain.ProjectRole{}
 	for _, perm := range perms {
 		idx := strings.Index(perm, "_")
@@ -23,5 +23,5 @@ func BuildSecCtx(uid types.ID, perms ...string) *session.Context {
 		}
 	}
 
-	return &session.Context{Identity: session.Identity{ID: uid, Name: "user-" + uid.String(), Nickname: "User " + uid.String()}, Perms: perms, ProjectRoles: visiableProjects}
+	return &session.Session{Identity: session.Identity{ID: uid, Name: "user-" + uid.String(), Nickname: "User " + uid.String()}, Perms: perms, ProjectRoles: visiableProjects}
 }

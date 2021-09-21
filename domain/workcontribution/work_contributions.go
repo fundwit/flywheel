@@ -24,7 +24,7 @@ type WorkContributionsQuery struct {
 	WorkKeys []string `form:"workKey" json:"workKeys"`
 }
 
-func QueryWorkContributions(query WorkContributionsQuery, sec *session.Context) (*[]WorkContributionRecord, error) {
+func QueryWorkContributions(query WorkContributionsQuery, sec *session.Session) (*[]WorkContributionRecord, error) {
 	records := []WorkContributionRecord{}
 
 	if len(query.WorkKeys) == 0 {
@@ -48,7 +48,7 @@ func QueryWorkContributions(query WorkContributionsQuery, sec *session.Context) 
 	return &records, nil
 }
 
-func CheckContributorWorkPermission(workKey string, contributorId types.ID, sec *session.Context) (*domain.Work, *account.User, error) {
+func CheckContributorWorkPermission(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
 	db := persistence.ActiveDataSourceManager.GormDB()
 	work := domain.Work{Identifier: workKey}
 	if err := db.Where(&work).First(&work).Error; err != nil {
@@ -82,7 +82,7 @@ func CheckContributorWorkPermission(workKey string, contributorId types.ID, sec 
 	return &work, &user, nil
 }
 
-func BeginWorkContribution(d *WorkContribution, sec *session.Context) (types.ID, error) {
+func BeginWorkContribution(d *WorkContribution, sec *session.Session) (types.ID, error) {
 	work, user, err := CheckContributorWorkPermissionFunc(d.WorkKey, d.ContributorId, sec)
 	if err != nil {
 		return 0, err
@@ -124,7 +124,7 @@ func BeginWorkContribution(d *WorkContribution, sec *session.Context) (types.ID,
 	return record.ID, nil
 }
 
-func FinishWorkContribution(d *WorkContributionFinishBody, sec *session.Context) error {
+func FinishWorkContribution(d *WorkContributionFinishBody, sec *session.Session) error {
 	work, user, err := CheckContributorWorkPermissionFunc(d.WorkKey, d.ContributorId, sec)
 	if err != nil {
 		return err

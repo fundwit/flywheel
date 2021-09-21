@@ -25,7 +25,7 @@ func handleCreateWorkLabelRelation(c *gin.Context) {
 	if err != nil {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
-	record, err := CreateWorkLabelRelationFunc(req, session.FindSecurityContext(c))
+	record, err := CreateWorkLabelRelationFunc(req, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -39,7 +39,7 @@ func handleDeleteWorkLabelRelation(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	err = DeleteWorkLabelRelationFunc(req, session.FindSecurityContext(c))
+	err = DeleteWorkLabelRelationFunc(req, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}

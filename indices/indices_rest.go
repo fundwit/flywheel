@@ -25,7 +25,7 @@ func RegisterIndicesRestAPI(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 }
 
 func handleIndexRequest(c *gin.Context) {
-	success, err := ScheduleNewSyncRunFunc(session.FindSecurityContext(c))
+	success, err := ScheduleNewSyncRunFunc(session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}

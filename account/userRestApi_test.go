@@ -39,7 +39,7 @@ var _ = Describe("UserRestApi", func() {
 		})
 		It("should success when token is valid", func() {
 			token := uuid.New().String()
-			session.TokenCache.Set(token, &session.Context{Token: token, Identity: session.Identity{Name: "ann", ID: 1},
+			session.TokenCache.Set(token, &session.Session{Token: token, Identity: session.Identity{Name: "ann", ID: 1},
 				Perms: []string{domain.ProjectRoleManager + "_1"}, ProjectRoles: []domain.ProjectRole{{
 					Role: domain.ProjectRoleManager, ProjectName: "project1", ProjectIdentifier: "TES", ProjectID: types.ID(1),
 				}}}, cache.DefaultExpiration)
@@ -54,7 +54,7 @@ var _ = Describe("UserRestApi", func() {
 
 		It("should failed when token is missing", func() {
 			token := uuid.New().String()
-			session.TokenCache.Set(token, &session.Context{Token: token, Identity: session.Identity{Name: "ann", ID: 1}}, cache.DefaultExpiration)
+			session.TokenCache.Set(token, &session.Session{Token: token, Identity: session.Identity{Name: "ann", ID: 1}}, cache.DefaultExpiration)
 
 			req := httptest.NewRequest(http.MethodGet, "/me", nil)
 			status, body, _ := testinfra.ExecuteRequest(req, router)
@@ -64,7 +64,7 @@ var _ = Describe("UserRestApi", func() {
 
 		It("should failed when token not match", func() {
 			token := uuid.New().String()
-			session.TokenCache.Set(token, &session.Context{Token: token, Identity: session.Identity{Name: "ann", ID: 1}}, cache.DefaultExpiration)
+			session.TokenCache.Set(token, &session.Session{Token: token, Identity: session.Identity{Name: "ann", ID: 1}}, cache.DefaultExpiration)
 
 			req := httptest.NewRequest(http.MethodGet, "/me", nil)
 			req.AddCookie(&http.Cookie{Name: session.KeySecToken, Value: "bad token"})
@@ -77,7 +77,7 @@ var _ = Describe("UserRestApi", func() {
 	Describe("HandleUpdateBaseAuth", func() {
 		It("should return 200 when update successful", func() {
 			var payload *account.BasicAuthUpdating
-			account.UpdateBasicAuthSecretFunc = func(u *account.BasicAuthUpdating, sec *session.Context) error {
+			account.UpdateBasicAuthSecretFunc = func(u *account.BasicAuthUpdating, sec *session.Session) error {
 				payload = u
 				return nil
 			}
@@ -93,7 +93,7 @@ var _ = Describe("UserRestApi", func() {
 
 		It("should return 400 when validation failed", func() {
 			var payload *account.BasicAuthUpdating
-			account.UpdateBasicAuthSecretFunc = func(u *account.BasicAuthUpdating, sec *session.Context) error {
+			account.UpdateBasicAuthSecretFunc = func(u *account.BasicAuthUpdating, sec *session.Session) error {
 				payload = u
 				return nil
 			}
@@ -112,7 +112,7 @@ var _ = Describe("UserRestApi", func() {
 
 	Describe("HandleQueryUsers", func() {
 		It("should return 200 when query successful", func() {
-			account.QueryUsersFunc = func(sec *session.Context) (*[]account.UserInfo, error) {
+			account.QueryUsersFunc = func(sec *session.Session) (*[]account.UserInfo, error) {
 				return &[]account.UserInfo{{ID: 123, Name: "test"}}, nil
 			}
 
@@ -126,7 +126,7 @@ var _ = Describe("UserRestApi", func() {
 	Describe("HandleCreateUser", func() {
 		It("should return 200 when create successful", func() {
 			var payload *account.UserCreation
-			account.CreateUserFunc = func(c *account.UserCreation, sec *session.Context) (*account.UserInfo, error) {
+			account.CreateUserFunc = func(c *account.UserCreation, sec *session.Session) (*account.UserInfo, error) {
 				payload = c
 				return &account.UserInfo{ID: 123, Name: "test", Nickname: "Test"}, nil
 			}
@@ -141,7 +141,7 @@ var _ = Describe("UserRestApi", func() {
 
 		It("should return 200 when create successful with requried params", func() {
 			var payload *account.UserCreation
-			account.CreateUserFunc = func(c *account.UserCreation, sec *session.Context) (*account.UserInfo, error) {
+			account.CreateUserFunc = func(c *account.UserCreation, sec *session.Session) (*account.UserInfo, error) {
 				payload = c
 				return &account.UserInfo{ID: 123, Name: "test"}, nil
 			}
@@ -159,7 +159,7 @@ var _ = Describe("UserRestApi", func() {
 		It("should return 200 when update user successful", func() {
 			var pathId types.ID
 			var payload *account.UserUpdation
-			account.UpdateUserFunc = func(id types.ID, c *account.UserUpdation, sec *session.Context) error {
+			account.UpdateUserFunc = func(id types.ID, c *account.UserUpdation, sec *session.Session) error {
 				pathId = id
 				payload = c
 				return nil
@@ -177,7 +177,7 @@ var _ = Describe("UserRestApi", func() {
 		It("should return 400 when validation failed", func() {
 			var pathId types.ID
 			var payload *account.UserUpdation
-			account.UpdateUserFunc = func(id types.ID, c *account.UserUpdation, sec *session.Context) error {
+			account.UpdateUserFunc = func(id types.ID, c *account.UserUpdation, sec *session.Session) error {
 				pathId = id
 				payload = c
 				return nil

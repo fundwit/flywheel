@@ -39,7 +39,7 @@ func HandleQueryContributions(c *gin.Context) {
 	}
 	query.WorkKeys = append(query.WorkKeys, body.WorkKeys...)
 
-	results, err := QueryWorkContributionsFunc(query, session.FindSecurityContext(c))
+	results, err := QueryWorkContributionsFunc(query, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -52,7 +52,7 @@ func HandleBeginContribution(c *gin.Context) {
 		panic(err)
 	}
 
-	detail, err := BeginWorkContributionFunc(&body, session.FindSecurityContext(c))
+	detail, err := BeginWorkContributionFunc(&body, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -65,7 +65,7 @@ func HandleFinishContribution(c *gin.Context) {
 		panic(err)
 	}
 
-	err := FinishWorkContributionFunc(&body, session.FindSecurityContext(c))
+	err := FinishWorkContributionFunc(&body, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}

@@ -50,7 +50,7 @@ var _ = Describe("WorkProcessStepHandler", func() {
 		})
 		It("should be able to handle service error", func() {
 			work.CreateWorkStateTransitionFunc =
-				func(c *domain.WorkProcessStepCreation, sec *session.Context) error {
+				func(c *domain.WorkProcessStepCreation, sec *session.Session) error {
 					return errors.New("a mocked error")
 				}
 			req := httptest.NewRequest(http.MethodPost, "/v1/transitions", bytes.NewReader([]byte(
@@ -62,7 +62,7 @@ var _ = Describe("WorkProcessStepHandler", func() {
 
 		It("should be able to create transition", func() {
 			work.CreateWorkStateTransitionFunc =
-				func(c *domain.WorkProcessStepCreation, sec *session.Context) error {
+				func(c *domain.WorkProcessStepCreation, sec *session.Session) error {
 					return nil
 				}
 
@@ -91,7 +91,7 @@ var _ = Describe("WorkProcessStepHandler", func() {
 
 		It("should be able to handle service error", func() {
 			work.QueryProcessStepsFunc =
-				func(query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error) {
+				func(query *domain.WorkProcessStepQuery, sec *session.Session) (*[]domain.WorkProcessStep, error) {
 					return nil, errors.New("a mocked error")
 				}
 			req := httptest.NewRequest(http.MethodGet, "/v1/work-process-steps?workId=100", nil)
@@ -106,7 +106,7 @@ var _ = Describe("WorkProcessStepHandler", func() {
 			timeString := strings.Trim(string(timeBytes), `"`)
 			Expect(err).To(BeNil())
 			work.QueryProcessStepsFunc =
-				func(query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error) {
+				func(query *domain.WorkProcessStepQuery, sec *session.Session) (*[]domain.WorkProcessStep, error) {
 					return &[]domain.WorkProcessStep{
 						{WorkID: 100, FlowID: 1, StateName: domain.StatePending.Name, StateCategory: domain.StatePending.Category,
 							NextStateName: domain.StateDoing.Name, NextStateCategory: domain.StateDoing.Category, CreatorID: 200, CreatorName: "user200",

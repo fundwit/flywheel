@@ -21,21 +21,21 @@ func TestTracingIngress(t *testing.T) {
 
 	router := gin.Default()
 	router.Use(TracingIngress())
-	router.GET("/test", func(c *gin.Context) {
+	router.GET("/test/:id", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
 
 	t.Run("new root trace", func(t *testing.T) {
 		tracer.Reset()
 
-		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req := httptest.NewRequest(http.MethodGet, "/test/123", nil)
 		status, _, _ := testinfra.ExecuteRequest(req, router)
 		Expect(status).To(Equal(http.StatusOK))
 
 		spans := tracer.FinishedSpans()
 		Expect(len(spans)).To(Equal(1))
 		s := spans[0]
-		Expect(s.OperationName).To(Equal("GET /test"))
+		Expect(s.OperationName).To(Equal("GET /test/:id"))
 		Expect(s.ParentID).To(Equal(0))
 		Expect(time.Since(s.StartTime) < time.Second).To(BeTrue())
 		Expect(time.Since(s.FinishTime) < time.Second).To(BeTrue())
@@ -49,7 +49,7 @@ func TestTracingIngress(t *testing.T) {
 
 		clientSpan := tracer.StartSpan("client")
 
-		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req := httptest.NewRequest(http.MethodGet, "/test/123", nil)
 		tracer.Inject(clientSpan.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(req.Header))
 		status, _, _ := testinfra.ExecuteRequest(req, router)
 
@@ -67,7 +67,7 @@ func TestTracingIngress(t *testing.T) {
 		Expect(s0.SpanContext.Sampled).To(BeTrue())
 
 		s1 := spans[0]
-		Expect(s1.OperationName).To(Equal("GET /test"))
+		Expect(s1.OperationName).To(Equal("GET /test/:id"))
 		Expect(s1.ParentID).To(Equal(s0.SpanContext.SpanID))
 		Expect(s1.SpanContext.SpanID).ToNot(BeZero())
 		Expect(s1.SpanContext.TraceID).To(Equal(s1.SpanContext.TraceID))

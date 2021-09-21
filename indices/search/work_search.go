@@ -15,7 +15,7 @@ var (
 	SearchWorksFunc = SearchWorks
 )
 
-func SearchWorks(q domain.WorkQuery, sec *session.Context) ([]work.WorkDetail, error) {
+func SearchWorks(q domain.WorkQuery, sec *session.Session) ([]work.WorkDetail, error) {
 	visibleProjects := sec.VisibleProjects()
 	if len(visibleProjects) == 0 {
 		return []work.WorkDetail{}, nil

@@ -60,10 +60,10 @@ func TestSimpleLoginHandler(t *testing.T) {
 		time.Sleep(1 * time.Millisecond)
 		securityContextValue, found := session.TokenCache.Get(resp.Cookies()[0].Value)
 		Expect(found).To(BeTrue())
-		secCtx, ok := securityContextValue.(*session.Context)
+		secCtx, ok := securityContextValue.(*session.Session)
 		Expect(ok).To(BeTrue())
 		Expect((*secCtx).SigningTime.After(begin) && (*secCtx).SigningTime.Before(time.Now()))
-		Expect(*secCtx).To(Equal(session.Context{Token: resp.Cookies()[0].Value, Identity: session.Identity{ID: 2, Name: "ann", Nickname: "Ann"},
+		Expect(*secCtx).To(Equal(session.Session{Token: resp.Cookies()[0].Value, Identity: session.Identity{ID: 2, Name: "ann", Nickname: "Ann"},
 			Perms: []string{}, ProjectRoles: []domain.ProjectRole{}, SigningTime: (*secCtx).SigningTime}))
 	})
 
@@ -127,7 +127,7 @@ func TestSimpleLogoutHandler(t *testing.T) {
 		defer afterEachSessionsRestApiCase(t, testDatabase)
 		router, testDatabase = beforeEachSessionsRestApiCase(t)
 
-		Expect(session.TokenCache.Add("test_token", &session.Context{}, cache.DefaultExpiration)).To(BeNil())
+		Expect(session.TokenCache.Add("test_token", &session.Session{}, cache.DefaultExpiration)).To(BeNil())
 		_, found := session.TokenCache.Get("test_token")
 		Expect(found).To(BeTrue())
 
@@ -150,7 +150,7 @@ func TestSimpleLogoutHandler(t *testing.T) {
 		defer afterEachSessionsRestApiCase(t, testDatabase)
 		router, testDatabase = beforeEachSessionsRestApiCase(t)
 
-		Expect(session.TokenCache.Add("test_token", &session.Context{}, cache.DefaultExpiration)).To(BeNil())
+		Expect(session.TokenCache.Add("test_token", &session.Session{}, cache.DefaultExpiration)).To(BeNil())
 		_, found := session.TokenCache.Get("test_token")
 		Expect(found).To(BeTrue())
 
@@ -173,7 +173,7 @@ func TestSimpleLogoutHandler(t *testing.T) {
 		defer afterEachSessionsRestApiCase(t, testDatabase)
 		router, testDatabase = beforeEachSessionsRestApiCase(t)
 
-		Expect(session.TokenCache.Add("test_token", &session.Context{}, cache.DefaultExpiration)).To(BeNil())
+		Expect(session.TokenCache.Add("test_token", &session.Session{}, cache.DefaultExpiration)).To(BeNil())
 		_, found := session.TokenCache.Get("test_token")
 		Expect(found).To(BeTrue())
 

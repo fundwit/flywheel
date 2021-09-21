@@ -25,7 +25,7 @@ func TestScheduleNewSyncRun(t *testing.T) {
 	RegisterTestingT(t)
 
 	t.Run("only system admin can schedule sync run", func(t *testing.T) {
-		sec := session.Context{Perms: authority.Permissions{account.SystemViewPermission.ID}}
+		sec := session.Session{Perms: authority.Permissions{account.SystemViewPermission.ID}}
 		success, err := indices.ScheduleNewSyncRun(&sec)
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 		Expect(success).To(BeFalse())
@@ -37,7 +37,7 @@ func TestScheduleNewSyncRun(t *testing.T) {
 			return nil
 		}
 
-		sec := session.Context{Perms: authority.Permissions{account.SystemAdminPermission.ID}}
+		sec := session.Session{Perms: authority.Permissions{account.SystemAdminPermission.ID}}
 		success, err := indices.ScheduleNewSyncRun(&sec)
 		Expect(err).To(BeNil())
 		Expect(success).To(BeTrue())
@@ -91,7 +91,7 @@ func TestIndexWorkEventHandle(t *testing.T) {
 		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
 			return nil
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*work.WorkDetail, error) {
+		work.DetailWorkFunc = func(identifier string, sec *session.Session) (*work.WorkDetail, error) {
 			return &work.WorkDetail{}, nil
 		}
 		var finishedIndexLogId types.ID
@@ -110,7 +110,7 @@ func TestIndexWorkEventHandle(t *testing.T) {
 		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
 			return nil
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*work.WorkDetail, error) {
+		work.DetailWorkFunc = func(identifier string, sec *session.Session) (*work.WorkDetail, error) {
 			return nil, errors.New("error on detail work")
 		}
 		ev := event.EventRecord{Event: event.Event{SourceType: "WORK", SourceId: 100, EventCategory: event.EventCategoryCreated}}
@@ -127,7 +127,7 @@ func TestIndexWorkEventHandle(t *testing.T) {
 		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
 			return errors.New("error on index document")
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*work.WorkDetail, error) {
+		work.DetailWorkFunc = func(identifier string, sec *session.Session) (*work.WorkDetail, error) {
 			id, err := types.ParseID(identifier)
 			if err != nil {
 				return nil, err
@@ -148,7 +148,7 @@ func TestIndexWorkEventHandle(t *testing.T) {
 		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
 			return nil
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*work.WorkDetail, error) {
+		work.DetailWorkFunc = func(identifier string, sec *session.Session) (*work.WorkDetail, error) {
 			id, err := types.ParseID(identifier)
 			if err != nil {
 				return nil, err
@@ -213,7 +213,7 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return works, nil
 		}
-		work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Context) ([]work.WorkDetail, error) {
+		work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Session) ([]work.WorkDetail, error) {
 			c := len(details)
 			for i := 0; i < c; i++ {
 				details[i].State = state.State{Name: "test"}
@@ -257,7 +257,7 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return works, nil
 		}
-		work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Context) ([]work.WorkDetail, error) {
+		work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Session) ([]work.WorkDetail, error) {
 			c := len(details)
 			for i := 0; i < c; i++ {
 				details[i].State = state.State{Name: "test"}
@@ -304,7 +304,7 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return works, nil
 		}
-		work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Context) ([]work.WorkDetail, error) {
+		work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Session) ([]work.WorkDetail, error) {
 			c := len(details)
 			for i := 0; i < c; i++ {
 				details[i].State = state.State{Name: "test"}
@@ -332,7 +332,7 @@ func TestIndicesFullSync(t *testing.T) {
 
 func TestIndexlogRecoverRoutine(t *testing.T) {
 	RegisterTestingT(t)
-	c := &session.Context{Perms: authority.Permissions{account.SystemRecoveryPermission.ID}}
+	c := &session.Session{Perms: authority.Permissions{account.SystemRecoveryPermission.ID}}
 
 	type indexResult struct {
 		index string
@@ -341,7 +341,7 @@ func TestIndexlogRecoverRoutine(t *testing.T) {
 	}
 
 	t.Run("only system recovery permission or can invoke IndexlogRecoveryRoutine", func(t *testing.T) {
-		sec := session.Context{Perms: authority.Permissions{account.SystemViewPermission.ID}}
+		sec := session.Session{Perms: authority.Permissions{account.SystemViewPermission.ID}}
 		err := indices.IndexlogRecoveryRoutine(&sec)
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 	})
@@ -352,14 +352,14 @@ func TestIndexlogRecoverRoutine(t *testing.T) {
 			panic(raisedErr)
 		}
 		err := indices.IndexlogRecoveryRoutine(
-			&session.Context{Perms: authority.Permissions{account.SystemAdminPermission.ID}})
+			&session.Session{Perms: authority.Permissions{account.SystemAdminPermission.ID}})
 		Expect(err).To(Equal(raisedErr))
 
 		indexlog.LoadPendingIndexLogFunc = func(page, size int) ([]indexlog.IndexLogRecord, error) {
 			panic("error on load pending index logs")
 		}
 		err = indices.IndexlogRecoveryRoutine(
-			&session.Context{Perms: authority.Permissions{account.SystemAdminPermission.ID}})
+			&session.Session{Perms: authority.Permissions{account.SystemAdminPermission.ID}})
 		Expect(err).To(Equal(errors.New("error on index log recovery routine: error on load pending index logs")))
 	})
 
@@ -383,7 +383,7 @@ func TestIndexlogRecoverRoutine(t *testing.T) {
 			}
 			return logs, nil
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*work.WorkDetail, error) {
+		work.DetailWorkFunc = func(identifier string, sec *session.Session) (*work.WorkDetail, error) {
 			if identifier == "3" {
 				return nil, gorm.ErrRecordNotFound
 			}
@@ -440,7 +440,7 @@ func TestIndexlogRecoverRoutine(t *testing.T) {
 			}
 			return logs, nil
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Context) (*work.WorkDetail, error) {
+		work.DetailWorkFunc = func(identifier string, sec *session.Session) (*work.WorkDetail, error) {
 			if identifier == "3" {
 				return nil, gorm.ErrRecordNotFound
 			}

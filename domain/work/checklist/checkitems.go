@@ -48,7 +48,7 @@ type CheckItemUpdate struct {
 	Done *bool  `json:"done"`
 }
 
-func CreateCheckItem(req CheckItemCreation, c *session.Context) (*CheckItem, error) {
+func CreateCheckItem(req CheckItemCreation, c *session.Session) (*CheckItem, error) {
 	var r *CheckItem
 	var ev *event.EventRecord
 	txErr := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
@@ -92,7 +92,7 @@ func CreateCheckItem(req CheckItemCreation, c *session.Context) (*CheckItem, err
 	return r, nil
 }
 
-func ListCheckItems(workId types.ID, c *session.Context) ([]CheckItem, error) {
+func ListCheckItems(workId types.ID, c *session.Session) ([]CheckItem, error) {
 	var r []CheckItem
 	txErr := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
 		w, err := findWorkAndCheckPerms(tx, workId, c)
@@ -110,7 +110,7 @@ func ListCheckItems(workId types.ID, c *session.Context) ([]CheckItem, error) {
 	return r, nil
 }
 
-func UpdateCheckItem(id types.ID, req CheckItemUpdate, c *session.Context) error {
+func UpdateCheckItem(id types.ID, req CheckItemUpdate, c *session.Session) error {
 	var ev *event.EventRecord
 	txErr := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
 		// find checkitem
@@ -159,7 +159,7 @@ func UpdateCheckItem(id types.ID, req CheckItemUpdate, c *session.Context) error
 	return nil
 }
 
-func DeleteCheckItem(id types.ID, c *session.Context) error {
+func DeleteCheckItem(id types.ID, c *session.Session) error {
 	var ev *event.EventRecord
 	txErr := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
 		// find checkitem
@@ -201,7 +201,7 @@ func DeleteCheckItem(id types.ID, c *session.Context) error {
 	return nil
 }
 
-func CleanWorkCheckItems(workId types.ID, c *session.Context) error {
+func CleanWorkCheckItems(workId types.ID, c *session.Session) error {
 	var ev *event.EventRecord
 	txErr := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
 		// check permission against to work
@@ -239,7 +239,7 @@ func CleanWorkCheckItemsDirectly(workId types.ID, tx *gorm.DB) error {
 	return nil
 }
 
-func findWorkAndCheckPerms(db *gorm.DB, id types.ID, sec *session.Context) (*domain.Work, error) {
+func findWorkAndCheckPerms(db *gorm.DB, id types.ID, sec *session.Session) (*domain.Work, error) {
 	var work domain.Work
 	if err := db.Where("id = ?", id).First(&work).Error; err != nil {
 		return nil, err

@@ -31,7 +31,7 @@ func RegisterUsersHandler(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 }
 
 func UserInfoQueryHandler(c *gin.Context) {
-	secCtx := session.FindSecurityContext(c)
+	secCtx := session.ExtractSessionFromGinContext(c)
 	if secCtx == nil {
 		panic(bizerror.ErrUnauthenticated)
 	}
@@ -39,7 +39,7 @@ func UserInfoQueryHandler(c *gin.Context) {
 }
 
 func HandleQueryUsers(c *gin.Context) {
-	results, err := QueryUsersFunc(session.FindSecurityContext(c))
+	results, err := QueryUsersFunc(session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -53,7 +53,7 @@ func HandleUpdateBaseAuth(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	err = UpdateBasicAuthSecretFunc(&payload, session.FindSecurityContext(c))
+	err = UpdateBasicAuthSecretFunc(&payload, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -67,7 +67,7 @@ func HandleCreateUser(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	u, err := CreateUserFunc(&payload, session.FindSecurityContext(c))
+	u, err := CreateUserFunc(&payload, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -86,7 +86,7 @@ func HandleUpdateUser(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	err = UpdateUserFunc(id, &payload, session.FindSecurityContext(c))
+	err = UpdateUserFunc(id, &payload, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}

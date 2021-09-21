@@ -20,7 +20,7 @@ var (
 	idWorker = sonyflake.NewSonyflake(sonyflake.Settings{})
 )
 
-func QueryProjects(sec *session.Context) (*[]domain.Project, error) {
+func QueryProjects(sec *session.Session) (*[]domain.Project, error) {
 	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
 		return nil, bizerror.ErrForbidden
 	}
@@ -32,7 +32,7 @@ func QueryProjects(sec *session.Context) (*[]domain.Project, error) {
 	return &projects, nil
 }
 
-func CreateProject(c *domain.ProjectCreating, sec *session.Context) (*domain.Project, error) {
+func CreateProject(c *domain.ProjectCreating, sec *session.Session) (*domain.Project, error) {
 	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
 		return nil, bizerror.ErrForbidden
 	}
@@ -55,7 +55,7 @@ func CreateProject(c *domain.ProjectCreating, sec *session.Context) (*domain.Pro
 	return &g, nil
 }
 
-func UpdateProject(id types.ID, d *domain.ProjectUpdating, sec *session.Context) error {
+func UpdateProject(id types.ID, d *domain.ProjectUpdating, sec *session.Session) error {
 	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
 		return bizerror.ErrForbidden
 	}
@@ -73,7 +73,7 @@ func UpdateProject(id types.ID, d *domain.ProjectUpdating, sec *session.Context)
 	})
 }
 
-func QueryProjectRole(projectId types.ID, sec *session.Context) (string, error) {
+func QueryProjectRole(projectId types.ID, sec *session.Session) (string, error) {
 	gm := domain.ProjectMember{ProjectId: projectId, MemberId: sec.Identity.ID}
 	db := persistence.ActiveDataSourceManager.GormDB()
 	var founds []domain.ProjectMember

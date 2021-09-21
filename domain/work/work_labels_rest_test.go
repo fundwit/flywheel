@@ -50,7 +50,7 @@ func TestCreateWorkLabelRelationAPI(t *testing.T) {
 	})
 
 	t.Run("should be able to handle error", func(t *testing.T) {
-		work.CreateWorkLabelRelationFunc = func(req work.WorkLabelRelationReq, c *session.Context) (*work.WorkLabelRelation, error) {
+		work.CreateWorkLabelRelationFunc = func(req work.WorkLabelRelationReq, c *session.Session) (*work.WorkLabelRelation, error) {
 			return nil, errors.New("some error")
 		}
 		reqBody := `{"workId":"10", "labelId":"200"}`
@@ -66,7 +66,7 @@ func TestCreateWorkLabelRelationAPI(t *testing.T) {
 		Expect(err).To(BeNil())
 		timeString := strings.Trim(string(timeBytes), `"`)
 
-		work.CreateWorkLabelRelationFunc = func(req work.WorkLabelRelationReq, c *session.Context) (*work.WorkLabelRelation, error) {
+		work.CreateWorkLabelRelationFunc = func(req work.WorkLabelRelationReq, c *session.Session) (*work.WorkLabelRelation, error) {
 			return &work.WorkLabelRelation{WorkId: req.WorkId, LabelId: req.LabelId, CreateTime: demoTime, CreatorId: 1000}, nil
 		}
 		reqBody := `{"workId":"100", "labelId":"2000"}`
@@ -97,7 +97,7 @@ func TestDeleteWorkLabelRelationAPI(t *testing.T) {
 
 	t.Run("should be able to delete label", func(t *testing.T) {
 		var r work.WorkLabelRelationReq
-		work.DeleteWorkLabelRelationFunc = func(req work.WorkLabelRelationReq, c *session.Context) error {
+		work.DeleteWorkLabelRelationFunc = func(req work.WorkLabelRelationReq, c *session.Session) error {
 			r = req
 			return nil
 		}
@@ -111,7 +111,7 @@ func TestDeleteWorkLabelRelationAPI(t *testing.T) {
 
 	t.Run("should be able to handle error", func(t *testing.T) {
 		var r work.WorkLabelRelationReq
-		work.DeleteWorkLabelRelationFunc = func(req work.WorkLabelRelationReq, c *session.Context) error {
+		work.DeleteWorkLabelRelationFunc = func(req work.WorkLabelRelationReq, c *session.Session) error {
 			r = req
 			return errors.New("some error")
 		}

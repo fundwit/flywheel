@@ -154,7 +154,7 @@ func TestCreateWork(t *testing.T) {
 				{ID: 200, Name: "label200", ThemeColor: "green"},
 			}, nil
 		}
-		checklist.ListCheckItemsFunc = func(workId types.ID, c *session.Context) ([]checklist.CheckItem, error) {
+		checklist.ListCheckItemsFunc = func(workId types.ID, c *session.Session) ([]checklist.CheckItem, error) {
 			return []checklist.CheckItem{{Name: "test1"}}, nil
 		}
 
@@ -196,7 +196,7 @@ func TestCreateWork(t *testing.T) {
 		Expect(detail.ID).To(Equal(w.ID))
 
 		// should be visible to system permissions
-		detail, err = work.DetailWork(w.ID.String(), &session.Context{
+		detail, err = work.DetailWork(w.ID.String(), &session.Session{
 			Identity: session.Identity{ID: 10, Name: "index-robot"}, Perms: authority.Permissions{account.SystemViewPermission.ID}})
 		Expect(err).To(BeNil())
 		Expect(detail).ToNot(BeNil())
@@ -717,7 +717,7 @@ func TestExtendWorks(t *testing.T) {
 		setup(t, &testDatabase)
 
 		flowMap := map[types.ID]domain.Workflow{}
-		flow.DetailWorkflowFunc = func(id types.ID, sec *session.Context) (*domain.WorkflowDetail, error) {
+		flow.DetailWorkflowFunc = func(id types.ID, sec *session.Session) (*domain.WorkflowDetail, error) {
 			flowMap[id] = domain.Workflow{ID: id, Name: "flow-" + id.String()}
 			return &domain.WorkflowDetail{
 				Workflow: flowMap[id],

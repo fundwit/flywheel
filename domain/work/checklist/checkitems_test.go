@@ -77,9 +77,9 @@ func TestCreateCheckitem(t *testing.T) {
 		defer checkitemsTestTeardown(t, testDatabase)
 		workflow1, p1, p2, _, _ := checkitemsTestSetup(t, &testDatabase)
 
-		c1 := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+		c1 := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
 			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
-		c2 := session.Context{Identity: session.Identity{ID: 20, Name: "user 20"},
+		c2 := session.Session{Identity: session.Identity{ID: 20, Name: "user 20"},
 			Perms: authority.Permissions{"manager_" + p2.ID.String()}}
 
 		// case1: assert resource not found if work is not found
@@ -100,7 +100,7 @@ func TestCreateCheckitem(t *testing.T) {
 		defer checkitemsTestTeardown(t, testDatabase)
 		workflow1, p1, _, persistedEvents, handedEvents := checkitemsTestSetup(t, &testDatabase)
 
-		c1 := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+		c1 := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
 			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
 
 		// prepare work
@@ -144,9 +144,9 @@ func TestListCheckitems(t *testing.T) {
 		defer checkitemsTestTeardown(t, testDatabase)
 		workflow1, p1, p2, _, _ := checkitemsTestSetup(t, &testDatabase)
 
-		c1 := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+		c1 := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
 			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
-		c2 := session.Context{Identity: session.Identity{ID: 20, Name: "user 20"},
+		c2 := session.Session{Identity: session.Identity{ID: 20, Name: "user 20"},
 			Perms: authority.Permissions{"manager_" + p2.ID.String()}}
 
 		// case1: assert resource not found if work is not found
@@ -167,7 +167,7 @@ func TestListCheckitems(t *testing.T) {
 		defer checkitemsTestTeardown(t, testDatabase)
 		workflow1, p1, _, _, _ := checkitemsTestSetup(t, &testDatabase)
 
-		c1 := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+		c1 := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
 			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
 
 		// prepare work
@@ -198,7 +198,7 @@ func TestListCheckitems(t *testing.T) {
 		Expect(cs2[0]).To(Equal(*ci2))
 
 		// be able to list checkitems with system permissions
-		cs2, err = checklist.ListCheckItems(w2.ID, &session.Context{
+		cs2, err = checklist.ListCheckItems(w2.ID, &session.Session{
 			Identity: session.Identity{ID: 10, Name: "index-robot"},
 			Perms:    authority.Permissions{account.SystemViewPermission.ID}})
 		Expect(err).To(BeNil())
@@ -215,9 +215,9 @@ func TestUpdateCheckitem(t *testing.T) {
 		defer checkitemsTestTeardown(t, testDatabase)
 		workflow1, p1, p2, _, _ := checkitemsTestSetup(t, &testDatabase)
 
-		c1 := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+		c1 := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
 			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
-		c2 := session.Context{Identity: session.Identity{ID: 20, Name: "user 20"},
+		c2 := session.Session{Identity: session.Identity{ID: 20, Name: "user 20"},
 			Perms: authority.Permissions{"manager_" + p2.ID.String()}}
 
 		// prepare work
@@ -245,7 +245,7 @@ func TestUpdateCheckitem(t *testing.T) {
 		defer checkitemsTestTeardown(t, testDatabase)
 		workflow1, p1, _, persistedEvents, handedEvents := checkitemsTestSetup(t, &testDatabase)
 
-		c1 := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+		c1 := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
 			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
 
 		// prepare work
@@ -320,9 +320,9 @@ func TestDeleteCheckitems(t *testing.T) {
 		defer checkitemsTestTeardown(t, testDatabase)
 		workflow1, p1, p2, _, _ := checkitemsTestSetup(t, &testDatabase)
 
-		c1 := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+		c1 := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
 			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
-		c2 := session.Context{Identity: session.Identity{ID: 20, Name: "user 20"},
+		c2 := session.Session{Identity: session.Identity{ID: 20, Name: "user 20"},
 			Perms: authority.Permissions{"manager_" + p2.ID.String()}}
 
 		// prepare work
@@ -344,7 +344,7 @@ func TestDeleteCheckitems(t *testing.T) {
 		defer checkitemsTestTeardown(t, testDatabase)
 		workflow1, p1, _, persistedEvents, handedEvents := checkitemsTestSetup(t, &testDatabase)
 
-		c1 := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+		c1 := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
 			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
 
 		// prepare work
@@ -402,9 +402,9 @@ func TestCleanWorkCheckitems(t *testing.T) {
 		defer checkitemsTestTeardown(t, testDatabase)
 		workflow1, p1, p2, _, _ := checkitemsTestSetup(t, &testDatabase)
 
-		c1 := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+		c1 := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
 			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
-		c2 := session.Context{Identity: session.Identity{ID: 20, Name: "user 20"},
+		c2 := session.Session{Identity: session.Identity{ID: 20, Name: "user 20"},
 			Perms: authority.Permissions{"manager_" + p2.ID.String()}}
 
 		// prepare work
@@ -424,7 +424,7 @@ func TestCleanWorkCheckitems(t *testing.T) {
 		defer checkitemsTestTeardown(t, testDatabase)
 		workflow1, p1, _, persistedEvents, handedEvents := checkitemsTestSetup(t, &testDatabase)
 
-		c1 := session.Context{Identity: session.Identity{ID: 10, Name: "user 10"},
+		c1 := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
 			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
 
 		// prepare work
@@ -470,7 +470,7 @@ func TestCleanWorkCheckitems(t *testing.T) {
 	})
 }
 
-func buildWork(workName string, flowId, gid types.ID, secCtx *session.Context) *work.WorkDetail {
+func buildWork(workName string, flowId, gid types.ID, secCtx *session.Session) *work.WorkDetail {
 	workCreation := &domain.WorkCreation{
 		Name:             workName,
 		ProjectID:        gid,

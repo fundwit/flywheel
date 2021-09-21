@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/mocktracer"
-	tracingGorm "github.com/smacker/opentracing-gorm"
+	otgorm "github.com/smacker/opentracing-gorm"
 )
 
 func TestGormTracing(t *testing.T) {
@@ -35,9 +35,8 @@ func TestGormTracing(t *testing.T) {
 		Expect(len(spans)).To(Equal(0))
 
 		// case2
-		tracingGorm.SetSpanToGorm(context.Background(), db)
 		r = []domain.Project{}
-		Expect(db.Find(&r).Error).To(BeNil())
+		Expect(otgorm.SetSpanToGorm(context.Background(), db).Find(&r).Error).To(BeNil())
 		Expect(len(r)).To(BeZero())
 		spans = tracer.FinishedSpans()
 		Expect(len(spans)).To(Equal(0))
@@ -54,7 +53,7 @@ func TestGormTracing(t *testing.T) {
 		ctx := opentracing.ContextWithSpan(context.Background(), clientSpan)
 
 		// extract span from context and then inject into db.values.
-		db := tracingGorm.SetSpanToGorm(ctx, testDatabase.DS.GormDB())
+		db := otgorm.SetSpanToGorm(ctx, testDatabase.DS.GormDB())
 
 		r := []domain.Project{}
 		Expect(db.Find(&r).Error).To(BeNil())

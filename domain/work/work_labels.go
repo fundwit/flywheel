@@ -57,7 +57,7 @@ func QueryLabelBriefsOfWork(workId types.ID) ([]label.LabelBrief, error) {
 	return labelBriefs, nil
 }
 
-func CreateWorkLabelRelation(req WorkLabelRelationReq, c *session.Context) (*WorkLabelRelation, error) {
+func CreateWorkLabelRelation(req WorkLabelRelationReq, c *session.Session) (*WorkLabelRelation, error) {
 	var r *WorkLabelRelation
 	txErr := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
 		// load work, check perms against to project of work
@@ -90,7 +90,7 @@ func CreateWorkLabelRelation(req WorkLabelRelationReq, c *session.Context) (*Wor
 	return r, nil
 }
 
-func DeleteWorkLabelRelation(req WorkLabelRelationReq, c *session.Context) error {
+func DeleteWorkLabelRelation(req WorkLabelRelationReq, c *session.Session) error {
 	if (req == WorkLabelRelationReq{}) {
 		return bizerror.ErrInvalidArguments
 	}

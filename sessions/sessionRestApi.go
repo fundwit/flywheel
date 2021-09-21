@@ -16,13 +16,13 @@ func RegisterSessionHandler(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 }
 
 func DetailSessionSecurityContext(c *gin.Context) {
-	sec := session.FindSecurityContext(c)
+	sec := session.ExtractSessionFromGinContext(c)
 
 	now := time.Now()
 	ttl := session.TokenExpiration - now.Sub(sec.SigningTime)
 	if ttl > 0 {
 		perms, projectRoles := account.LoadPermFunc(sec.Identity.ID)
-		securityContext := session.Context{Token: sec.Token, Identity: sec.Identity, Perms: perms, ProjectRoles: projectRoles, SigningTime: now}
+		securityContext := session.Session{Token: sec.Token, Identity: sec.Identity, Perms: perms, ProjectRoles: projectRoles, SigningTime: now}
 		session.TokenCache.Set(sec.Token, &securityContext, ttl)
 		c.JSON(http.StatusOK, &securityContext)
 	} else {

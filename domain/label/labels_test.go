@@ -37,12 +37,12 @@ func TestQueryLabels(t *testing.T) {
 
 	t.Run("only project member has permission to query labels", func(t *testing.T) {
 		i := label.LabelQuery{ProjectID: 100}
-		l, err := label.QueryLabels(i, &session.Context{Perms: authority.Permissions{
+		l, err := label.QueryLabels(i, &session.Session{Perms: authority.Permissions{
 			account.SystemAdminPermission.ID, "admin_101"}})
 		Expect(l).To(BeNil())
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 
-		l, err = label.QueryLabels(i, &session.Context{Identity: session.Identity{ID: 10, Name: "user 10"}})
+		l, err = label.QueryLabels(i, &session.Session{Identity: session.Identity{ID: 10, Name: "user 10"}})
 		Expect(l).To(BeNil())
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 	})
@@ -51,7 +51,7 @@ func TestQueryLabels(t *testing.T) {
 		defer teardown(t, testDatabase)
 		setup(t, &testDatabase)
 
-		c := &session.Context{Perms: authority.Permissions{"admin_100", "member_200", "admin_300"},
+		c := &session.Session{Perms: authority.Permissions{"admin_100", "member_200", "admin_300"},
 			Identity: session.Identity{ID: 10, Name: "user 10"}}
 		l1, err := label.CreateLabel(label.LabelCreation{ProjectID: 100, Name: "test label 1", ThemeColor: "red"}, c)
 		Expect(err).To(BeNil())
@@ -78,12 +78,12 @@ func TestCreateLabel(t *testing.T) {
 
 	t.Run("only project member has permission to create label", func(t *testing.T) {
 		i := label.LabelCreation{ProjectID: 100, Name: "test label", ThemeColor: "red"}
-		l, err := label.CreateLabel(i, &session.Context{Perms: authority.Permissions{
+		l, err := label.CreateLabel(i, &session.Session{Perms: authority.Permissions{
 			account.SystemAdminPermission.ID, "admin_101"}})
 		Expect(l).To(BeNil())
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 
-		l, err = label.CreateLabel(i, &session.Context{Identity: session.Identity{ID: 10, Name: "user 10"}})
+		l, err = label.CreateLabel(i, &session.Session{Identity: session.Identity{ID: 10, Name: "user 10"}})
 		Expect(l).To(BeNil())
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 	})
@@ -92,7 +92,7 @@ func TestCreateLabel(t *testing.T) {
 		defer teardown(t, testDatabase)
 		setup(t, &testDatabase)
 
-		c := &session.Context{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
+		c := &session.Session{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
 		i := label.LabelCreation{ProjectID: 100, Name: "test label", ThemeColor: "red"}
 		l, err := label.CreateLabel(i, c)
 		Expect(err).To(BeNil())
@@ -112,7 +112,7 @@ func TestCreateLabel(t *testing.T) {
 		defer teardown(t, testDatabase)
 		setup(t, &testDatabase)
 
-		c := &session.Context{Perms: authority.Permissions{"admin_100", "admin_200"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
+		c := &session.Session{Perms: authority.Permissions{"admin_100", "admin_200"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
 		i := label.LabelCreation{ProjectID: 100, Name: "test label", ThemeColor: "red"}
 		_, err := label.CreateLabel(i, c)
 		Expect(err).To(BeNil())
@@ -135,16 +135,16 @@ func TestDeleteLabel(t *testing.T) {
 		defer teardown(t, testDatabase)
 		setup(t, &testDatabase)
 
-		c := &session.Context{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
+		c := &session.Session{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
 		i := label.LabelCreation{ProjectID: 100, Name: "test label", ThemeColor: "red"}
 		l, err := label.CreateLabel(i, c)
 		Expect(err).To(BeNil())
 
-		err = label.DeleteLabel(l.ID, &session.Context{Perms: authority.Permissions{
+		err = label.DeleteLabel(l.ID, &session.Session{Perms: authority.Permissions{
 			account.SystemAdminPermission.ID, "admin_101"}})
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 
-		err = label.DeleteLabel(l.ID, &session.Context{Identity: session.Identity{ID: 10, Name: "user 10"}})
+		err = label.DeleteLabel(l.ID, &session.Session{Identity: session.Identity{ID: 10, Name: "user 10"}})
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 	})
 
@@ -152,7 +152,7 @@ func TestDeleteLabel(t *testing.T) {
 		defer teardown(t, testDatabase)
 		setup(t, &testDatabase)
 
-		c := &session.Context{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
+		c := &session.Session{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
 		i := label.LabelCreation{ProjectID: 100, Name: "test label", ThemeColor: "red"}
 		l, err := label.CreateLabel(i, c)
 		Expect(err).To(BeNil())
@@ -178,7 +178,7 @@ func TestDeleteLabel(t *testing.T) {
 		defer teardown(t, testDatabase)
 		setup(t, &testDatabase)
 
-		c := &session.Context{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
+		c := &session.Session{Perms: authority.Permissions{"admin_100"}, Identity: session.Identity{ID: 10, Name: "user 10"}}
 		i := label.LabelCreation{ProjectID: 100, Name: "test label", ThemeColor: "red"}
 		l, err := label.CreateLabel(i, c)
 		Expect(err).To(BeNil())

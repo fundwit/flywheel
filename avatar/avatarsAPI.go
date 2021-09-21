@@ -50,7 +50,7 @@ func HandleCreateAvatar(c *gin.Context) {
 	}
 	defer src.Close()
 
-	if err := CreateAvatarFunc(id, src, session.FindSecurityContext(c)); err != nil {
+	if err := CreateAvatarFunc(id, src, session.ExtractSessionFromGinContext(c)); err != nil {
 		panic(err)
 	}
 

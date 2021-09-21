@@ -23,7 +23,7 @@ func TestHandleIndexRequest(t *testing.T) {
 	RegisterIndicesRestAPI(router)
 
 	t.Run("handle error", func(t *testing.T) {
-		ScheduleNewSyncRunFunc = func(sec *session.Context) (bool, error) {
+		ScheduleNewSyncRunFunc = func(sec *session.Session) (bool, error) {
 			return false, errors.New("error on schedule new sync run")
 		}
 		req := httptest.NewRequest(http.MethodPost, PathIndexRequests, nil)
@@ -33,7 +33,7 @@ func TestHandleIndexRequest(t *testing.T) {
 	})
 
 	t.Run("submit index request successfully", func(t *testing.T) {
-		ScheduleNewSyncRunFunc = func(sec *session.Context) (bool, error) {
+		ScheduleNewSyncRunFunc = func(sec *session.Session) (bool, error) {
 			return true, nil
 		}
 		req := httptest.NewRequest(http.MethodPost, PathIndexRequests, nil)
@@ -43,7 +43,7 @@ func TestHandleIndexRequest(t *testing.T) {
 	})
 
 	t.Run("submit index request failed", func(t *testing.T) {
-		ScheduleNewSyncRunFunc = func(sec *session.Context) (bool, error) {
+		ScheduleNewSyncRunFunc = func(sec *session.Session) (bool, error) {
 			return false, nil
 		}
 		req := httptest.NewRequest(http.MethodPost, PathIndexRequests, nil)
@@ -61,7 +61,7 @@ func TestHandleCreatePendingIndexLogsRecovery(t *testing.T) {
 	RegisterIndicesRestAPI(router)
 
 	t.Run("handle error", func(t *testing.T) {
-		IndexlogRecoveryRoutineFunc = func(sec *session.Context) error {
+		IndexlogRecoveryRoutineFunc = func(sec *session.Session) error {
 			return errors.New("error on pending index log recovery")
 		}
 		req := httptest.NewRequest(http.MethodPost, PathPendingIndexRecovery, nil)
@@ -72,7 +72,7 @@ func TestHandleCreatePendingIndexLogsRecovery(t *testing.T) {
 
 	t.Run("create pending index log recovery routine successfully", func(t *testing.T) {
 		indexLogRecoveryLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 1)
-		IndexlogRecoveryRoutineFunc = func(sec *session.Context) error {
+		IndexlogRecoveryRoutineFunc = func(sec *session.Session) error {
 			return nil
 		}
 		req := httptest.NewRequest(http.MethodPost, PathPendingIndexRecovery, nil)

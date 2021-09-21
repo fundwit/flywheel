@@ -73,31 +73,31 @@ func TestSearchWorks(t *testing.T) {
 		Expect(indices.IndexWorks([]work.WorkDetail{w2002})).To(BeNil())
 
 		// assert: visible project limit
-		works, err := SearchWorks(domain.WorkQuery{}, &session.Context{})
+		works, err := SearchWorks(domain.WorkQuery{}, &session.Session{})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(BeZero())
 
-		works, err = SearchWorks(domain.WorkQuery{}, &session.Context{Perms: []string{"manager_111", "common_222"}})
+		works, err = SearchWorks(domain.WorkQuery{}, &session.Session{Perms: []string{"manager_111", "common_222"}})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(BeZero())
 
-		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100}, &session.Context{Perms: []string{"manager_200", "common_222"}})
+		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100}, &session.Session{Perms: []string{"manager_200", "common_222"}})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(BeZero())
 
-		works, err = SearchWorks(domain.WorkQuery{ProjectID: 200}, &session.Context{Perms: []string{"manager_200", "common_222"}})
+		works, err = SearchWorks(domain.WorkQuery{ProjectID: 200}, &session.Session{Perms: []string{"manager_200", "common_222"}})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(1))
 		Expect(works[0]).To(Equal(w2002))
 
-		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100, Name: "demo1"}, &session.Context{Perms: []string{"manager_200", "common_100"}})
+		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100, Name: "demo1"}, &session.Session{Perms: []string{"manager_200", "common_100"}})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(1))
 		Expect(works[0]).To(Equal(w1001))
 
 		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100, ArchiveState: "ALL",
 			StateCategories: []state.Category{state.InProcess, state.Done}},
-			&session.Context{Perms: []string{"common_100"}})
+			&session.Session{Perms: []string{"common_100"}})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(3))
 		Expect(works[0]).To(Equal(w1001))
@@ -106,14 +106,14 @@ func TestSearchWorks(t *testing.T) {
 
 		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100, ArchiveState: "ON",
 			StateCategories: []state.Category{state.InProcess, state.Done}},
-			&session.Context{Perms: []string{"common_100"}})
+			&session.Session{Perms: []string{"common_100"}})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(1))
 		Expect(works[0]).To(Equal(w1003))
 
 		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100, ArchiveState: "OFF",
 			StateCategories: []state.Category{state.InProcess, state.Done}},
-			&session.Context{Perms: []string{"common_100"}})
+			&session.Session{Perms: []string{"common_100"}})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(2))
 		Expect(works[0]).To(Equal(w1001))
@@ -122,7 +122,7 @@ func TestSearchWorks(t *testing.T) {
 		// default archive state is OFF
 		works, err = SearchWorks(domain.WorkQuery{ProjectID: 100,
 			StateCategories: []state.Category{state.InProcess, state.Done}},
-			&session.Context{Perms: []string{"common_100"}})
+			&session.Session{Perms: []string{"common_100"}})
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(2))
 		Expect(works[0]).To(Equal(w1001))
@@ -133,7 +133,7 @@ func TestSearchWorks(t *testing.T) {
 func beforeEach(t *testing.T) {
 	es.CreateClientFromEnv()
 	es.IndexFunc = es.Index
-	work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Context) ([]work.WorkDetail, error) {
+	work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Session) ([]work.WorkDetail, error) {
 		return details, nil
 	}
 

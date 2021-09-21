@@ -30,7 +30,7 @@ func HandleQueryProjectMembers(c *gin.Context) {
 	if err != nil {
 		panic(err)
 	}
-	result, err := QueryProjectMembersFunc(&payload, session.FindSecurityContext(c))
+	result, err := QueryProjectMembersFunc(&payload, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +43,7 @@ func HandleCreateProjectMember(c *gin.Context) {
 	if err != nil {
 		panic(err)
 	}
-	err = CreateProjectMemberFunc(&payload, session.FindSecurityContext(c))
+	err = CreateProjectMemberFunc(&payload, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -57,7 +57,7 @@ func HandleDeleteProjectMember(c *gin.Context) {
 		panic(err)
 	}
 
-	err = DeleteProjectMemberFunc(&payload, session.FindSecurityContext(c))
+	err = DeleteProjectMemberFunc(&payload, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}

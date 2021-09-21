@@ -19,11 +19,11 @@ import (
 
 var (
 	WorkIndexEventHandlerName = "workIndexr"
-	indexRobot                = &session.Context{
+	indexRobot                = &session.Session{
 		Identity: session.Identity{ID: 10, Name: "index-robot"},
 		Perms:    authority.Permissions{account.SystemViewPermission.ID},
 	}
-	anonymousRecoveryInvoker = &session.Context{
+	anonymousRecoveryInvoker = &session.Session{
 		Identity: session.Identity{ID: 11, Name: "anonymous-invoker"},
 		Perms:    authority.Permissions{account.SystemRecoveryPermission.ID},
 	}
@@ -36,7 +36,7 @@ var (
 	IndexlogRecoveryRoutineFunc = IndexlogRecoveryRoutine
 )
 
-func ScheduleNewSyncRun(sec *session.Context) (bool, error) {
+func ScheduleNewSyncRun(sec *session.Session) (bool, error) {
 	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
 		return false, bizerror.ErrForbidden
 	}
@@ -68,7 +68,7 @@ var (
 	SyncBatchSize = 500
 )
 
-func IndexlogRecoveryRoutine(sec *session.Context) (err error) {
+func IndexlogRecoveryRoutine(sec *session.Session) (err error) {
 	if !sec.Perms.HasRole(account.SystemRecoveryPermission.ID) && !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
 		return bizerror.ErrForbidden
 	}

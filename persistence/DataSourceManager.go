@@ -21,6 +21,7 @@ func (m *DataSourceManager) Start() error {
 	if err != nil {
 		return err
 	}
+	tracingGorm.AddGormCallbacks(db)
 	m.gormDB = db
 	if os.Getenv("GIN_MODE") == "debug" {
 		m.gormDB.LogMode(true)
@@ -39,9 +40,7 @@ func (m *DataSourceManager) Stop() {
 
 func (m *DataSourceManager) GormDB() *gorm.DB {
 	if m.gormDB != nil {
-		d := m.gormDB.New()
-		tracingGorm.AddGormCallbacks(d)
-		return d
+		return m.gormDB.New()
 	}
 	return nil
 }

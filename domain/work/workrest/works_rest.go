@@ -1,6 +1,7 @@
 package workrest
 
 import (
+	"context"
 	"errors"
 	"flywheel/bizerror"
 	"flywheel/domain"
@@ -42,7 +43,7 @@ func handleQuery(c *gin.Context) {
 	}
 
 	//works, err := work.QueryWorkFunc(&query, session.FindSecurityContext(c))
-	works, err := search.SearchWorksFunc(query, session.FindSecurityContext(c))
+	works, err := search.SearchWorksFunc(query, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -56,7 +57,8 @@ func handleCreate(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	detail, err := work.CreateWorkFunc(&creation, session.FindSecurityContext(c))
+	context.Background()
+	detail, err := work.CreateWorkFunc(&creation, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -64,7 +66,7 @@ func handleCreate(c *gin.Context) {
 }
 
 func handleDetail(c *gin.Context) {
-	detail, err := work.DetailWorkFunc(c.Param("id"), session.FindSecurityContext(c))
+	detail, err := work.DetailWorkFunc(c.Param("id"), session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -84,7 +86,7 @@ func handleUpdate(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	updatedWork, err := work.UpdateWorkFunc(parsedId, &updating, session.FindSecurityContext(c))
+	updatedWork, err := work.UpdateWorkFunc(parsedId, &updating, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -97,7 +99,7 @@ func handleUpdateOrders(c *gin.Context) {
 	if err != nil {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
-	err = work.UpdateStateRangeOrdersFunc(&updating, session.FindSecurityContext(c))
+	err = work.UpdateStateRangeOrdersFunc(&updating, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -110,7 +112,7 @@ func handleDelete(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: errors.New("invalid id '" + c.Param("id") + "'")})
 	}
 
-	err = work.DeleteWorkFunc(parsedId, session.FindSecurityContext(c))
+	err = work.DeleteWorkFunc(parsedId, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -123,7 +125,7 @@ func handleCreateArchivedWorks(c *gin.Context) {
 		panic(err)
 	}
 
-	err := work.ArchiveWorksFunc(query.WorkIdList, session.FindSecurityContext(c))
+	err := work.ArchiveWorksFunc(query.WorkIdList, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}

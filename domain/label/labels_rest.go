@@ -28,7 +28,7 @@ func handleCreateLabel(c *gin.Context) {
 	if err != nil {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
-	record, err := CreateLabelFunc(creation, session.FindSecurityContext(c))
+	record, err := CreateLabelFunc(creation, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -41,7 +41,7 @@ func handleQueryLabels(c *gin.Context) {
 	if err != nil {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
-	record, err := QueryLabelsFunc(query, session.FindSecurityContext(c))
+	record, err := QueryLabelsFunc(query, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -54,7 +54,7 @@ func handleDeleteLabel(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: errors.New("invalid id '" + c.Param("id") + "'")})
 	}
 
-	err = DeleteLabelFunc(parsedId, session.FindSecurityContext(c))
+	err = DeleteLabelFunc(parsedId, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}

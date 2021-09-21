@@ -43,7 +43,7 @@ func TestHandleCreateAvatar(t *testing.T) {
 	RegisterAvatarAPI(engine)
 
 	buff := &bytes.Buffer{}
-	CreateAvatarFunc = func(id types.ID, r io.Reader, sec *session.Context) error {
+	CreateAvatarFunc = func(id types.ID, r io.Reader, sec *session.Session) error {
 		if _, err := io.Copy(buff, r); err != nil {
 			return err
 		}

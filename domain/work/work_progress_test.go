@@ -72,7 +72,7 @@ func workProgressTestTeardown(t *testing.T, testDatabase *testinfra.TestDatabase
 	}
 }
 
-func buildWork(workName string, flowId, gid types.ID, secCtx *session.Context) *work.WorkDetail {
+func buildWork(workName string, flowId, gid types.ID, secCtx *session.Session) *work.WorkDetail {
 	workCreation := &domain.WorkCreation{
 		Name:             workName,
 		ProjectID:        gid,

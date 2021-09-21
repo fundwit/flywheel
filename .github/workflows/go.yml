@@ -33,7 +33,7 @@ jobs:
 
     - name: Test
       run: |
-        TZ='Asia/Shanghai' go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+        TZ='Asia/Shanghai' go test -race -coverprofile=coverage.txt -covermode=atomic ./...
         bash <(curl -s https://codecov.io/bash)
 
     - name: Generte Build Info File

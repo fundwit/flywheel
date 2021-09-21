@@ -20,16 +20,18 @@ type LoginRequest struct {
 const KeySecCtx = "SecCtx"
 const KeySecToken = "sec_token"
 
-func FindSecurityContext(ctx *gin.Context) *Context {
+func ExtractSessionFromGinContext(ctx *gin.Context) *Session {
 	value, found := ctx.Get(KeySecCtx)
 	if !found {
-		return nil
+		return &Session{Context: ctx.Request.Context()}
 	}
-	secCtx, ok := value.(*Context)
-	if !ok || secCtx.Token == "" {
-		return nil
+	s0, ok := value.(*Session)
+	if !ok || s0.Token == "" {
+		return &Session{Context: ctx.Request.Context()}
 	}
-	return secCtx
+	s := s0.Clone()
+	s.Context = ctx.Request.Context() // trace context
+	return &s
 }
 
 func SimpleAuthFilter() gin.HandlerFunc {
@@ -42,16 +44,16 @@ func SimpleAuthFilter() gin.HandlerFunc {
 		if !found {
 			panic(bizerror.ErrUnauthenticated)
 		}
-		secCtx, ok := securityContextValue.(*Context)
+		secCtx, ok := securityContextValue.(*Session)
 		if !ok {
 			panic(bizerror.ErrUnauthenticated)
 		}
-		SaveSecurityContext(ctx, secCtx)
+		InjectSessionIntoGinContext(ctx, secCtx)
 		ctx.Next()
 	}
 }
 
-func SaveSecurityContext(ctx *gin.Context, secCtx *Context) {
+func InjectSessionIntoGinContext(ctx *gin.Context, secCtx *Session) {
 	if secCtx != nil && secCtx.Token != "" {
 		ctx.Set(KeySecCtx, secCtx)
 	}

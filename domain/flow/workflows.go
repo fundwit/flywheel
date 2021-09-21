@@ -33,7 +33,7 @@ var (
 	DeleteWorkflowStateTransitionsFunc = DeleteWorkflowStateTransitions
 )
 
-func CreateWorkflow(c *WorkflowCreation, sec *session.Context) (*domain.WorkflowDetail, error) {
+func CreateWorkflow(c *WorkflowCreation, sec *session.Session) (*domain.WorkflowDetail, error) {
 	if !sec.Perms.HasRoleSuffix("_" + c.ProjectID.String()) {
 		return nil, bizerror.ErrForbidden
 	}
@@ -85,7 +85,7 @@ func CreateWorkflow(c *WorkflowCreation, sec *session.Context) (*domain.Workflow
 	return workflow, nil
 }
 
-func DetailWorkflow(id types.ID, sec *session.Context) (*domain.WorkflowDetail, error) {
+func DetailWorkflow(id types.ID, sec *session.Session) (*domain.WorkflowDetail, error) {
 	workflowDetail := domain.WorkflowDetail{}
 	db := persistence.ActiveDataSourceManager.GormDB()
 	err := db.Transaction(func(tx *gorm.DB) error {
@@ -128,7 +128,7 @@ func DetailWorkflow(id types.ID, sec *session.Context) (*domain.WorkflowDetail, 
 	return &workflowDetail, nil
 }
 
-func DeleteWorkflow(id types.ID, sec *session.Context) error {
+func DeleteWorkflow(id types.ID, sec *session.Session) error {
 	wf := domain.Workflow{}
 	db := persistence.ActiveDataSourceManager.GormDB()
 	err := db.Transaction(func(tx *gorm.DB) error {
@@ -159,7 +159,7 @@ func DeleteWorkflow(id types.ID, sec *session.Context) error {
 	return err
 }
 
-func QueryWorkflows(query *domain.WorkflowQuery, sec *session.Context) (*[]domain.Workflow, error) {
+func QueryWorkflows(query *domain.WorkflowQuery, sec *session.Session) (*[]domain.Workflow, error) {
 	var workflows []domain.Workflow
 	db := persistence.ActiveDataSourceManager.GormDB()
 
@@ -179,7 +179,7 @@ func QueryWorkflows(query *domain.WorkflowQuery, sec *session.Context) (*[]domai
 	return &workflows, nil
 }
 
-func UpdateWorkflowBase(id types.ID, c *WorkflowBaseUpdation, sec *session.Context) (*domain.Workflow, error) {
+func UpdateWorkflowBase(id types.ID, c *WorkflowBaseUpdation, sec *session.Session) (*domain.Workflow, error) {
 	wf := domain.Workflow{}
 	db := persistence.ActiveDataSourceManager.GormDB()
 	err := db.Transaction(func(tx *gorm.DB) error {
@@ -205,7 +205,7 @@ func UpdateWorkflowBase(id types.ID, c *WorkflowBaseUpdation, sec *session.Conte
 	return &wf, nil
 }
 
-func CreateState(workflowID types.ID, creating *StateCreating, sec *session.Context) error {
+func CreateState(workflowID types.ID, creating *StateCreating, sec *session.Session) error {
 	now := time.Now()
 	return persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
 		if err := checkPerms(workflowID, sec); err != nil {
@@ -250,7 +250,7 @@ type workBrief struct {
 	Name       string
 }
 
-func UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, sec *session.Context) error {
+func UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, sec *session.Session) error {
 	workflow := domain.Workflow{}
 	db := persistence.ActiveDataSourceManager.GormDB()
 
@@ -368,7 +368,7 @@ func UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, sec *sessi
 	return nil
 }
 
-func UpdateStateRangeOrders(workflowID types.ID, wantedOrders *[]StateOrderRangeUpdating, sec *session.Context) error {
+func UpdateStateRangeOrders(workflowID types.ID, wantedOrders *[]StateOrderRangeUpdating, sec *session.Session) error {
 	if wantedOrders == nil || len(*wantedOrders) == 0 {
 		return nil
 	}
@@ -393,7 +393,7 @@ func UpdateStateRangeOrders(workflowID types.ID, wantedOrders *[]StateOrderRange
 	})
 }
 
-func checkPerms(id types.ID, sec *session.Context) error {
+func checkPerms(id types.ID, sec *session.Session) error {
 	var workflow domain.Workflow
 	if err := persistence.ActiveDataSourceManager.GormDB().Where(&domain.Workflow{ID: id}).First(&workflow).Error; err != nil {
 		return err
@@ -404,7 +404,7 @@ func checkPerms(id types.ID, sec *session.Context) error {
 	return nil
 }
 
-func CreateWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *session.Context) error {
+func CreateWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *session.Session) error {
 	workflow := domain.Workflow{}
 	db := persistence.ActiveDataSourceManager.GormDB()
 	return db.Transaction(func(tx *gorm.DB) error {
@@ -442,7 +442,7 @@ func CreateWorkflowStateTransitions(id types.ID, transitions []state.Transition,
 	})
 }
 
-func DeleteWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *session.Context) error {
+func DeleteWorkflowStateTransitions(id types.ID, transitions []state.Transition, sec *session.Session) error {
 	wf := domain.Workflow{}
 	db := persistence.ActiveDataSourceManager.GormDB()
 	return db.Transaction(func(tx *gorm.DB) error {

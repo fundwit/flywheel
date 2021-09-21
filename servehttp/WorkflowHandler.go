@@ -52,7 +52,7 @@ func (h *workflowHandler) handleQueryWorkflows(c *gin.Context) {
 	query := domain.WorkflowQuery{}
 	_ = c.MustBindWith(&query, binding.Query)
 
-	flows, err := flow.QueryWorkflowsFunc(&query, session.FindSecurityContext(c))
+	flows, err := flow.QueryWorkflowsFunc(&query, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -69,7 +69,7 @@ func (h *workflowHandler) handleCreateWorkflow(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	workflow, err := flow.CreateWorkflowFunc(&creation, session.FindSecurityContext(c))
+	workflow, err := flow.CreateWorkflowFunc(&creation, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -85,7 +85,7 @@ func (h *workflowHandler) handleDetailWorkflows(c *gin.Context) {
 		return
 	}
 
-	workflowDetail, err := flow.DetailWorkflowFunc(id, session.FindSecurityContext(c))
+	workflowDetail, err := flow.DetailWorkflowFunc(id, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -110,7 +110,7 @@ func (h *workflowHandler) handleUpdateWorkflowsBase(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	workflow, err := flow.UpdateWorkflowBaseFunc(id, &updating, session.FindSecurityContext(c))
+	workflow, err := flow.UpdateWorkflowBaseFunc(id, &updating, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -126,7 +126,7 @@ func (h *workflowHandler) handleDeleteWorkflow(c *gin.Context) {
 		return
 	}
 
-	err = flow.DeleteWorkflowFunc(id, session.FindSecurityContext(c))
+	err = flow.DeleteWorkflowFunc(id, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -147,7 +147,7 @@ func (h *workflowHandler) handleQueryTransitions(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	workflow, _ := flow.DetailWorkflowFunc(query.FlowID, session.FindSecurityContext(c))
+	workflow, _ := flow.DetailWorkflowFunc(query.FlowID, session.ExtractSessionFromGinContext(c))
 	if workflow == nil {
 		c.JSON(http.StatusNotFound, &misc.ErrorBody{Code: "common.bad_param",
 			Message: "the flow of id " + strconv.FormatUint(uint64(query.FlowID), 10) + " was not found"})
@@ -176,7 +176,7 @@ func (h *workflowHandler) handleCreateStateMachineTransitions(c *gin.Context) {
 		}
 	}
 
-	err = flow.CreateWorkflowStateTransitionsFunc(id, transitions, session.FindSecurityContext(c))
+	err = flow.CreateWorkflowStateTransitionsFunc(id, transitions, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -203,7 +203,7 @@ func (h *workflowHandler) handleDeleteStateMachineTransitions(c *gin.Context) {
 		}
 	}
 
-	err = flow.DeleteWorkflowStateTransitionsFunc(id, transitions, session.FindSecurityContext(c))
+	err = flow.DeleteWorkflowStateTransitionsFunc(id, transitions, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -228,7 +228,7 @@ func (h *workflowHandler) handleUpdateStateMachineState(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	err = flow.UpdateWorkflowStateFunc(id, updating, session.FindSecurityContext(c))
+	err = flow.UpdateWorkflowStateFunc(id, updating, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -255,7 +255,7 @@ func (h *workflowHandler) handleUpdateStateMachineStateOrders(c *gin.Context) {
 			panic(&bizerror.ErrBadParam{Cause: err})
 		}
 	}
-	err = flow.UpdateStateRangeOrdersFunc(id, &orderUpdating, session.FindSecurityContext(c))
+	err = flow.UpdateStateRangeOrdersFunc(id, &orderUpdating, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()
@@ -277,7 +277,7 @@ func (h *workflowHandler) handleCreateStateMachineState(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	err = flow.CreateStateFunc(id, &stateCreating, session.FindSecurityContext(c))
+	err = flow.CreateStateFunc(id, &stateCreating, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		_ = c.Error(err)
 		c.Abort()

@@ -51,7 +51,7 @@ var (
 	DeleteLabelFunc = DeleteLabel
 )
 
-func CreateLabel(l LabelCreation, ctx *session.Context) (*Label, error) {
+func CreateLabel(l LabelCreation, ctx *session.Session) (*Label, error) {
 	if !ctx.Perms.HasRoleSuffix("_" + l.ProjectID.String()) {
 		return nil, bizerror.ErrForbidden
 	}
@@ -66,7 +66,7 @@ func CreateLabel(l LabelCreation, ctx *session.Context) (*Label, error) {
 	return &r, nil
 }
 
-func QueryLabels(q LabelQuery, ctx *session.Context) ([]Label, error) {
+func QueryLabels(q LabelQuery, ctx *session.Session) ([]Label, error) {
 	if !ctx.Perms.HasRoleSuffix("_" + q.ProjectID.String()) {
 		return nil, bizerror.ErrForbidden
 	}
@@ -79,7 +79,7 @@ func QueryLabels(q LabelQuery, ctx *session.Context) ([]Label, error) {
 	return labels, nil
 }
 
-func DeleteLabel(id types.ID, ctx *session.Context) error {
+func DeleteLabel(id types.ID, ctx *session.Session) error {
 	err1 := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
 		l, err := findLabelAndCheckPerms(tx, id, ctx)
 		if err != nil {
@@ -100,7 +100,7 @@ func DeleteLabel(id types.ID, ctx *session.Context) error {
 	return err1
 }
 
-func findLabelAndCheckPerms(db *gorm.DB, id types.ID, sec *session.Context) (*Label, error) {
+func findLabelAndCheckPerms(db *gorm.DB, id types.ID, sec *session.Session) (*Label, error) {
 	var l Label
 	if err := db.Where("id = ?", id).First(&l).Error; err != nil {
 		return nil, err

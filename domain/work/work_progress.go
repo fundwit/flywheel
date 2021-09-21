@@ -20,7 +20,7 @@ var (
 	CreateWorkStateTransitionFunc = CreateWorkStateTransition
 )
 
-func QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *session.Context) (*[]domain.WorkProcessStep, error) {
+func QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *session.Session) (*[]domain.WorkProcessStep, error) {
 	db := persistence.ActiveDataSourceManager.GormDB()
 	work := domain.Work{}
 	if err := db.Where(&domain.Work{ID: query.WorkID}).Select("project_id").First(&work).Error; err != nil {
@@ -41,7 +41,7 @@ func QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *session.Context)
 	return &processSteps, nil
 }
 
-func CreateWorkStateTransition(c *domain.WorkProcessStepCreation, sec *session.Context) error {
+func CreateWorkStateTransition(c *domain.WorkProcessStepCreation, sec *session.Session) error {
 	workflow, err := flow.DetailWorkflowFunc(c.FlowID, sec)
 	if err != nil {
 		return err

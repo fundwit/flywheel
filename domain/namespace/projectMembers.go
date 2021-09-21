@@ -20,7 +20,7 @@ var (
 	DetailProjectMembersFunc = DetailProjectMembers
 )
 
-func CreateProjectMember(d *domain.ProjectMemberCreation, sec *session.Context) error {
+func CreateProjectMember(d *domain.ProjectMemberCreation, sec *session.Session) error {
 	return persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
 		if !sec.Perms.HasRole(account.SystemAdminPermission.ID) && !sec.Perms.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, d.ProjectID)) {
 			return bizerror.ErrForbidden
@@ -50,7 +50,7 @@ func CreateProjectMember(d *domain.ProjectMemberCreation, sec *session.Context) 
 	})
 }
 
-func QueryProjectMemberDetails(d *domain.ProjectMemberQuery, sec *session.Context) (*[]domain.ProjectMemberDetail, error) {
+func QueryProjectMemberDetails(d *domain.ProjectMemberQuery, sec *session.Session) (*[]domain.ProjectMemberDetail, error) {
 	dbQuery := persistence.ActiveDataSourceManager.GormDB().Model(&domain.ProjectMember{})
 
 	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
@@ -116,7 +116,7 @@ func DetailProjectMembers(pms *[]domain.ProjectMember) (*[]domain.ProjectMemberD
 	return &details, nil
 }
 
-func DeleteProjectMember(d *domain.ProjectMemberDeletion, sec *session.Context) error {
+func DeleteProjectMember(d *domain.ProjectMemberDeletion, sec *session.Session) error {
 	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) && !sec.Perms.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, d.ProjectID)) {
 		return bizerror.ErrForbidden
 	}

@@ -26,7 +26,7 @@ func RegisterProjectsRestApis(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 }
 
 func HandleQueryProjects(c *gin.Context) {
-	result, err := QueryProjectsFunc(session.FindSecurityContext(c))
+	result, err := QueryProjectsFunc(session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -39,7 +39,7 @@ func HandleCreateProject(c *gin.Context) {
 	if err != nil {
 		panic(err)
 	}
-	result, err := CreateProjectFunc(&payload, session.FindSecurityContext(c))
+	result, err := CreateProjectFunc(&payload, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -57,7 +57,7 @@ func HandleUpdateProject(c *gin.Context) {
 	if err != nil {
 		panic(err)
 	}
-	err = UpdateProjectFunc(id, &payload, session.FindSecurityContext(c))
+	err = UpdateProjectFunc(id, &payload, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}

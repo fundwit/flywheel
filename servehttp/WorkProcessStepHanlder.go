@@ -39,7 +39,7 @@ func (h *workProcessStepHandler) handleCreate(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	err = work.CreateWorkStateTransitionFunc(&creation, session.FindSecurityContext(c))
+	err = work.CreateWorkStateTransitionFunc(&creation, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}
@@ -52,7 +52,7 @@ func (h *workProcessStepHandler) handleQuery(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	works, err := work.QueryProcessStepsFunc(&query, session.FindSecurityContext(c))
+	works, err := work.QueryProcessStepsFunc(&query, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)
 	}

@@ -38,7 +38,7 @@ func TestDetailSessionSecurityContext(t *testing.T) {
 		begin := time.Now()
 		time.Sleep(1 * time.Millisecond)
 		token := uuid.New().String()
-		session.TokenCache.Set(token, &session.Context{Token: token, Identity: session.Identity{Name: "ann", Nickname: "Ann", ID: 1},
+		session.TokenCache.Set(token, &session.Session{Token: token, Identity: session.Identity{Name: "ann", Nickname: "Ann", ID: 1},
 			Perms: []string{domain.ProjectRoleManager + "_1"}, ProjectRoles: []domain.ProjectRole{{
 				Role: domain.ProjectRoleManager, ProjectName: "project1", ProjectIdentifier: "TES", ProjectID: types.ID(1),
 			}}, SigningTime: time.Now()}, cache.DefaultExpiration)
@@ -57,10 +57,10 @@ func TestDetailSessionSecurityContext(t *testing.T) {
 		time.Sleep(1 * time.Millisecond)
 		securityContextValue, found := session.TokenCache.Get(token)
 		Expect(found).To(BeTrue())
-		secCtx, ok := securityContextValue.(*session.Context)
+		secCtx, ok := securityContextValue.(*session.Session)
 		Expect(ok).To(BeTrue())
 		Expect((*secCtx).SigningTime.After(begin) && (*secCtx).SigningTime.Before(time.Now()))
-		Expect(*secCtx).To(Equal(session.Context{
+		Expect(*secCtx).To(Equal(session.Session{
 			Token:        token,
 			Identity:     session.Identity{ID: 1, Name: "ann", Nickname: "Ann"},
 			Perms:        []string{"manager_1"},
@@ -84,7 +84,7 @@ func TestDetailSessionSecurityContext(t *testing.T) {
 
 		Expect(testDatabase.DS.GormDB().Save(&account.User{ID: 2, Name: "ann", Secret: account.HashSha256("abc123")}).Error).To(BeNil())
 		token := uuid.New().String()
-		session.TokenCache.Set(token, &session.Context{Token: token, Identity: session.Identity{Name: "ann", ID: 1},
+		session.TokenCache.Set(token, &session.Session{Token: token, Identity: session.Identity{Name: "ann", ID: 1},
 			Perms: []string{domain.ProjectRoleManager + "_1"}, ProjectRoles: []domain.ProjectRole{{
 				Role: domain.ProjectRoleManager + "", ProjectName: "project1", ProjectIdentifier: "TES", ProjectID: types.ID(1),
 			}}, SigningTime: time.Now().AddDate(0, 0, -1)}, cache.DefaultExpiration)

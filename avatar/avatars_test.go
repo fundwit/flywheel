@@ -47,7 +47,7 @@ func TestCreateAvatar(t *testing.T) {
 
 	t.Run("Show be able to save avatar by self", func(t *testing.T) {
 		store = ""
-		err := CreateAvatar(123456, bytes.NewReader([]byte("hello world")), &session.Context{Identity: session.Identity{ID: 123456}})
+		err := CreateAvatar(123456, bytes.NewReader([]byte("hello world")), &session.Session{Identity: session.Identity{ID: 123456}})
 		if store != "avatars/123456.png=>hello world" || err != nil {
 			t.Errorf("CreateAvatar(by self) = %v, %s, wants: nil, 'avatars/123456.png=>hello world'", err, store)
 		}
@@ -55,7 +55,7 @@ func TestCreateAvatar(t *testing.T) {
 
 	t.Run("Show not be able to save avatar by other", func(t *testing.T) {
 		store = ""
-		err := CreateAvatar(123456, bytes.NewReader([]byte("hello world")), &session.Context{Identity: session.Identity{ID: 123}})
+		err := CreateAvatar(123456, bytes.NewReader([]byte("hello world")), &session.Session{Identity: session.Identity{ID: 123}})
 		if store != "" || err != bizerror.ErrForbidden {
 			t.Errorf("CreateAvatar(by other) = %v, %s, wants: %v, ''", err, store, bizerror.ErrForbidden)
 		}

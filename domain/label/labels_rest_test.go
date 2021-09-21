@@ -34,7 +34,7 @@ func TestQueryLabelsAPI(t *testing.T) {
 	})
 
 	t.Run("should be able to handle error", func(t *testing.T) {
-		label.QueryLabelsFunc = func(q label.LabelQuery, ctx *session.Context) ([]label.Label, error) {
+		label.QueryLabelsFunc = func(q label.LabelQuery, ctx *session.Session) ([]label.Label, error) {
 			return nil, errors.New("some error")
 		}
 		req := httptest.NewRequest(http.MethodGet, label.PathLabels+"?projectId=100", nil)
@@ -50,7 +50,7 @@ func TestQueryLabelsAPI(t *testing.T) {
 		timeString := strings.Trim(string(timeBytes), `"`)
 
 		var q1 label.LabelQuery
-		label.QueryLabelsFunc = func(q label.LabelQuery, ctx *session.Context) ([]label.Label, error) {
+		label.QueryLabelsFunc = func(q label.LabelQuery, ctx *session.Session) ([]label.Label, error) {
 			q1 = q
 			return []label.Label{{ID: 123, CreateTime: demoTime, CreatorID: 10, Name: "label123", ThemeColor: "red", ProjectID: 100}}, nil
 		}
@@ -97,7 +97,7 @@ func TestCreateLabelAPI(t *testing.T) {
 	})
 
 	t.Run("should be able to handle error", func(t *testing.T) {
-		label.CreateLabelFunc = func(l label.LabelCreation, ctx *session.Context) (*label.Label, error) {
+		label.CreateLabelFunc = func(l label.LabelCreation, ctx *session.Session) (*label.Label, error) {
 			return nil, errors.New("some error")
 		}
 		reqBody := `{"name":"test-label", "themeColor":"red", "projectId": "1234"}`
@@ -113,7 +113,7 @@ func TestCreateLabelAPI(t *testing.T) {
 		Expect(err).To(BeNil())
 		timeString := strings.Trim(string(timeBytes), `"`)
 
-		label.CreateLabelFunc = func(l label.LabelCreation, ctx *session.Context) (*label.Label, error) {
+		label.CreateLabelFunc = func(l label.LabelCreation, ctx *session.Session) (*label.Label, error) {
 			return &label.Label{Name: l.Name, ThemeColor: l.ThemeColor, ProjectID: l.ProjectID, ID: 1111, CreatorID: 10, CreateTime: demoTime}, nil
 		}
 		reqBody := `{"name":"test-label", "themeColor":"red", "projectId": "999"}`
@@ -143,7 +143,7 @@ func TestDeleteLabelAPI(t *testing.T) {
 
 	t.Run("should be able to delete label", func(t *testing.T) {
 		var reqId types.ID
-		label.DeleteLabelFunc = func(id types.ID, ctx *session.Context) error {
+		label.DeleteLabelFunc = func(id types.ID, ctx *session.Session) error {
 			reqId = id
 			return nil
 		}
@@ -156,7 +156,7 @@ func TestDeleteLabelAPI(t *testing.T) {
 	})
 
 	t.Run("should be able to handle error", func(t *testing.T) {
-		label.DeleteLabelFunc = func(id types.ID, ctx *session.Context) error {
+		label.DeleteLabelFunc = func(id types.ID, ctx *session.Session) error {
 			return errors.New("some error")
 		}
 		req := httptest.NewRequest(http.MethodDelete, label.PathLabels+"/100", nil)

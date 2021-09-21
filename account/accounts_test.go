@@ -29,7 +29,7 @@ var _ = Describe("userManage", func() {
 
 	Describe("UpdateBasicAuthSecret", func() {
 		It("should be able to update basic auth secret correctly", func() {
-			sec := session.Context{Identity: session.Identity{ID: 1}}
+			sec := session.Session{Identity: session.Identity{ID: 1}}
 			Expect(testDatabase.DS.GormDB().Save(&account.User{ID: 1, Name: "aaa", Secret: account.HashSha256("123456")}).Error).To(BeNil())
 			Expect(account.UpdateBasicAuthSecret(&account.BasicAuthUpdating{OriginalSecret: "234567", NewSecret: "654321"}, &sec)).To(Equal(bizerror.ErrInvalidPassword))
 			Expect(account.UpdateBasicAuthSecret(&account.BasicAuthUpdating{OriginalSecret: "123456", NewSecret: "654321"}, &sec)).To(BeNil())
@@ -54,7 +54,7 @@ var _ = Describe("userManage", func() {
 
 	Describe("QueryUsers", func() {
 		It("should be able to query users correctly", func() {
-			sec := session.Context{Identity: session.Identity{ID: 1}, Perms: []string{account.SystemAdminPermission.ID}}
+			sec := session.Session{Identity: session.Identity{ID: 1}, Perms: []string{account.SystemAdminPermission.ID}}
 			Expect(testDatabase.DS.GormDB().Save(&account.User{ID: 1, Name: "aaa", Secret: account.HashSha256("123456")}).Error).To(BeNil())
 
 			users, err := account.QueryUsers(&sec)
@@ -66,7 +66,7 @@ var _ = Describe("userManage", func() {
 
 	Describe("CreateUser", func() {
 		It("should be blocked when user lack of permission", func() {
-			sec := &session.Context{Identity: session.Identity{ID: 1}}
+			sec := &session.Session{Identity: session.Identity{ID: 1}}
 
 			u, err := account.CreateUser(&account.UserCreation{Name: "test", Secret: "123456"}, sec)
 			Expect(err).To(Equal(bizerror.ErrForbidden))
@@ -74,7 +74,7 @@ var _ = Describe("userManage", func() {
 		})
 
 		It("should be able to create users correctly", func() {
-			sec := &session.Context{Identity: session.Identity{ID: 1}, Perms: []string{account.SystemAdminPermission.ID}}
+			sec := &session.Session{Identity: session.Identity{ID: 1}, Perms: []string{account.SystemAdminPermission.ID}}
 			u, err := account.CreateUser(&account.UserCreation{Name: "test", Secret: "123456"}, sec)
 			Expect(err).To(BeNil())
 			Expect((*u).ID).ToNot(BeZero())
@@ -86,7 +86,7 @@ var _ = Describe("userManage", func() {
 		})
 
 		It("should be able to create users with nickname correctly", func() {
-			sec := &session.Context{Identity: session.Identity{ID: 1}, Perms: []string{account.SystemAdminPermission.ID}}
+			sec := &session.Session{Identity: session.Identity{ID: 1}, Perms: []string{account.SystemAdminPermission.ID}}
 			u, err := account.CreateUser(&account.UserCreation{Name: "test", Nickname: "Test User", Secret: "123456"}, sec)
 			Expect(err).To(BeNil())
 			Expect((*u).ID).ToNot(BeZero())
@@ -100,12 +100,12 @@ var _ = Describe("userManage", func() {
 
 	Describe("UpdateUser", func() {
 		It("should be able to update nickname correctly", func() {
-			sec := session.Context{Identity: session.Identity{ID: 1}}
+			sec := session.Session{Identity: session.Identity{ID: 1}}
 			Expect(testDatabase.DS.GormDB().Save(&account.User{ID: 1, Name: "aaa", Secret: account.HashSha256("123456")}).Error).To(BeNil())
 
 			Expect(account.UpdateUser(404, &account.UserUpdation{Nickname: "New Name"}, &sec)).To(Equal(bizerror.ErrForbidden))
 			Expect(account.UpdateUser(2, &account.UserUpdation{Nickname: "New Name"},
-				&session.Context{Identity: session.Identity{ID: 2}})).To(Equal(gorm.ErrRecordNotFound))
+				&session.Session{Identity: session.Identity{ID: 2}})).To(Equal(gorm.ErrRecordNotFound))
 
 			Expect(account.UpdateUser(1, &account.UserUpdation{Nickname: "New Name 1"}, &sec)).To(BeNil())
 			user := account.User{}
@@ -113,7 +113,7 @@ var _ = Describe("userManage", func() {
 			Expect(user.Nickname).To(Equal("New Name 1"))
 
 			Expect(account.UpdateUser(1, &account.UserUpdation{Nickname: "New Name 2"},
-				&session.Context{Perms: authority.Permissions{account.SystemAdminPermission.ID}, Identity: session.Identity{ID: 404}})).To(BeNil())
+				&session.Session{Perms: authority.Permissions{account.SystemAdminPermission.ID}, Identity: session.Identity{ID: 404}})).To(BeNil())
 			user = account.User{}
 			Expect(testDatabase.DS.GormDB().Model(&account.User{}).Where(&account.User{ID: 1}).First(&user).Error).To(BeNil())
 			Expect(user.Nickname).To(Equal("New Name 2"))

@@ -28,7 +28,7 @@ func HashSha256(raw string) string {
 	return hex.EncodeToString(sum)
 }
 
-func UpdateBasicAuthSecret(u *BasicAuthUpdating, sec *session.Context) error {
+func UpdateBasicAuthSecret(u *BasicAuthUpdating, sec *session.Session) error {
 	user := User{}
 	if err := persistence.ActiveDataSourceManager.GormDB().Model(&User{}).Where(&User{ID: sec.Identity.ID, Secret: HashSha256(u.OriginalSecret)}).Scan(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -46,7 +46,7 @@ func UpdateBasicAuthSecret(u *BasicAuthUpdating, sec *session.Context) error {
 	return nil
 }
 
-func QueryUsers(sec *session.Context) (*[]UserInfo, error) {
+func QueryUsers(sec *session.Session) (*[]UserInfo, error) {
 	var users []UserInfo
 	if err := persistence.ActiveDataSourceManager.GormDB().Model(&User{}).Scan(&users).Error; err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func QueryUsers(sec *session.Context) (*[]UserInfo, error) {
 	return &users, nil
 }
 
-func CreateUser(c *UserCreation, sec *session.Context) (*UserInfo, error) {
+func CreateUser(c *UserCreation, sec *session.Session) (*UserInfo, error) {
 	if !sec.Perms.HasRole(SystemAdminPermission.ID) {
 		return nil, bizerror.ErrForbidden
 	}
@@ -66,7 +66,7 @@ func CreateUser(c *UserCreation, sec *session.Context) (*UserInfo, error) {
 	return &UserInfo{ID: user.ID, Name: user.Name, Nickname: user.Nickname}, nil
 }
 
-func UpdateUser(userId types.ID, c *UserUpdation, sec *session.Context) error {
+func UpdateUser(userId types.ID, c *UserUpdation, sec *session.Session) error {
 	if !sec.Perms.HasRole(SystemAdminPermission.ID) && userId != sec.Identity.ID {
 		return bizerror.ErrForbidden
 	}

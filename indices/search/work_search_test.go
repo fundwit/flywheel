@@ -1,6 +1,7 @@
 package search
 
 import (
+	"context"
 	"flywheel/domain"
 	"flywheel/domain/state"
 	"flywheel/domain/work"
@@ -23,6 +24,7 @@ func TestSearchWorks(t *testing.T) {
 	t.Run("should be able to search works", func(t *testing.T) {
 		defer afterEach(t)
 		beforeEach(t)
+		s := &session.Session{Context: context.Background()}
 
 		ts := types.TimestampOfDate(2020, 1, 2, 3, 4, 5, 0, time.Local)
 		w1000 := work.WorkDetail{
@@ -66,11 +68,11 @@ func TestSearchWorks(t *testing.T) {
 		}
 
 		// do: create doc
-		Expect(indices.IndexWorks([]work.WorkDetail{w1000})).To(BeNil())
-		Expect(indices.IndexWorks([]work.WorkDetail{w1001})).To(BeNil())
-		Expect(indices.IndexWorks([]work.WorkDetail{w1002})).To(BeNil())
-		Expect(indices.IndexWorks([]work.WorkDetail{w1003})).To(BeNil()) // archived
-		Expect(indices.IndexWorks([]work.WorkDetail{w2002})).To(BeNil())
+		Expect(indices.IndexWorks([]work.WorkDetail{w1000}, s)).To(BeNil())
+		Expect(indices.IndexWorks([]work.WorkDetail{w1001}, s)).To(BeNil())
+		Expect(indices.IndexWorks([]work.WorkDetail{w1002}, s)).To(BeNil())
+		Expect(indices.IndexWorks([]work.WorkDetail{w1003}, s)).To(BeNil()) // archived
+		Expect(indices.IndexWorks([]work.WorkDetail{w2002}, s)).To(BeNil())
 
 		// assert: visible project limit
 		works, err := SearchWorks(domain.WorkQuery{}, &session.Session{})
@@ -133,7 +135,7 @@ func TestSearchWorks(t *testing.T) {
 func beforeEach(t *testing.T) {
 	es.CreateClientFromEnv()
 	es.IndexFunc = es.Index
-	work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Session) ([]work.WorkDetail, error) {
+	work.ExtendWorksFunc = func(details []work.WorkDetail, s *session.Session) ([]work.WorkDetail, error) {
 		return details, nil
 	}
 
@@ -143,6 +145,6 @@ func beforeEach(t *testing.T) {
 func afterEach(t *testing.T) {
 	work.ExtendWorksFunc = work.ExtendWorks
 	if strings.Contains(indices.WorkIndexName, "_test_") {
-		Expect(es.DropIndex(indices.WorkIndexName)).To(BeNil())
+		Expect(es.DropIndex(indices.WorkIndexName, &session.Session{Context: context.Background()})).To(BeNil())
 	}
 }

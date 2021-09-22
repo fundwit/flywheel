@@ -1,6 +1,7 @@
 package work_test
 
 import (
+	"context"
 	"errors"
 	"flywheel/account"
 	"flywheel/authority"
@@ -32,7 +33,7 @@ func setup(t *testing.T, testDatabase **testinfra.TestDatabase) (*domain.Workflo
 
 	db := testinfra.StartMysqlTestDatabase("flywheel")
 	*testDatabase = db
-	Expect(db.DS.GormDB().AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
+	Expect(db.DS.GormDB(context.Background()).AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}, &checklist.CheckItem{}).Error).To(BeNil())
 
 	persistence.ActiveDataSourceManager = db.DS
@@ -64,7 +65,7 @@ func setup(t *testing.T, testDatabase **testinfra.TestDatabase) (*domain.Workflo
 		handedEvents = append(handedEvents, *record)
 		return nil
 	}
-	work.QueryLabelBriefsOfWorkFunc = func(workId types.ID) ([]label.LabelBrief, error) {
+	work.QueryLabelBriefsOfWorkFunc = func(workId types.ID, s *session.Session) ([]label.LabelBrief, error) {
 		return nil, nil
 	}
 	flow.DetailWorkflowFunc = flow.DetailWorkflow
@@ -86,7 +87,7 @@ func TestCreateWork(t *testing.T) {
 		defer teardown(t, testDatabase)
 		flowDetail, _, project1, _, persistedEvents, handedEvents := setup(t, &testDatabase)
 
-		testDatabase.DS.GormDB().DropTable(&domain.Work{})
+		testDatabase.DS.GormDB(context.Background()).DropTable(&domain.Work{})
 		creation := &domain.WorkCreation{Name: "test work", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name}
 		w, err := work.CreateWork(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
 		Expect(w).To(BeNil())
@@ -148,7 +149,7 @@ func TestCreateWork(t *testing.T) {
 		Expect(time.Since((*persistedEvents)[0].Timestamp.Time()) < time.Second).To(BeTrue())
 		Expect(*handedEvents).To(Equal(*persistedEvents))
 
-		work.QueryLabelBriefsOfWorkFunc = func(workId types.ID) ([]label.LabelBrief, error) {
+		work.QueryLabelBriefsOfWorkFunc = func(workId types.ID, s *session.Session) ([]label.LabelBrief, error) {
 			return []label.LabelBrief{
 				{ID: 100, Name: "label100", ThemeColor: "red"},
 				{ID: 200, Name: "label200", ThemeColor: "green"},
@@ -182,7 +183,7 @@ func TestCreateWork(t *testing.T) {
 
 		// should create init process step
 		var initProcessStep []domain.WorkProcessStep
-		Expect(testDatabase.DS.GormDB().Model(&domain.WorkProcessStep{}).Scan(&initProcessStep).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&domain.WorkProcessStep{}).Scan(&initProcessStep).Error).To(BeNil())
 		Expect(initProcessStep).ToNot(BeNil())
 		Expect(len(initProcessStep)).To(Equal(1))
 		fmt.Println(initProcessStep[0].BeginTime, "detail:", detail.CreateTime, detail.StateBeginTime, "work:", w.CreateTime, w.StateBeginTime)
@@ -351,7 +352,7 @@ func TestArchiveWorks(t *testing.T) {
 			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 		Expect(err).To(BeZero())
 
-		testDatabase.DS.GormDB().DropTable(&domain.Work{})
+		testDatabase.DS.GormDB(context.Background()).DropTable(&domain.Work{})
 		err = work.ArchiveWorks([]types.ID{detail.ID}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 		Expect(err).ToNot(BeNil())
 		Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
@@ -367,7 +368,7 @@ func TestArchiveWorks(t *testing.T) {
 		Expect(err).To(BeZero())
 
 		var works []domain.Work
-		Expect(testDatabase.DS.GormDB().Find(&works).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Find(&works).Error).To(BeNil())
 		Expect(err).To(BeNil())
 		Expect(works).ToNot(BeNil())
 		Expect(len(works)).To(Equal(1))
@@ -382,7 +383,7 @@ func TestArchiveWorks(t *testing.T) {
 		Expect(err).To(BeNil())
 
 		works = []domain.Work{}
-		Expect(testDatabase.DS.GormDB().Where("id = ?", workToArchive.ID).Find(&works).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Where("id = ?", workToArchive.ID).Find(&works).Error).To(BeNil())
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(1))
 		archivedWork := (works)[0]
@@ -403,7 +404,7 @@ func TestArchiveWorks(t *testing.T) {
 		Expect(err).To(BeNil())
 
 		works1 := []domain.Work{}
-		Expect(testDatabase.DS.GormDB().Where("id = ?", workToArchive.ID).Find(&works1).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Where("id = ?", workToArchive.ID).Find(&works1).Error).To(BeNil())
 		Expect(err).To(BeNil())
 		Expect((works1)[0].ArchiveTime).To(Equal((works)[0].ArchiveTime))
 		Expect(len(*persistedEvents)).To(Equal(1))
@@ -450,7 +451,7 @@ func TestUpdateWork(t *testing.T) {
 		Expect(*handedEvents).To(Equal(*persistedEvents))
 
 		var works []domain.Work
-		Expect(testDatabase.DS.GormDB().Find(&works).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Find(&works).Error).To(BeNil())
 		Expect(works).ToNot(BeNil())
 		Expect(len(works)).To(Equal(1))
 
@@ -503,7 +504,7 @@ func TestUpdateWork(t *testing.T) {
 		defer teardown(t, testDatabase)
 		_, _, project1, _, persistedEvents, handedEvents := setup(t, &testDatabase)
 
-		testDatabase.DS.GormDB().DropTable(&domain.Work{})
+		testDatabase.DS.GormDB(context.Background()).DropTable(&domain.Work{})
 
 		updatedWork, err := work.UpdateWork(12345,
 			&domain.WorkUpdating{Name: "test work1 new"}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
@@ -519,7 +520,7 @@ func TestUpdateWork(t *testing.T) {
 		flowDetail, _, project1, _, _, _ := setup(t, &testDatabase)
 
 		now := types.CurrentTimestamp()
-		Expect(testDatabase.DS.GormDB().Create(&domain.Work{ID: 2, Name: "w1", ProjectID: project1.ID,
+		Expect(testDatabase.DS.GormDB(context.Background()).Create(&domain.Work{ID: 2, Name: "w1", ProjectID: project1.ID,
 			CreateTime: now, FlowID: flowDetail.ID, OrderInState: 2,
 			StateName: domain.StateDone.Name, StateCategory: domain.StateDone.Category, StateBeginTime: now}).Error).To(BeNil())
 		Expect(work.ArchiveWorks([]types.ID{2}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))).To(BeNil())
@@ -551,7 +552,7 @@ func TestDeleteWork(t *testing.T) {
 		Expect(err).To(BeZero())
 
 		var works []domain.Work
-		Expect(testDatabase.DS.GormDB().Find(&works).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Find(&works).Error).To(BeNil())
 		Expect(err).To(BeNil())
 		Expect(works).ToNot(BeNil())
 		Expect(len(works)).To(Equal(2))
@@ -584,15 +585,15 @@ func TestDeleteWork(t *testing.T) {
 		Expect(*handedEvents).To(Equal(*persistedEvents))
 
 		works = []domain.Work{}
-		Expect(testDatabase.DS.GormDB().Find(&works).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Find(&works).Error).To(BeNil())
 		Expect(err).To(BeNil())
 		Expect(len(works)).To(Equal(1))
 
 		// assert work process steps should also be deleted
 		processStep := domain.WorkProcessStep{}
-		Expect(testDatabase.DS.GormDB().First(&processStep, domain.WorkProcessStep{WorkID: workToDelete.ID}).Error).To(Equal(gorm.ErrRecordNotFound))
+		Expect(testDatabase.DS.GormDB(context.Background()).First(&processStep, domain.WorkProcessStep{WorkID: workToDelete.ID}).Error).To(Equal(gorm.ErrRecordNotFound))
 		processStep = domain.WorkProcessStep{}
-		Expect(testDatabase.DS.GormDB().First(&processStep).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).First(&processStep).Error).To(BeNil())
 	})
 
 	t.Run("should forbid to delete without permissions", func(t *testing.T) {
@@ -618,12 +619,12 @@ func TestDeleteWork(t *testing.T) {
 			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 		Expect(err).To(BeZero())
 
-		Expect(testDatabase.DS.GormDB().DropTable(&domain.WorkProcessStep{}).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).DropTable(&domain.WorkProcessStep{}).Error).To(BeNil())
 		err = work.DeleteWork(detail.ID, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 		Expect(err).ToNot(BeNil())
 		Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".work_process_steps' doesn't exist"))
 
-		testDatabase.DS.GormDB().DropTable(&domain.Work{})
+		testDatabase.DS.GormDB(context.Background()).DropTable(&domain.Work{})
 		err = work.DeleteWork(detail.ID, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 		Expect(err).ToNot(BeNil())
 		Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
@@ -647,7 +648,7 @@ func TestUpdateStateRangeOrders(t *testing.T) {
 		setup(t, &testDatabase)
 
 		Expect(work.UpdateStateRangeOrders(&[]domain.WorkOrderRangeUpdating{
-			{ID: 1, NewOlder: 3, OldOlder: 2}}, nil)).To(Equal(errors.New("record not found")))
+			{ID: 1, NewOlder: 3, OldOlder: 2}}, &session.Session{})).To(Equal(errors.New("record not found")))
 		Expect(work.UpdateStateRangeOrders(&[]domain.WorkOrderRangeUpdating{
 			{ID: 1, NewOlder: 3, OldOlder: 2}}, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_404"))).To(Equal(errors.New("record not found")))
 	})
@@ -666,7 +667,7 @@ func TestUpdateStateRangeOrders(t *testing.T) {
 
 		// default w1 > w2 > w3
 		list := []domain.Work{}
-		Expect(testDatabase.DS.GormDB().Order("order_in_state ASC").Find(&list).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Order("order_in_state ASC").Find(&list).Error).To(BeNil())
 		Expect(len(list)).To(Equal(3))
 		Expect([]string{list[0].Name, list[1].Name, list[2].Name}).To(Equal([]string{"w1", "w2", "w3"}))
 		Expect(list[0].OrderInState < list[1].OrderInState && list[1].OrderInState < list[2].OrderInState).To(BeTrue())
@@ -676,7 +677,7 @@ func TestUpdateStateRangeOrders(t *testing.T) {
 			To(Equal(errors.New("expected affected row is 1, but actual is 0")))
 
 		list = []domain.Work{}
-		Expect(testDatabase.DS.GormDB().Order("order_in_state ASC").Find(&list).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Order("order_in_state ASC").Find(&list).Error).To(BeNil())
 		Expect(len(list)).To(Equal(3))
 		Expect([]string{list[0].Name, list[1].Name, list[2].Name}).To(Equal([]string{"w1", "w2", "w3"}))
 		Expect(list[0].OrderInState < list[1].OrderInState && list[1].OrderInState < list[2].OrderInState).To(BeTrue())
@@ -701,7 +702,7 @@ func TestUpdateStateRangeOrders(t *testing.T) {
 		Expect(*handedEvents).To(Equal(*persistedEvents))
 
 		list = []domain.Work{}
-		Expect(testDatabase.DS.GormDB().Order("order_in_state ASC").Find(&list).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Order("order_in_state ASC").Find(&list).Error).To(BeNil())
 		Expect(len(list)).To(Equal(3))
 		Expect([]string{list[0].Name, list[1].Name, list[2].Name}).To(Equal([]string{"w3", "w2", "w1"}))
 		Expect(list[0].OrderInState < list[1].OrderInState && list[1].OrderInState < list[2].OrderInState).To(BeTrue())
@@ -717,7 +718,7 @@ func TestExtendWorks(t *testing.T) {
 		setup(t, &testDatabase)
 
 		flowMap := map[types.ID]domain.Workflow{}
-		flow.DetailWorkflowFunc = func(id types.ID, sec *session.Session) (*domain.WorkflowDetail, error) {
+		flow.DetailWorkflowFunc = func(id types.ID, s *session.Session) (*domain.WorkflowDetail, error) {
 			flowMap[id] = domain.Workflow{ID: id, Name: "flow-" + id.String()}
 			return &domain.WorkflowDetail{
 				Workflow: flowMap[id],
@@ -727,7 +728,7 @@ func TestExtendWorks(t *testing.T) {
 				}},
 			}, nil
 		}
-		work.QueryLabelBriefsOfWorkFunc = func(workId types.ID) ([]label.LabelBrief, error) {
+		work.QueryLabelBriefsOfWorkFunc = func(workId types.ID, s *session.Session) ([]label.LabelBrief, error) {
 			return nil, nil
 		}
 
@@ -762,7 +763,7 @@ func TestLoadWorks(t *testing.T) {
 		defer teardown(t, testDatabase)
 		setup(t, &testDatabase)
 
-		testDatabase.DS.GormDB().DropTable(&domain.Work{})
+		testDatabase.DS.GormDB(context.Background()).DropTable(&domain.Work{})
 		w, err := work.LoadWorks(1, 10)
 		Expect(w).To(BeNil())
 		Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
@@ -772,7 +773,7 @@ func TestLoadWorks(t *testing.T) {
 		defer teardown(t, testDatabase)
 		setup(t, &testDatabase)
 
-		db := persistence.ActiveDataSourceManager.GormDB()
+		db := persistence.ActiveDataSourceManager.GormDB(context.Background())
 		works := []domain.Work{
 			{ID: 1, Identifier: "work1", Name: "work1", ProjectID: 1, FlowID: 1},
 			{ID: 4, Identifier: "work4", Name: "work4", ProjectID: 2, FlowID: 1},

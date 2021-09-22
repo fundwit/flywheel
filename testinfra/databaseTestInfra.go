@@ -1,6 +1,7 @@
 package testinfra
 
 import (
+	"context"
 	"flywheel/persistence"
 	"os"
 	"strings"
@@ -43,8 +44,8 @@ func StartMysqlTestDatabase(baseName string) *TestDatabase {
 
 func StopMysqlTestDatabase(testDatabase *TestDatabase) {
 	if testDatabase != nil || testDatabase.DS != nil {
-		if testDatabase.DS.GormDB() != nil {
-			if err := testDatabase.DS.GormDB().Exec("DROP DATABASE " + testDatabase.TestDatabaseName).Error; err != nil {
+		if testDatabase.DS.GormDB(context.Background()) != nil {
+			if err := testDatabase.DS.GormDB(context.Background()).Exec("DROP DATABASE " + testDatabase.TestDatabaseName).Error; err != nil {
 				logrus.Println("failed to drop test database: " + testDatabase.TestDatabaseName)
 			} else {
 				logrus.Debugln("test database " + testDatabase.TestDatabaseName + " dropped")

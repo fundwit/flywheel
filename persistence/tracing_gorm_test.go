@@ -25,20 +25,12 @@ func TestGormTracing(t *testing.T) {
 
 		tracer.Reset()
 
-		// case1
-		db := testDatabase.DS.GormDB()
+		db := testDatabase.DS.GormDB(context.Background())
 		r := []domain.Project{}
 		Expect(db.Find(&r).Error).To(BeNil())
 		Expect(len(r)).To(BeZero())
 
 		spans := tracer.FinishedSpans()
-		Expect(len(spans)).To(Equal(0))
-
-		// case2
-		r = []domain.Project{}
-		Expect(otgorm.SetSpanToGorm(context.Background(), db).Find(&r).Error).To(BeNil())
-		Expect(len(r)).To(BeZero())
-		spans = tracer.FinishedSpans()
 		Expect(len(spans)).To(Equal(0))
 	})
 
@@ -53,7 +45,7 @@ func TestGormTracing(t *testing.T) {
 		ctx := opentracing.ContextWithSpan(context.Background(), clientSpan)
 
 		// extract span from context and then inject into db.values.
-		db := otgorm.SetSpanToGorm(ctx, testDatabase.DS.GormDB())
+		db := otgorm.SetSpanToGorm(ctx, testDatabase.DS.GormDB(ctx))
 
 		r := []domain.Project{}
 		Expect(db.Find(&r).Error).To(BeNil())
@@ -82,7 +74,7 @@ func TestGormTracing(t *testing.T) {
 func gormTractingTestSetup(t *testing.T, testDatabase **testinfra.TestDatabase) {
 	db := testinfra.StartMysqlTestDatabase("flywheel")
 	*testDatabase = db
-	Expect(db.DS.GormDB().AutoMigrate(&domain.Project{}).Error).To(BeNil())
+	Expect(db.DS.GormDB(context.Background()).AutoMigrate(&domain.Project{}).Error).To(BeNil())
 }
 
 func gormTracingTestTeardown(t *testing.T, testDatabase *testinfra.TestDatabase) {

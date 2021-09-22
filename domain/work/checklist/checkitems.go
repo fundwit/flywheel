@@ -51,7 +51,7 @@ type CheckItemUpdate struct {
 func CreateCheckItem(req CheckItemCreation, c *session.Session) (*CheckItem, error) {
 	var r *CheckItem
 	var ev *event.EventRecord
-	txErr := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+	txErr := persistence.ActiveDataSourceManager.GormDB(c.Context).Transaction(func(tx *gorm.DB) error {
 		// check permission against to work
 		w, err := findWorkAndCheckPerms(tx, req.WorkId, c)
 		if err != nil {
@@ -94,7 +94,7 @@ func CreateCheckItem(req CheckItemCreation, c *session.Session) (*CheckItem, err
 
 func ListCheckItems(workId types.ID, c *session.Session) ([]CheckItem, error) {
 	var r []CheckItem
-	txErr := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+	txErr := persistence.ActiveDataSourceManager.GormDB(c.Context).Transaction(func(tx *gorm.DB) error {
 		w, err := findWorkAndCheckPerms(tx, workId, c)
 		if err != nil {
 			return err
@@ -112,7 +112,7 @@ func ListCheckItems(workId types.ID, c *session.Session) ([]CheckItem, error) {
 
 func UpdateCheckItem(id types.ID, req CheckItemUpdate, c *session.Session) error {
 	var ev *event.EventRecord
-	txErr := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+	txErr := persistence.ActiveDataSourceManager.GormDB(c.Context).Transaction(func(tx *gorm.DB) error {
 		// find checkitem
 		ci := CheckItem{}
 		if err := tx.Where("id = ?", id).First(&ci).Error; err != nil {
@@ -161,7 +161,7 @@ func UpdateCheckItem(id types.ID, req CheckItemUpdate, c *session.Session) error
 
 func DeleteCheckItem(id types.ID, c *session.Session) error {
 	var ev *event.EventRecord
-	txErr := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+	txErr := persistence.ActiveDataSourceManager.GormDB(c.Context).Transaction(func(tx *gorm.DB) error {
 		// find checkitem
 		ci := CheckItem{}
 		if err := tx.Where("id = ?", id).First(&ci).Error; errors.Is(err, gorm.ErrRecordNotFound) {
@@ -203,7 +203,7 @@ func DeleteCheckItem(id types.ID, c *session.Session) error {
 
 func CleanWorkCheckItems(workId types.ID, c *session.Session) error {
 	var ev *event.EventRecord
-	txErr := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+	txErr := persistence.ActiveDataSourceManager.GormDB(c.Context).Transaction(func(tx *gorm.DB) error {
 		// check permission against to work
 		w, err := findWorkAndCheckPerms(tx, workId, c)
 		if err != nil {
@@ -239,13 +239,13 @@ func CleanWorkCheckItemsDirectly(workId types.ID, tx *gorm.DB) error {
 	return nil
 }
 
-func findWorkAndCheckPerms(db *gorm.DB, id types.ID, sec *session.Session) (*domain.Work, error) {
+func findWorkAndCheckPerms(db *gorm.DB, id types.ID, s *session.Session) (*domain.Work, error) {
 	var work domain.Work
 	if err := db.Where("id = ?", id).First(&work).Error; err != nil {
 		return nil, err
 	}
 
-	if sec == nil || !sec.Perms.HasProjectViewPerm(work.ProjectID) {
+	if s == nil || !s.Perms.HasProjectViewPerm(work.ProjectID) {
 		return nil, bizerror.ErrForbidden
 	}
 	return &work, nil

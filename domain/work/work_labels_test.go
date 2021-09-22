@@ -1,6 +1,7 @@
 package work_test
 
 import (
+	"context"
 	"flywheel/account"
 	"flywheel/authority"
 	"flywheel/bizerror"
@@ -28,7 +29,7 @@ func workLabelsTestSetup(t *testing.T, testDatabase **testinfra.TestDatabase) (*
 	db := testinfra.StartMysqlTestDatabase("flywheel")
 	*testDatabase = db
 	// migration
-	Expect(db.DS.GormDB().AutoMigrate(&work.WorkLabelRelation{}, &label.Label{}, &domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
+	Expect(db.DS.GormDB(context.Background()).AutoMigrate(&work.WorkLabelRelation{}, &label.Label{}, &domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}, &checklist.CheckItem{}).Error).To(BeNil())
 
 	persistence.ActiveDataSourceManager = db.DS
@@ -124,7 +125,7 @@ func TestCreateWorkLabelRelation(t *testing.T) {
 		Expect(time.Since(r.CreateTime.Time()) < time.Second).To(BeTrue())
 
 		q := work.WorkLabelRelation{}
-		Expect(testDatabase.DS.GormDB().Where(&work.WorkLabelRelation{WorkId: w.ID, LabelId: l.ID}).First(&q).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Where(&work.WorkLabelRelation{WorkId: w.ID, LabelId: l.ID}).First(&q).Error).To(BeNil())
 		Expect(q).To(Equal(*r))
 
 		q.CreateTime = types.Timestamp{}
@@ -183,31 +184,31 @@ func TestDeleteWorkLabelRelation(t *testing.T) {
 		// prepare label
 		l, err := label.CreateLabel(label.LabelCreation{ProjectID: p1.ID, Name: "test label", ThemeColor: "red"}, &c)
 		Expect(err).To(BeNil())
-		Expect(work.IsLabelReferencedByWork(*l, testDatabase.DS.GormDB())).To(BeNil())
+		Expect(work.IsLabelReferencedByWork(*l, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
 
 		// prepare work-label-relation
 		req := work.WorkLabelRelationReq{WorkId: w.ID, LabelId: l.ID}
 		_, err = work.CreateWorkLabelRelation(req, &c)
 		Expect(err).To(BeNil())
-		Expect(work.IsLabelReferencedByWork(*l, testDatabase.DS.GormDB())).To(Equal(bizerror.ErrLabelIsReferenced))
+		Expect(work.IsLabelReferencedByWork(*l, testDatabase.DS.GormDB(context.Background()))).To(Equal(bizerror.ErrLabelIsReferenced))
 		// assert LabelDeleteCheckFuncs is registered
 		Expect(label.DeleteLabel(l.ID, &c)).To(Equal(bizerror.ErrLabelIsReferenced))
 		// assert query label briefs of work
-		b, err := work.QueryLabelBriefsOfWork(w.ID)
+		b, err := work.QueryLabelBriefsOfWork(w.ID, &c)
 		Expect(err).To(BeNil())
 		Expect(b).To(Equal([]label.LabelBrief{{ID: l.ID, Name: l.Name, ThemeColor: l.ThemeColor}}))
 
 		// do delete work-label-relation
 		Expect(work.DeleteWorkLabelRelation(req, &c)).To(BeNil())
-		Expect(work.IsLabelReferencedByWork(*l, testDatabase.DS.GormDB())).To(BeNil())
+		Expect(work.IsLabelReferencedByWork(*l, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
 
-		b, err = work.QueryLabelBriefsOfWork(w.ID)
+		b, err = work.QueryLabelBriefsOfWork(w.ID, &c)
 		Expect(err).To(BeNil())
 		Expect(len(b)).To(BeZero())
 
 		// assert relation already been delete from database
 		q := work.WorkLabelRelation{}
-		Expect(testDatabase.DS.GormDB().Where(&work.WorkLabelRelation{WorkId: w.ID, LabelId: l.ID}).
+		Expect(testDatabase.DS.GormDB(context.Background()).Where(&work.WorkLabelRelation{WorkId: w.ID, LabelId: l.ID}).
 			First(&q).Error).To(Equal(gorm.ErrRecordNotFound))
 	})
 }

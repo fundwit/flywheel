@@ -20,14 +20,14 @@ var (
 	DetailProjectMembersFunc = DetailProjectMembers
 )
 
-func CreateProjectMember(d *domain.ProjectMemberCreation, sec *session.Session) error {
-	return persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
-		if !sec.Perms.HasRole(account.SystemAdminPermission.ID) && !sec.Perms.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, d.ProjectID)) {
+func CreateProjectMember(d *domain.ProjectMemberCreation, s *session.Session) error {
+	return persistence.ActiveDataSourceManager.GormDB(s.Context).Transaction(func(tx *gorm.DB) error {
+		if !s.Perms.HasRole(account.SystemAdminPermission.ID) && !s.Perms.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, d.ProjectID)) {
 			return bizerror.ErrForbidden
 		}
 
 		// non system administrators can not grant for themselfs
-		if !sec.Perms.HasRole(account.SystemAdminPermission.ID) && sec.Identity.ID == d.MemberId {
+		if !s.Perms.HasRole(account.SystemAdminPermission.ID) && s.Identity.ID == d.MemberId {
 			return bizerror.ErrProjectMemberSelfGrant
 		}
 
@@ -50,11 +50,11 @@ func CreateProjectMember(d *domain.ProjectMemberCreation, sec *session.Session) 
 	})
 }
 
-func QueryProjectMemberDetails(d *domain.ProjectMemberQuery, sec *session.Session) (*[]domain.ProjectMemberDetail, error) {
-	dbQuery := persistence.ActiveDataSourceManager.GormDB().Model(&domain.ProjectMember{})
+func QueryProjectMemberDetails(d *domain.ProjectMemberQuery, s *session.Session) (*[]domain.ProjectMemberDetail, error) {
+	dbQuery := persistence.ActiveDataSourceManager.GormDB(s.Context).Model(&domain.ProjectMember{})
 
-	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
-		dbQuery = dbQuery.Where("project_id IN (?)", sec.VisibleProjects())
+	if !s.Perms.HasRole(account.SystemAdminPermission.ID) {
+		dbQuery = dbQuery.Where("project_id IN (?)", s.VisibleProjects())
 	}
 	if d.ProjectID != nil {
 		dbQuery = dbQuery.Where("project_id = ?", d.ProjectID)
@@ -68,7 +68,7 @@ func QueryProjectMemberDetails(d *domain.ProjectMemberQuery, sec *session.Sessio
 		return nil, err
 	}
 
-	details, err := DetailProjectMembersFunc(&result)
+	details, err := DetailProjectMembersFunc(&result, s)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func QueryProjectMemberDetails(d *domain.ProjectMemberQuery, sec *session.Sessio
 	return details, nil
 }
 
-func DetailProjectMembers(pms *[]domain.ProjectMember) (*[]domain.ProjectMemberDetail, error) {
+func DetailProjectMembers(pms *[]domain.ProjectMember, s *session.Session) (*[]domain.ProjectMemberDetail, error) {
 	if pms == nil {
 		return &[]domain.ProjectMemberDetail{}, nil
 	}
@@ -89,11 +89,11 @@ func DetailProjectMembers(pms *[]domain.ProjectMember) (*[]domain.ProjectMemberD
 		memberIds = append(memberIds, pm.MemberId)
 	}
 
-	projectIdNameMap, err := QueryProjectNamesFunc(projectIds)
+	projectIdNameMap, err := QueryProjectNamesFunc(projectIds, s)
 	if err != nil {
 		return nil, err
 	}
-	memberIdNameMap, err := QueryAccountNamesFunc(memberIds)
+	memberIdNameMap, err := QueryAccountNamesFunc(memberIds, s)
 	if err != nil {
 		return nil, err
 	}
@@ -116,12 +116,12 @@ func DetailProjectMembers(pms *[]domain.ProjectMember) (*[]domain.ProjectMemberD
 	return &details, nil
 }
 
-func DeleteProjectMember(d *domain.ProjectMemberDeletion, sec *session.Session) error {
-	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) && !sec.Perms.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, d.ProjectID)) {
+func DeleteProjectMember(d *domain.ProjectMemberDeletion, s *session.Session) error {
+	if !s.Perms.HasRole(account.SystemAdminPermission.ID) && !s.Perms.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, d.ProjectID)) {
 		return bizerror.ErrForbidden
 	}
 
-	return persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+	return persistence.ActiveDataSourceManager.GormDB(s.Context).Transaction(func(tx *gorm.DB) error {
 		record := domain.ProjectMember{}
 		if err := tx.Where("project_id = ? AND member_id = ?", d.ProjectID, d.MemberID).First(&record).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {

@@ -1,6 +1,7 @@
 package event
 
 import (
+	"context"
 	"flywheel/indices/indexlog"
 	"flywheel/persistence"
 	"flywheel/testinfra"
@@ -19,7 +20,7 @@ var (
 
 func setup(t *testing.T) {
 	testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
-	assert.Nil(t, testDatabase.DS.GormDB().AutoMigrate(&EventRecord{}).Error)
+	assert.Nil(t, testDatabase.DS.GormDB(context.Background()).AutoMigrate(&EventRecord{}).Error)
 	persistence.ActiveDataSourceManager = testDatabase.DS
 }
 func teardown(t *testing.T) {
@@ -59,11 +60,11 @@ func TestEventPersistCreate(t *testing.T) {
 			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
 		}
 
-		assert.Nil(t, eventPersistCreate(&event, testDatabase.DS.GormDB()))
+		assert.Nil(t, eventPersistCreate(&event, testDatabase.DS.GormDB(context.Background())))
 
 		// assert records in tables
 		records := []EventRecord{}
-		Expect(testDatabase.DS.GormDB().Model(&EventRecord{}).Find(&records).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&EventRecord{}).Find(&records).Error).To(BeNil())
 		Expect(len(records)).To(Equal(1))
 		Expect(records[0]).To(Equal(event))
 	})

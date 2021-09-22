@@ -8,6 +8,7 @@ import (
 
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
+	otgorm "github.com/smacker/opentracing-gorm"
 )
 
 type WorkLabelRelation struct {
@@ -38,15 +39,14 @@ func IsLabelReferencedByWork(l label.Label, tx *gorm.DB) error {
 	return bizerror.ErrLabelIsReferenced
 }
 
-func QueryLabelBriefsOfWork(workId types.ID) ([]label.LabelBrief, error) {
+func QueryLabelBriefsOfWork(workId types.ID, s *session.Session) ([]label.LabelBrief, error) {
 	var labelBriefs []label.LabelBrief
 	if workId.IsZero() {
 		return labelBriefs, nil
 	}
 
-	db := persistence.ActiveDataSourceManager.GormDB()
-
-	if err := db.LogMode(true).Model(&WorkLabelRelation{}).
+	db := otgorm.SetSpanToGorm(s.Context, persistence.ActiveDataSourceManager.GormDB(s.Context))
+	if err := db.Model(&WorkLabelRelation{}).
 		Select("labels.id, labels.name, labels.theme_color").
 		Where(&WorkLabelRelation{WorkId: workId}).
 		Joins("INNER JOIN labels ON labels.id = work_label_relations.label_id").
@@ -59,7 +59,7 @@ func QueryLabelBriefsOfWork(workId types.ID) ([]label.LabelBrief, error) {
 
 func CreateWorkLabelRelation(req WorkLabelRelationReq, c *session.Session) (*WorkLabelRelation, error) {
 	var r *WorkLabelRelation
-	txErr := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+	txErr := persistence.ActiveDataSourceManager.GormDB(c.Context).Transaction(func(tx *gorm.DB) error {
 		// load work, check perms against to project of work
 		w, err := findWorkAndCheckPerms(tx, req.WorkId, c)
 		if err != nil {
@@ -95,15 +95,14 @@ func DeleteWorkLabelRelation(req WorkLabelRelationReq, c *session.Session) error
 		return bizerror.ErrInvalidArguments
 	}
 
-	err1 := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+	err1 := persistence.ActiveDataSourceManager.GormDB(c.Context).Transaction(func(tx *gorm.DB) error {
 		// load work, check perms against to project of work
 		w, err := findWorkAndCheckPerms(tx, req.WorkId, c)
 		if err != nil {
 			return err
 		}
 
-		return persistence.ActiveDataSourceManager.GormDB().
-			Delete(&WorkLabelRelation{}, &WorkLabelRelation{WorkId: w.ID, LabelId: req.LabelId}).Error
+		return tx.Delete(&WorkLabelRelation{}, &WorkLabelRelation{WorkId: w.ID, LabelId: req.LabelId}).Error
 	})
 	if err1 != nil {
 		return err1

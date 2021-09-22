@@ -62,7 +62,7 @@ func TestIndexWorkEventHandle(t *testing.T) {
 	})
 
 	t.Run("work delete event handle success", func(t *testing.T) {
-		es.DeleteDocumentByIdFunc = func(index string, id types.ID) error {
+		es.DeleteDocumentByIdFunc = func(index string, id types.ID, s *session.Session) error {
 			return nil
 		}
 		indexlog.FinishIndexLogFunc = func(id types.ID) error {
@@ -74,7 +74,7 @@ func TestIndexWorkEventHandle(t *testing.T) {
 		Expect(*indices.IndexWorkEventHandle(&ev)).To(Equal(expectedResult))
 	})
 	t.Run("work delete event handle failed", func(t *testing.T) {
-		es.DeleteDocumentByIdFunc = func(index string, id types.ID) error {
+		es.DeleteDocumentByIdFunc = func(index string, id types.ID, s *session.Session) error {
 			return errors.New("error on delete document")
 		}
 		ev := event.EventRecord{Event: event.Event{SourceType: "WORK", SourceId: 100, EventCategory: event.EventCategoryDeleted}}
@@ -88,10 +88,10 @@ func TestIndexWorkEventHandle(t *testing.T) {
 	})
 
 	t.Run("work create or update event handle success", func(t *testing.T) {
-		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
+		es.IndexFunc = func(index string, id types.ID, doc interface{}, s *session.Session) error {
 			return nil
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Session) (*work.WorkDetail, error) {
+		work.DetailWorkFunc = func(identifier string, s *session.Session) (*work.WorkDetail, error) {
 			return &work.WorkDetail{}, nil
 		}
 		var finishedIndexLogId types.ID
@@ -107,10 +107,10 @@ func TestIndexWorkEventHandle(t *testing.T) {
 	})
 
 	t.Run("failed in detail work progress for work creation event or work updating event", func(t *testing.T) {
-		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
+		es.IndexFunc = func(index string, id types.ID, doc interface{}, s *session.Session) error {
 			return nil
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Session) (*work.WorkDetail, error) {
+		work.DetailWorkFunc = func(identifier string, s *session.Session) (*work.WorkDetail, error) {
 			return nil, errors.New("error on detail work")
 		}
 		ev := event.EventRecord{Event: event.Event{SourceType: "WORK", SourceId: 100, EventCategory: event.EventCategoryCreated}}
@@ -124,10 +124,10 @@ func TestIndexWorkEventHandle(t *testing.T) {
 	})
 
 	t.Run("failed in index progress for work creation event or work updating event", func(t *testing.T) {
-		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
+		es.IndexFunc = func(index string, id types.ID, doc interface{}, s *session.Session) error {
 			return errors.New("error on index document")
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Session) (*work.WorkDetail, error) {
+		work.DetailWorkFunc = func(identifier string, s *session.Session) (*work.WorkDetail, error) {
 			id, err := types.ParseID(identifier)
 			if err != nil {
 				return nil, err
@@ -145,10 +145,10 @@ func TestIndexWorkEventHandle(t *testing.T) {
 	})
 
 	t.Run("failed in finish index log for work creation event or work updating event", func(t *testing.T) {
-		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
+		es.IndexFunc = func(index string, id types.ID, doc interface{}, s *session.Session) error {
 			return nil
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Session) (*work.WorkDetail, error) {
+		work.DetailWorkFunc = func(identifier string, s *session.Session) (*work.WorkDetail, error) {
 			id, err := types.ParseID(identifier)
 			if err != nil {
 				return nil, err
@@ -197,7 +197,7 @@ func TestIndicesFullSync(t *testing.T) {
 	t.Run("should be able to index all works", func(t *testing.T) {
 		docs := []indexResult{}
 
-		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
+		es.IndexFunc = func(index string, id types.ID, doc interface{}, s *session.Session) error {
 			docs = append(docs, indexResult{index, id, doc})
 			return nil
 		}
@@ -213,7 +213,7 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return works, nil
 		}
-		work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Session) ([]work.WorkDetail, error) {
+		work.ExtendWorksFunc = func(details []work.WorkDetail, s *session.Session) ([]work.WorkDetail, error) {
 			c := len(details)
 			for i := 0; i < c; i++ {
 				details[i].State = state.State{Name: "test"}
@@ -238,7 +238,7 @@ func TestIndicesFullSync(t *testing.T) {
 	t.Run("should continue to next batch when failed in load works", func(t *testing.T) {
 		docs := []indexResult{}
 
-		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
+		es.IndexFunc = func(index string, id types.ID, doc interface{}, s *session.Session) error {
 			docs = append(docs, indexResult{index, id, doc})
 			return nil
 		}
@@ -257,7 +257,7 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return works, nil
 		}
-		work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Session) ([]work.WorkDetail, error) {
+		work.ExtendWorksFunc = func(details []work.WorkDetail, s *session.Session) ([]work.WorkDetail, error) {
 			c := len(details)
 			for i := 0; i < c; i++ {
 				details[i].State = state.State{Name: "test"}
@@ -285,7 +285,7 @@ func TestIndicesFullSync(t *testing.T) {
 	t.Run("should continue to next batch when failed in index works", func(t *testing.T) {
 		docs := []indexResult{}
 
-		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
+		es.IndexFunc = func(index string, id types.ID, doc interface{}, s *session.Session) error {
 			if int(id-1)/indices.SyncBatchSize == 1 {
 				return errors.New("error on load works")
 			}
@@ -304,7 +304,7 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return works, nil
 		}
-		work.ExtendWorksFunc = func(details []work.WorkDetail, sec *session.Session) ([]work.WorkDetail, error) {
+		work.ExtendWorksFunc = func(details []work.WorkDetail, s *session.Session) ([]work.WorkDetail, error) {
 			c := len(details)
 			for i := 0; i < c; i++ {
 				details[i].State = state.State{Name: "test"}
@@ -366,7 +366,7 @@ func TestIndexlogRecoverRoutine(t *testing.T) {
 	t.Run("should be able to index all pending index log", func(t *testing.T) {
 		docs := []indexResult{}
 
-		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
+		es.IndexFunc = func(index string, id types.ID, doc interface{}, s *session.Session) error {
 			docs = append(docs, indexResult{index, id, doc})
 			return nil
 		}
@@ -383,7 +383,7 @@ func TestIndexlogRecoverRoutine(t *testing.T) {
 			}
 			return logs, nil
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Session) (*work.WorkDetail, error) {
+		work.DetailWorkFunc = func(identifier string, s *session.Session) (*work.WorkDetail, error) {
 			if identifier == "3" {
 				return nil, gorm.ErrRecordNotFound
 			}
@@ -420,7 +420,7 @@ func TestIndexlogRecoverRoutine(t *testing.T) {
 	t.Run("should continue to next batch when failed in: load index logs, detail work, obsolete index log, index work", func(t *testing.T) {
 		docs := []indexResult{}
 
-		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
+		es.IndexFunc = func(index string, id types.ID, doc interface{}, s *session.Session) error {
 			docs = append(docs, indexResult{index, id, doc})
 			return nil
 		}
@@ -440,7 +440,7 @@ func TestIndexlogRecoverRoutine(t *testing.T) {
 			}
 			return logs, nil
 		}
-		work.DetailWorkFunc = func(identifier string, sec *session.Session) (*work.WorkDetail, error) {
+		work.DetailWorkFunc = func(identifier string, s *session.Session) (*work.WorkDetail, error) {
 			if identifier == "3" {
 				return nil, gorm.ErrRecordNotFound
 			}
@@ -456,7 +456,7 @@ func TestIndexlogRecoverRoutine(t *testing.T) {
 		indexlog.ObsoleteIndexLogFunc = func(id types.ID) error {
 			return errors.New("error on obsolete index log")
 		}
-		es.IndexFunc = func(index string, id types.ID, doc interface{}) error {
+		es.IndexFunc = func(index string, id types.ID, doc interface{}, s *session.Session) error {
 			if int(id-1)/indices.SyncBatchSize == 2 {
 				return errors.New("error on load works")
 			}

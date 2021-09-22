@@ -168,7 +168,7 @@ func TestDeleteCheckItemAPI(t *testing.T) {
 	checklist.RegisterCheckItemsRestAPI(router)
 
 	t.Run("should be able to handle delete check item", func(t *testing.T) {
-		checklist.DeleteCheckItemFunc = func(id types.ID, sec *session.Session) error {
+		checklist.DeleteCheckItemFunc = func(id types.ID, s *session.Session) error {
 			return nil
 		}
 		req := httptest.NewRequest(http.MethodDelete, checklist.PathCheckItems+"/123", nil)
@@ -186,7 +186,7 @@ func TestDeleteCheckItemAPI(t *testing.T) {
 	})
 
 	t.Run("should be able to handle exception of unexpected", func(t *testing.T) {
-		checklist.DeleteCheckItemFunc = func(id types.ID, sec *session.Session) error {
+		checklist.DeleteCheckItemFunc = func(id types.ID, s *session.Session) error {
 			return errors.New("unexpected exception")
 		}
 		req := httptest.NewRequest(http.MethodDelete, checklist.PathCheckItems+"/123", nil)

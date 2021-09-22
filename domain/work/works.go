@@ -1,6 +1,7 @@
 package work
 
 import (
+	"context"
 	"errors"
 	"flywheel/bizerror"
 	"flywheel/domain"
@@ -17,7 +18,6 @@ import (
 
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
-	otgorm "github.com/smacker/opentracing-gorm"
 	"github.com/sony/sonyflake"
 )
 
@@ -46,17 +46,16 @@ type WorkDetail struct {
 	CheckList []checklist.CheckItem `json:"checklist"`
 }
 
-func CreateWork(c *domain.WorkCreation, sec *session.Session) (*WorkDetail, error) {
-	if !sec.Perms.HasRoleSuffix("_" + c.ProjectID.String()) {
+func CreateWork(c *domain.WorkCreation, s *session.Session) (*WorkDetail, error) {
+	if !s.Perms.HasRoleSuffix("_" + c.ProjectID.String()) {
 		return nil, bizerror.ErrForbidden
 	}
 
-	db := persistence.ActiveDataSourceManager.GormDB()
 	var workDetail *WorkDetail
 	var ev *event.EventRecord
 
-	err1 := db.Transaction(func(tx *gorm.DB) error {
-		workflowDetail, err := flow.DetailWorkflow(c.FlowID, sec)
+	err1 := persistence.ActiveDataSourceManager.GormDB(s.Context).Transaction(func(tx *gorm.DB) error {
+		workflowDetail, err := flow.DetailWorkflow(c.FlowID, s)
 		if err != nil {
 			return err
 		}
@@ -105,13 +104,13 @@ func CreateWork(c *domain.WorkCreation, sec *session.Session) (*WorkDetail, erro
 		}
 
 		initProcessStep := domain.WorkProcessStep{WorkID: workDetail.ID, FlowID: workDetail.FlowID,
-			CreatorID: sec.Identity.ID, CreatorName: sec.Identity.Nickname,
+			CreatorID: s.Identity.ID, CreatorName: s.Identity.Nickname,
 			StateName: workDetail.State.Name, StateCategory: workDetail.State.Category, BeginTime: workDetail.CreateTime}
 		if err := tx.Create(initProcessStep).Error; err != nil {
 			return err
 		}
 
-		ev, err = CreateWorkCreatedEvent(&workDetail.Work, &sec.Identity, workDetail.CreateTime, tx)
+		ev, err = CreateWorkCreatedEvent(&workDetail.Work, &s.Identity, workDetail.CreateTime, tx)
 		if err != nil {
 			return err
 		}
@@ -129,25 +128,24 @@ func CreateWork(c *domain.WorkCreation, sec *session.Session) (*WorkDetail, erro
 	return workDetail, nil
 }
 
-func DetailWork(identifier string, sec *session.Session) (*WorkDetail, error) {
+func DetailWork(identifier string, s *session.Session) (*WorkDetail, error) {
 	id, _ := types.ParseID(identifier)
 	w := domain.Work{}
-	db := otgorm.SetSpanToGorm(sec.Context, persistence.ActiveDataSourceManager.GormDB())
-	if err := db.Where("id = ? OR identifier LIKE ?", id, identifier).First(&w).Error; err != nil {
+	if err := persistence.ActiveDataSourceManager.GormDB(s.Context).Where("id = ? OR identifier LIKE ?", id, identifier).First(&w).Error; err != nil {
 		return nil, err
 	}
 
-	if !sec.Perms.HasProjectViewPerm(w.ProjectID) {
+	if !s.Perms.HasProjectViewPerm(w.ProjectID) {
 		return nil, bizerror.ErrForbidden
 	}
 
-	ws, err := ExtendWorks([]WorkDetail{{Work: w}}, sec)
+	ws, err := ExtendWorks([]WorkDetail{{Work: w}}, s)
 	if err != nil {
 		return nil, err
 	}
 
 	wd := &ws[0]
-	if err := extendWorkIndexedInfo(wd, sec); err != nil {
+	if err := extendWorkIndexedInfo(wd, s); err != nil {
 		return nil, err
 	}
 
@@ -165,7 +163,7 @@ func extendWorkIndexedInfo(w *WorkDetail, c *session.Session) error {
 }
 
 // ExtendWorks append Work.state type and labels
-func ExtendWorks(workDetails []WorkDetail, sec *session.Session) ([]WorkDetail, error) {
+func ExtendWorks(workDetails []WorkDetail, s *session.Session) ([]WorkDetail, error) {
 	var err error
 	workflowCache := map[types.ID]*domain.WorkflowDetail{}
 	c := len(workDetails)
@@ -175,7 +173,7 @@ func ExtendWorks(workDetails []WorkDetail, sec *session.Session) ([]WorkDetail, 
 		// using w.FlowID to append workflow, state, stateCategory
 		workflow := workflowCache[w.FlowID]
 		if workflow == nil {
-			workflow, err = flow.DetailWorkflowFunc(w.FlowID, sec)
+			workflow, err = flow.DetailWorkflowFunc(w.FlowID, s)
 			if err != nil {
 				return nil, err
 			}
@@ -191,7 +189,7 @@ func ExtendWorks(workDetails []WorkDetail, sec *session.Session) ([]WorkDetail, 
 		w.StateCategory = stateFound.Category
 
 		// using w.ID to append labels
-		wls, err := QueryLabelBriefsOfWorkFunc(w.ID)
+		wls, err := QueryLabelBriefsOfWorkFunc(w.ID, s)
 		if err != nil {
 			return nil, err
 		}
@@ -203,12 +201,12 @@ func ExtendWorks(workDetails []WorkDetail, sec *session.Session) ([]WorkDetail, 
 	return workDetails, nil
 }
 
-func ArchiveWorks(ids []types.ID, sec *session.Session) error {
+func ArchiveWorks(ids []types.ID, s *session.Session) error {
 	var events []*event.EventRecord
 	now := types.CurrentTimestamp()
-	err1 := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+	err1 := persistence.ActiveDataSourceManager.GormDB(s.Context).Transaction(func(tx *gorm.DB) error {
 		for _, id := range ids {
-			work, err := findWorkAndCheckPerms(tx, id, sec)
+			work, err := findWorkAndCheckPerms(tx, id, s)
 			if err != nil {
 				return err
 			}
@@ -225,7 +223,7 @@ func ArchiveWorks(ids []types.ID, sec *session.Session) error {
 					OldValue: work.ArchiveTime.String(), OldValueDesc: work.ArchiveTime.String(),
 					NewValue: now.String(), NewValueDesc: now.String(),
 				}},
-				&sec.Identity, now, tx)
+				&s.Identity, now, tx)
 			if err != nil {
 				return err
 			}
@@ -251,22 +249,22 @@ func ArchiveWorks(ids []types.ID, sec *session.Session) error {
 	return nil
 }
 
-func findWorkAndCheckPerms(db *gorm.DB, id types.ID, sec *session.Session) (*domain.Work, error) {
+func findWorkAndCheckPerms(db *gorm.DB, id types.ID, s *session.Session) (*domain.Work, error) {
 	var work domain.Work
 	if err := db.Where("id = ?", id).First(&work).Error; err != nil {
 		return nil, err
 	}
-	if sec == nil || !sec.Perms.HasRoleSuffix("_"+work.ProjectID.String()) {
+	if s == nil || !s.Perms.HasRoleSuffix("_"+work.ProjectID.String()) {
 		return nil, bizerror.ErrForbidden
 	}
 	return &work, nil
 }
 
-func UpdateWork(id types.ID, u *domain.WorkUpdating, sec *session.Session) (*domain.Work, error) {
+func UpdateWork(id types.ID, u *domain.WorkUpdating, s *session.Session) (*domain.Work, error) {
 	var updatedWork domain.Work
 	var ev *event.EventRecord
-	err1 := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
-		originWork, err := findWorkAndCheckPerms(tx, id, sec)
+	err1 := persistence.ActiveDataSourceManager.GormDB(s.Context).Transaction(func(tx *gorm.DB) error {
+		originWork, err := findWorkAndCheckPerms(tx, id, s)
 		if err != nil {
 			return err
 		}
@@ -289,7 +287,7 @@ func UpdateWork(id types.ID, u *domain.WorkUpdating, sec *session.Session) (*dom
 				OldValue: originWork.Name, OldValueDesc: originWork.Name,
 				NewValue: u.Name, NewValueDesc: u.Name,
 			}},
-			&sec.Identity, types.CurrentTimestamp(), tx)
+			&s.Identity, types.CurrentTimestamp(), tx)
 		if err != nil {
 			return err
 		}
@@ -310,17 +308,17 @@ func UpdateWork(id types.ID, u *domain.WorkUpdating, sec *session.Session) (*dom
 	return &updatedWork, nil
 }
 
-func DeleteWork(id types.ID, sec *session.Session) error {
+func DeleteWork(id types.ID, s *session.Session) error {
 	var ev *event.EventRecord
-	err1 := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
-		_, err := findWorkAndCheckPerms(tx, id, sec)
+	err1 := persistence.ActiveDataSourceManager.GormDB(s.Context).Transaction(func(tx *gorm.DB) error {
+		_, err := findWorkAndCheckPerms(tx, id, s)
 		if err != nil {
 			return err
 		}
 		work := domain.Work{ID: id}
 		err = tx.Model(&work).First(&work).Error
 		if err == nil {
-			ev, err = CreateWorkDeletedEvent(&work, &sec.Identity, types.CurrentTimestamp(), tx)
+			ev, err = CreateWorkDeletedEvent(&work, &s.Identity, types.CurrentTimestamp(), tx)
 			if err != nil {
 				return err
 			}
@@ -348,16 +346,16 @@ func DeleteWork(id types.ID, sec *session.Session) error {
 	return err1
 }
 
-func UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *session.Session) error {
+func UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, s *session.Session) error {
 	if wantedOrders == nil || len(*wantedOrders) == 0 {
 		return nil
 	}
 
 	var events []*event.EventRecord
-	err1 := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+	err1 := persistence.ActiveDataSourceManager.GormDB(s.Context).Transaction(func(tx *gorm.DB) error {
 		for _, orderUpdating := range *wantedOrders {
 			// TODO transition issues
-			originWork, err := findWorkAndCheckPerms(tx, orderUpdating.ID, sec)
+			originWork, err := findWorkAndCheckPerms(tx, orderUpdating.ID, s)
 			if err != nil {
 				return err
 			}
@@ -375,7 +373,7 @@ func UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *
 					OldValue: strconv.FormatInt(originWork.OrderInState, 10), OldValueDesc: strconv.FormatInt(originWork.OrderInState, 10),
 					NewValue: strconv.FormatInt(orderUpdating.NewOlder, 10), NewValueDesc: strconv.FormatInt(orderUpdating.NewOlder, 10),
 				}},
-				&sec.Identity, types.CurrentTimestamp(), tx)
+				&s.Identity, types.CurrentTimestamp(), tx)
 			if err != nil {
 				return err
 			}
@@ -396,7 +394,7 @@ func UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *
 
 func LoadWorks(page, size int) ([]domain.Work, error) {
 	works := []domain.Work{}
-	db := persistence.ActiveDataSourceManager.GormDB()
+	db := persistence.ActiveDataSourceManager.GormDB(context.Background())
 	offset := (page - 1) * size
 	if offset < 0 {
 		offset = 0

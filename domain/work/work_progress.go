@@ -20,8 +20,8 @@ var (
 	CreateWorkStateTransitionFunc = CreateWorkStateTransition
 )
 
-func QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *session.Session) (*[]domain.WorkProcessStep, error) {
-	db := persistence.ActiveDataSourceManager.GormDB()
+func QueryProcessSteps(query *domain.WorkProcessStepQuery, s *session.Session) (*[]domain.WorkProcessStep, error) {
+	db := persistence.ActiveDataSourceManager.GormDB(s.Context)
 	work := domain.Work{}
 	if err := db.Where(&domain.Work{ID: query.WorkID}).Select("project_id").First(&work).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -30,7 +30,7 @@ func QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *session.Session)
 			return nil, err
 		}
 	}
-	if !sec.Perms.HasProjectViewPerm(work.ProjectID) {
+	if !s.Perms.HasProjectViewPerm(work.ProjectID) {
 		return &[]domain.WorkProcessStep{}, nil
 	}
 
@@ -41,8 +41,8 @@ func QueryProcessSteps(query *domain.WorkProcessStepQuery, sec *session.Session)
 	return &processSteps, nil
 }
 
-func CreateWorkStateTransition(c *domain.WorkProcessStepCreation, sec *session.Session) error {
-	workflow, err := flow.DetailWorkflowFunc(c.FlowID, sec)
+func CreateWorkStateTransition(c *domain.WorkProcessStepCreation, s *session.Session) error {
+	workflow, err := flow.DetailWorkflowFunc(c.FlowID, s)
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func CreateWorkStateTransition(c *domain.WorkProcessStepCreation, sec *session.S
 		return errors.New("invalid state " + toState.Name)
 	}
 
-	db := persistence.ActiveDataSourceManager.GormDB()
+	db := persistence.ActiveDataSourceManager.GormDB(s.Context)
 	var ev *event.EventRecord
 	err = db.Transaction(func(tx *gorm.DB) error {
 		// check perms
@@ -70,7 +70,7 @@ func CreateWorkStateTransition(c *domain.WorkProcessStepCreation, sec *session.S
 		if err := tx.Where(&work).First(&work).Error; err != nil {
 			return err
 		}
-		if !sec.Perms.HasRoleSuffix("_" + work.ProjectID.String()) {
+		if !s.Perms.HasRoleSuffix("_" + work.ProjectID.String()) {
 			return bizerror.ErrForbidden
 		}
 		if !work.ArchiveTime.IsZero() {
@@ -113,7 +113,7 @@ func CreateWorkStateTransition(c *domain.WorkProcessStepCreation, sec *session.S
 		if ret.RowsAffected != 1 {
 			return bizerror.ErrWorkProcessStepStateInvalid
 		}
-		nextProcessStep := domain.WorkProcessStep{WorkID: work.ID, FlowID: work.FlowID, CreatorID: sec.Identity.ID, CreatorName: sec.Identity.Nickname,
+		nextProcessStep := domain.WorkProcessStep{WorkID: work.ID, FlowID: work.FlowID, CreatorID: s.Identity.ID, CreatorName: s.Identity.Nickname,
 			StateName: toState.Name, StateCategory: toState.Category, BeginTime: now}
 		if err := tx.Create(nextProcessStep).Error; err != nil {
 			return err
@@ -123,7 +123,7 @@ func CreateWorkStateTransition(c *domain.WorkProcessStepCreation, sec *session.S
 			[]event.UpdatedProperty{{
 				PropertyName: "StateName", PropertyDesc: "StateName", OldValue: work.StateName, OldValueDesc: work.StateName, NewValue: c.ToState, NewValueDesc: c.ToState,
 			}},
-			&sec.Identity, now, tx)
+			&s.Identity, now, tx)
 		if err != nil {
 			return err
 		}

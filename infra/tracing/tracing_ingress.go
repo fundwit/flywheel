@@ -14,7 +14,8 @@ func TracingIngress() gin.HandlerFunc {
 		defer serverSpan.Finish()
 
 		ctx.Request = ctx.Request.WithContext(opentracing.ContextWithSpan(ctx.Request.Context(), serverSpan))
-
 		ctx.Next()
+
+		ext.HTTPUrl.Set(serverSpan, ctx.Request.RequestURI)
 	}
 }

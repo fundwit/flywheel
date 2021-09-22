@@ -1,6 +1,7 @@
 package work_test
 
 import (
+	"context"
 	"flywheel/account"
 	"flywheel/bizerror"
 	"flywheel/domain"
@@ -30,7 +31,7 @@ func workProgressTestSetup(t *testing.T, testDatabase **testinfra.TestDatabase) 
 	db := testinfra.StartMysqlTestDatabase("flywheel")
 	*testDatabase = db
 	// migration
-	Expect(db.DS.GormDB().AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
+	Expect(db.DS.GormDB(context.Background()).AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{},
 		&work.WorkLabelRelation{}, &label.Label{}, &checklist.CheckItem{}).Error).To(BeNil())
 
@@ -72,14 +73,14 @@ func workProgressTestTeardown(t *testing.T, testDatabase *testinfra.TestDatabase
 	}
 }
 
-func buildWork(workName string, flowId, gid types.ID, secCtx *session.Session) *work.WorkDetail {
+func buildWork(workName string, flowId, gid types.ID, s *session.Session) *work.WorkDetail {
 	workCreation := &domain.WorkCreation{
 		Name:             workName,
 		ProjectID:        gid,
 		FlowID:           flowId,
 		InitialStateName: domain.StatePending.Name,
 	}
-	detail, err := work.CreateWork(workCreation, secCtx)
+	detail, err := work.CreateWork(workCreation, s)
 	Expect(err).To(BeNil())
 	Expect(detail).ToNot(BeNil())
 	Expect(detail.StateName).To(Equal("PENDING"))
@@ -99,13 +100,13 @@ func TestQueryProcessSteps(t *testing.T) {
 			&domain.WorkCreation{Name: "test work1", ProjectID: project1.ID, InitialStateName: domain.StatePending.Name}, secCtx)
 		Expect(err).To(BeZero())
 
-		testDatabase.DS.GormDB().DropTable(&domain.WorkProcessStep{})
+		testDatabase.DS.GormDB(context.Background()).DropTable(&domain.WorkProcessStep{})
 		results, err := work.QueryProcessSteps(&domain.WorkProcessStepQuery{WorkID: w.ID}, secCtx)
 		Expect(results).To(BeNil())
 		Expect(err).ToNot(BeNil())
 		Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".work_process_steps' doesn't exist"))
 
-		testDatabase.DS.GormDB().DropTable(&domain.Work{})
+		testDatabase.DS.GormDB(context.Background()).DropTable(&domain.Work{})
 		results, err = work.QueryProcessSteps(&domain.WorkProcessStepQuery{WorkID: w.ID}, secCtx)
 		Expect(results).To(BeNil())
 		Expect(err).ToNot(BeNil())
@@ -153,7 +154,7 @@ func TestQueryProcessSteps(t *testing.T) {
 
 		// add a record should not be query out
 		now := types.CurrentTimestamp()
-		Expect(testDatabase.DS.GormDB().Create(&domain.WorkProcessStep{WorkID: 3, FlowID: 2,
+		Expect(testDatabase.DS.GormDB(context.Background()).Create(&domain.WorkProcessStep{WorkID: 3, FlowID: 2,
 			StateName: "DOING", StateCategory: state.InProcess, BeginTime: now, EndTime: now}).Error).To(BeNil())
 
 		results, err := work.QueryProcessSteps(&domain.WorkProcessStepQuery{WorkID: work1.ID}, secCtx)
@@ -252,7 +253,7 @@ func TestCreateWorkStateTransition(t *testing.T) {
 		defer workProgressTestTeardown(t, testDatabase)
 		_, _, _, persistedEvents, handedEvents := workProgressTestSetup(t, &testDatabase)
 
-		err := testDatabase.DS.GormDB().DropTable(&domain.Work{}).Error
+		err := testDatabase.DS.GormDB(context.Background()).DropTable(&domain.Work{}).Error
 		Expect(err).To(BeNil())
 
 		err = work.CreateWorkStateTransition(
@@ -336,7 +337,7 @@ func TestCreateWorkStateTransition(t *testing.T) {
 		Expect(err).To(BeNil())
 		detail := buildWork("test work", workflow.ID, project1.ID, sec)
 
-		Expect(testDatabase.DS.GormDB().DropTable(&domain.WorkProcessStep{}).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).DropTable(&domain.WorkProcessStep{}).Error).To(BeNil())
 
 		*persistedEvents = []event.EventRecord{}
 		*handedEvents = []event.EventRecord{}
@@ -389,7 +390,7 @@ func TestCreateWorkStateTransition(t *testing.T) {
 
 		// assert: there should be a initial process step after work created
 		var processSteps []domain.WorkProcessStep
-		Expect(testDatabase.DS.GormDB().Model(&domain.WorkProcessStep{}).Scan(&processSteps).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&domain.WorkProcessStep{}).Scan(&processSteps).Error).To(BeNil())
 		Expect(processSteps).ToNot(BeNil())
 		Expect(len(processSteps)).To(Equal(1))
 		Expect(processSteps[0]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,
@@ -424,7 +425,7 @@ func TestCreateWorkStateTransition(t *testing.T) {
 		Expect(detail.ProcessEndTime.IsZero()).To(BeTrue())
 
 		// assert: should handle process step
-		Expect(testDatabase.DS.GormDB().Model(&domain.WorkProcessStep{}).Scan(&processSteps).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&domain.WorkProcessStep{}).Scan(&processSteps).Error).To(BeNil())
 		Expect(processSteps).ToNot(BeNil())
 		Expect(len(processSteps)).To(Equal(2))
 		Expect(processSteps[0]).To(Equal(domain.WorkProcessStep{WorkID: detail.ID, FlowID: detail.FlowID,

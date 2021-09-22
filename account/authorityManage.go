@@ -1,6 +1,7 @@
 package account
 
 import (
+	"context"
 	"errors"
 	"flywheel/authority"
 	"flywheel/domain"
@@ -33,7 +34,7 @@ func LoadPermFuncReset() {
 }
 
 func DefaultSecurityConfiguration() error {
-	db := persistence.ActiveDataSourceManager.GormDB()
+	db := persistence.ActiveDataSourceManager.GormDB(context.Background())
 	if err := db.Save(&systemAdminRole).Error; err != nil {
 		return err
 	}
@@ -72,7 +73,7 @@ func DefaultSecurityConfiguration() error {
 func loadPerms(uid types.ID) (authority.Permissions, authority.ProjectRoles) {
 	var roles []string
 	var projectRoles []domain.ProjectRole
-	db := persistence.ActiveDataSourceManager.GormDB()
+	db := persistence.ActiveDataSourceManager.GormDB(context.Background())
 
 	// system perms
 	var systemRoles []string

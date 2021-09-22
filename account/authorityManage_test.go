@@ -1,6 +1,7 @@
 package account_test
 
 import (
+	"context"
 	"flywheel/account"
 	"flywheel/authority"
 	"flywheel/domain"
@@ -20,7 +21,7 @@ var _ = Describe("AuthorityManage", func() {
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
 		persistence.ActiveDataSourceManager = testDatabase.DS
-		Expect(testDatabase.DS.GormDB().AutoMigrate(&account.User{}, &account.Role{}, &account.Permission{},
+		Expect(testDatabase.DS.GormDB(context.TODO()).AutoMigrate(&account.User{}, &account.Role{}, &account.Permission{},
 			&account.UserRoleBinding{}, &account.RolePermissionBinding{}).Error).To(BeNil())
 		account.LoadPermFuncReset()
 	})
@@ -38,7 +39,7 @@ var _ = Describe("AuthorityManage", func() {
 			var userRoles []account.UserRoleBinding
 			var rolePerms []account.RolePermissionBinding
 
-			db := testDatabase.DS.GormDB()
+			db := testDatabase.DS.GormDB(context.TODO())
 			Expect(db.Find(&users).Error).To(BeNil())
 			Expect(len(users)).To(Equal(1))
 			Expect(users[0]).To(Equal(account.User{ID: 1, Name: "admin", Secret: account.HashSha256("admin123")}))
@@ -91,17 +92,17 @@ var _ = Describe("AuthorityManage", func() {
 	Describe("LoadPerms", func() {
 		It("should return actual project permissions for non system role user", func() {
 			now := time.Now()
-			Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.ProjectMember{}, &domain.Project{}).Error).To(BeNil())
-			Expect(testDatabase.DS.GormDB().Create(
+			Expect(testDatabase.DS.GormDB(context.TODO()).AutoMigrate(&domain.ProjectMember{}, &domain.Project{}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB(context.TODO()).Create(
 				&domain.Project{ID: 1, Name: "project1", Identifier: "1", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
-			Expect(testDatabase.DS.GormDB().Create(
+			Expect(testDatabase.DS.GormDB(context.TODO()).Create(
 				&domain.Project{ID: 20, Name: "project20", Identifier: "20", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
 
-			Expect(testDatabase.DS.GormDB().Create(
+			Expect(testDatabase.DS.GormDB(context.TODO()).Create(
 				&domain.ProjectMember{ProjectId: 1, MemberId: 3, Role: domain.ProjectRoleManager + "", CreateTime: now}).Error).To(BeNil())
-			Expect(testDatabase.DS.GormDB().Create(
+			Expect(testDatabase.DS.GormDB(context.TODO()).Create(
 				&domain.ProjectMember{ProjectId: 10, MemberId: 30, Role: "viewer", CreateTime: now}).Error).To(BeNil())
-			Expect(testDatabase.DS.GormDB().Create(
+			Expect(testDatabase.DS.GormDB(context.TODO()).Create(
 				&domain.ProjectMember{ProjectId: 20, MemberId: 3, Role: "viewer", CreateTime: now}).Error).To(BeNil())
 
 			s, gr := account.LoadPermFunc(3)
@@ -116,18 +117,18 @@ var _ = Describe("AuthorityManage", func() {
 
 		It("should return aggregated permissions for system role user", func() {
 			Expect(account.DefaultSecurityConfiguration()).To(BeNil())
-			Expect(testDatabase.DS.GormDB().Save(&account.UserRoleBinding{UserID: 3, RoleID: "system-admin"}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB(context.TODO()).Save(&account.UserRoleBinding{UserID: 3, RoleID: "system-admin"}).Error).To(BeNil())
 
 			now := time.Now()
-			Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.ProjectMember{}, &domain.Project{}).Error).To(BeNil())
-			Expect(testDatabase.DS.GormDB().Create(
+			Expect(testDatabase.DS.GormDB(context.TODO()).AutoMigrate(&domain.ProjectMember{}, &domain.Project{}).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB(context.TODO()).Create(
 				&domain.Project{ID: 1, Name: "project1", Identifier: "1", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
-			Expect(testDatabase.DS.GormDB().Create(
+			Expect(testDatabase.DS.GormDB(context.TODO()).Create(
 				&domain.Project{ID: 20, Name: "project20", Identifier: "20", NextWorkId: 1, Creator: types.ID(999), CreateTime: now}).Error).To(BeNil())
 
-			Expect(testDatabase.DS.GormDB().Create(
+			Expect(testDatabase.DS.GormDB(context.TODO()).Create(
 				&domain.ProjectMember{ProjectId: 10, MemberId: 30, Role: "viewer", CreateTime: now}).Error).To(BeNil())
-			Expect(testDatabase.DS.GormDB().Create(
+			Expect(testDatabase.DS.GormDB(context.TODO()).Create(
 				&domain.ProjectMember{ProjectId: 20, MemberId: 3, Role: "viewer", CreateTime: now}).Error).To(BeNil())
 
 			s, gr := account.LoadPermFunc(3)

@@ -24,17 +24,17 @@ type WorkContributionsQuery struct {
 	WorkKeys []string `form:"workKey" json:"workKeys"`
 }
 
-func QueryWorkContributions(query WorkContributionsQuery, sec *session.Session) (*[]WorkContributionRecord, error) {
+func QueryWorkContributions(query WorkContributionsQuery, s *session.Session) (*[]WorkContributionRecord, error) {
 	records := []WorkContributionRecord{}
 
 	if len(query.WorkKeys) == 0 {
 		return &records, nil
 	}
 
-	db := persistence.ActiveDataSourceManager.GormDB()
+	db := persistence.ActiveDataSourceManager.GormDB(s.Context)
 
 	// admin can view all
-	if sec.Perms.HasRole(account.SystemAdminPermission.ID) {
+	if s.Perms.HasRole(account.SystemAdminPermission.ID) {
 		if err := db.Where("work_key IN (?)", query.WorkKeys).Find(&records).Error; err != nil {
 			return nil, err
 		}
@@ -42,14 +42,14 @@ func QueryWorkContributions(query WorkContributionsQuery, sec *session.Session) 
 	}
 
 	// non-admin: group member can view all of project
-	if err := db.Where("work_key IN (?) AND work_project_id IN (?)", query.WorkKeys, sec.VisibleProjects()).Find(&records).Error; err != nil {
+	if err := db.Where("work_key IN (?) AND work_project_id IN (?)", query.WorkKeys, s.VisibleProjects()).Find(&records).Error; err != nil {
 		return nil, err
 	}
 	return &records, nil
 }
 
-func CheckContributorWorkPermission(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
-	db := persistence.ActiveDataSourceManager.GormDB()
+func CheckContributorWorkPermission(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
+	db := persistence.ActiveDataSourceManager.GormDB(s.Context)
 	work := domain.Work{Identifier: workKey}
 	if err := db.Where(&work).First(&work).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -65,8 +65,8 @@ func CheckContributorWorkPermission(workKey string, contributorId types.ID, sec 
 		return nil, nil, err
 	}
 
-	if sec.Identity.ID != contributorId {
-		if !sec.Perms.HasRole(account.SystemAdminPermission.ID) && !sec.Perms.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, work.ProjectID)) {
+	if s.Identity.ID != contributorId {
+		if !s.Perms.HasRole(account.SystemAdminPermission.ID) && !s.Perms.HasRole(fmt.Sprintf("%s_%d", domain.ProjectRoleManager, work.ProjectID)) {
 			return nil, nil, bizerror.ErrForbidden // only system admin and project manager can assign work to other member
 		}
 
@@ -75,21 +75,21 @@ func CheckContributorWorkPermission(workKey string, contributorId types.ID, sec 
 			return nil, nil, bizerror.ErrNoContent // contributor is not member of project
 		}
 	} else {
-		if !sec.ProjectRoles.HasProject(work.ProjectID) {
+		if !s.ProjectRoles.HasProject(work.ProjectID) {
 			return nil, nil, bizerror.ErrForbidden // session user is not member of project
 		}
 	}
 	return &work, &user, nil
 }
 
-func BeginWorkContribution(d *WorkContribution, sec *session.Session) (types.ID, error) {
-	work, user, err := CheckContributorWorkPermissionFunc(d.WorkKey, d.ContributorId, sec)
+func BeginWorkContribution(d *WorkContribution, s *session.Session) (types.ID, error) {
+	work, user, err := CheckContributorWorkPermissionFunc(d.WorkKey, d.ContributorId, s)
 	if err != nil {
 		return 0, err
 	}
 
 	var record WorkContributionRecord
-	err = persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+	err = persistence.ActiveDataSourceManager.GormDB(s.Context).Transaction(func(tx *gorm.DB) error {
 		condition := map[string]interface{}{
 			"work_key":       d.WorkKey,
 			"contributor_id": d.ContributorId,
@@ -124,13 +124,13 @@ func BeginWorkContribution(d *WorkContribution, sec *session.Session) (types.ID,
 	return record.ID, nil
 }
 
-func FinishWorkContribution(d *WorkContributionFinishBody, sec *session.Session) error {
-	work, user, err := CheckContributorWorkPermissionFunc(d.WorkKey, d.ContributorId, sec)
+func FinishWorkContribution(d *WorkContributionFinishBody, s *session.Session) error {
+	work, user, err := CheckContributorWorkPermissionFunc(d.WorkKey, d.ContributorId, s)
 	if err != nil {
 		return err
 	}
 
-	return persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+	return persistence.ActiveDataSourceManager.GormDB(s.Context).Transaction(func(tx *gorm.DB) error {
 		var record WorkContributionRecord
 		condition := map[string]interface{}{
 			"work_key":       d.WorkContribution.WorkKey,

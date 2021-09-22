@@ -15,8 +15,8 @@ var (
 	SearchWorksFunc = SearchWorks
 )
 
-func SearchWorks(q domain.WorkQuery, sec *session.Session) ([]work.WorkDetail, error) {
-	visibleProjects := sec.VisibleProjects()
+func SearchWorks(q domain.WorkQuery, s *session.Session) ([]work.WorkDetail, error) {
+	visibleProjects := s.VisibleProjects()
 	if len(visibleProjects) == 0 {
 		return []work.WorkDetail{}, nil
 	}
@@ -70,7 +70,7 @@ func SearchWorks(q domain.WorkQuery, sec *session.Session) ([]work.WorkDetail, e
 	sorts = append(sorts, es.H{"orderInState": es.H{"order": "asc"}})
 
 	root := es.H{"bool": es.H{"filter": filters}}
-	r, err := es.SearchFunc(indices.WorkIndexName, es.H{"size": 10000, "query": root, "sort": sorts})
+	r, err := es.SearchFunc(indices.WorkIndexName, es.H{"size": 10000, "query": root, "sort": sorts}, s)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func SearchWorks(q domain.WorkQuery, sec *session.Session) ([]work.WorkDetail, e
 	}
 
 	// non indexed properties:  type, state, stateCategory, labels
-	worksExts, err := work.ExtendWorksFunc(workDetails, sec)
+	worksExts, err := work.ExtendWorksFunc(workDetails, s)
 	if err != nil {
 		return nil, err
 	}

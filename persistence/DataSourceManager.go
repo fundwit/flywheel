@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"context"
 	"os"
 
 	"github.com/jinzhu/gorm"
@@ -38,9 +39,9 @@ func (m *DataSourceManager) Stop() {
 	}
 }
 
-func (m *DataSourceManager) GormDB() *gorm.DB {
+func (m *DataSourceManager) GormDB(c context.Context) *gorm.DB {
 	if m.gormDB != nil {
-		return m.gormDB.New()
+		return tracingGorm.SetSpanToGorm(c, m.gormDB.New())
 	}
 	return nil
 }

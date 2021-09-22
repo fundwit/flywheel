@@ -53,8 +53,8 @@ func SimpleAuthFilter() gin.HandlerFunc {
 	}
 }
 
-func InjectSessionIntoGinContext(ctx *gin.Context, secCtx *Session) {
-	if secCtx != nil && secCtx.Token != "" {
-		ctx.Set(KeySecCtx, secCtx)
+func InjectSessionIntoGinContext(ctx *gin.Context, s *Session) {
+	if s != nil && s.Token != "" {
+		ctx.Set(KeySecCtx, s)
 	}
 }

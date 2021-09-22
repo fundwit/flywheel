@@ -27,7 +27,7 @@ func TestHandleQueryContributionsAPI(t *testing.T) {
 
 	t.Run("should be able to handle work contributions query rest api request and response", func(t *testing.T) {
 		var reqBody *workcontribution.WorkContributionsQuery
-		workcontribution.QueryWorkContributionsFunc = func(query workcontribution.WorkContributionsQuery, sec *session.Session) (*[]workcontribution.WorkContributionRecord, error) {
+		workcontribution.QueryWorkContributionsFunc = func(query workcontribution.WorkContributionsQuery, s *session.Session) (*[]workcontribution.WorkContributionRecord, error) {
 			reqBody = &query
 			return &[]workcontribution.WorkContributionRecord{{
 				WorkContribution: workcontribution.WorkContribution{WorkKey: "TEST-1", ContributorId: 1000},
@@ -57,7 +57,7 @@ func TestHandleBeginContributionAPI(t *testing.T) {
 
 	t.Run("should be able to handle work contribution begining rest api request and response", func(t *testing.T) {
 		var reqBody *workcontribution.WorkContribution
-		workcontribution.BeginWorkContributionFunc = func(d *workcontribution.WorkContribution, sec *session.Session) (types.ID, error) {
+		workcontribution.BeginWorkContributionFunc = func(d *workcontribution.WorkContribution, s *session.Session) (types.ID, error) {
 			reqBody = d
 			return 12345, nil
 		}
@@ -81,7 +81,7 @@ func TestHandleFinishContributionAPI(t *testing.T) {
 
 	t.Run("should be able to handle work contribution finish rest api request and response", func(t *testing.T) {
 		var reqBody *workcontribution.WorkContributionFinishBody
-		workcontribution.FinishWorkContributionFunc = func(d *workcontribution.WorkContributionFinishBody, sec *session.Session) error {
+		workcontribution.FinishWorkContributionFunc = func(d *workcontribution.WorkContributionFinishBody, s *session.Session) error {
 			reqBody = d
 			return nil
 		}

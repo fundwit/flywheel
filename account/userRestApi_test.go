@@ -77,7 +77,7 @@ var _ = Describe("UserRestApi", func() {
 	Describe("HandleUpdateBaseAuth", func() {
 		It("should return 200 when update successful", func() {
 			var payload *account.BasicAuthUpdating
-			account.UpdateBasicAuthSecretFunc = func(u *account.BasicAuthUpdating, sec *session.Session) error {
+			account.UpdateBasicAuthSecretFunc = func(u *account.BasicAuthUpdating, s *session.Session) error {
 				payload = u
 				return nil
 			}
@@ -93,7 +93,7 @@ var _ = Describe("UserRestApi", func() {
 
 		It("should return 400 when validation failed", func() {
 			var payload *account.BasicAuthUpdating
-			account.UpdateBasicAuthSecretFunc = func(u *account.BasicAuthUpdating, sec *session.Session) error {
+			account.UpdateBasicAuthSecretFunc = func(u *account.BasicAuthUpdating, s *session.Session) error {
 				payload = u
 				return nil
 			}
@@ -112,7 +112,7 @@ var _ = Describe("UserRestApi", func() {
 
 	Describe("HandleQueryUsers", func() {
 		It("should return 200 when query successful", func() {
-			account.QueryUsersFunc = func(sec *session.Session) (*[]account.UserInfo, error) {
+			account.QueryUsersFunc = func(s *session.Session) (*[]account.UserInfo, error) {
 				return &[]account.UserInfo{{ID: 123, Name: "test"}}, nil
 			}
 
@@ -126,7 +126,7 @@ var _ = Describe("UserRestApi", func() {
 	Describe("HandleCreateUser", func() {
 		It("should return 200 when create successful", func() {
 			var payload *account.UserCreation
-			account.CreateUserFunc = func(c *account.UserCreation, sec *session.Session) (*account.UserInfo, error) {
+			account.CreateUserFunc = func(c *account.UserCreation, s *session.Session) (*account.UserInfo, error) {
 				payload = c
 				return &account.UserInfo{ID: 123, Name: "test", Nickname: "Test"}, nil
 			}
@@ -139,9 +139,9 @@ var _ = Describe("UserRestApi", func() {
 			Expect(*payload).To(Equal(account.UserCreation{Name: "test", Secret: "123456", Nickname: "Test"}))
 		})
 
-		It("should return 200 when create successful with requried params", func() {
+		It("should return 200 when create successful with required params", func() {
 			var payload *account.UserCreation
-			account.CreateUserFunc = func(c *account.UserCreation, sec *session.Session) (*account.UserInfo, error) {
+			account.CreateUserFunc = func(c *account.UserCreation, s *session.Session) (*account.UserInfo, error) {
 				payload = c
 				return &account.UserInfo{ID: 123, Name: "test"}, nil
 			}
@@ -159,7 +159,7 @@ var _ = Describe("UserRestApi", func() {
 		It("should return 200 when update user successful", func() {
 			var pathId types.ID
 			var payload *account.UserUpdation
-			account.UpdateUserFunc = func(id types.ID, c *account.UserUpdation, sec *session.Session) error {
+			account.UpdateUserFunc = func(id types.ID, c *account.UserUpdation, s *session.Session) error {
 				pathId = id
 				payload = c
 				return nil
@@ -177,7 +177,7 @@ var _ = Describe("UserRestApi", func() {
 		It("should return 400 when validation failed", func() {
 			var pathId types.ID
 			var payload *account.UserUpdation
-			account.UpdateUserFunc = func(id types.ID, c *account.UserUpdation, sec *session.Session) error {
+			account.UpdateUserFunc = func(id types.ID, c *account.UserUpdation, s *session.Session) error {
 				pathId = id
 				payload = c
 				return nil

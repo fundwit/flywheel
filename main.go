@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flywheel/account"
 	"flywheel/avatar"
 	"flywheel/bizerror"
@@ -59,7 +60,7 @@ func main() {
 	persistence.ActiveDataSourceManager = ds
 
 	// database migration (race condition)
-	err = ds.GormDB().AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{}, &checklist.CheckItem{},
+	err = ds.GormDB(context.Background()).AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{}, &checklist.CheckItem{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{},
 		&workcontribution.WorkContributionRecord{}, &event.EventRecord{}, &indexlog.IndexLogRecord{},
 		&account.User{}, &domain.Project{}, &domain.ProjectMember{},

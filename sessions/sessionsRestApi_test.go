@@ -2,6 +2,7 @@ package sessions_test
 
 import (
 	"bytes"
+	"context"
 	"flywheel/account"
 	"flywheel/bizerror"
 	"flywheel/domain"
@@ -32,7 +33,7 @@ func TestSimpleLoginHandler(t *testing.T) {
 		defer afterEachSessionsRestApiCase(t, testDatabase)
 		router, testDatabase = beforeEachSessionsRestApiCase(t)
 
-		Expect(testDatabase.DS.GormDB().Save(&account.User{ID: 2, Name: "ann", Nickname: "Ann", Secret: account.HashSha256("abc123")}).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Save(&account.User{ID: 2, Name: "ann", Nickname: "Ann", Secret: account.HashSha256("abc123")}).Error).To(BeNil())
 
 		begin := time.Now()
 		time.Sleep(1 * time.Millisecond)
@@ -81,7 +82,7 @@ func TestSimpleLoginHandler(t *testing.T) {
 		defer afterEachSessionsRestApiCase(t, testDatabase)
 		router, testDatabase = beforeEachSessionsRestApiCase(t)
 
-		err := testDatabase.DS.GormDB().Save(&account.User{ID: 1, Name: "ann", Secret: account.HashSha256("abc123")}).Error
+		err := testDatabase.DS.GormDB(context.Background()).Save(&account.User{ID: 1, Name: "ann", Secret: account.HashSha256("abc123")}).Error
 		Expect(err).To(BeNil())
 
 		req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewReader([]byte(`{"name": "ann", "password":"bad pass"}`)))
@@ -104,7 +105,7 @@ func TestSimpleLoginHandler(t *testing.T) {
 		defer afterEachSessionsRestApiCase(t, testDatabase)
 		router, testDatabase = beforeEachSessionsRestApiCase(t)
 
-		err := testDatabase.DS.GormDB().DropTable(&account.User{}).Error
+		err := testDatabase.DS.GormDB(context.Background()).DropTable(&account.User{}).Error
 		Expect(err).To(BeNil())
 
 		req := httptest.NewRequest(http.MethodPost, "/v1/sessions", bytes.NewReader([]byte(`{"name": "ann", "password":"bad pass"}`)))
@@ -199,7 +200,7 @@ func beforeEachSessionsRestApiCase(t *testing.T) (*gin.Engine, *testinfra.TestDa
 	session.TokenCache.Flush()
 	testDatabase := testinfra.StartMysqlTestDatabase("flywheel")
 	persistence.ActiveDataSourceManager = testDatabase.DS
-	Expect(testDatabase.DS.GormDB().AutoMigrate(&account.User{}, &domain.ProjectMember{},
+	Expect(testDatabase.DS.GormDB(context.Background()).AutoMigrate(&account.User{}, &domain.ProjectMember{},
 		&account.Role{}, &account.Permission{}, &account.UserRoleBinding{}, &account.RolePermissionBinding{}).Error).To(BeNil())
 	account.LoadPermFuncReset()
 

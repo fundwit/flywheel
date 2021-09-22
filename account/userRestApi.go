@@ -31,11 +31,11 @@ func RegisterUsersHandler(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 }
 
 func UserInfoQueryHandler(c *gin.Context) {
-	secCtx := session.ExtractSessionFromGinContext(c)
-	if secCtx == nil {
+	s := session.ExtractSessionFromGinContext(c)
+	if s == nil {
 		panic(bizerror.ErrUnauthenticated)
 	}
-	c.JSON(http.StatusOK, &secCtx)
+	c.JSON(http.StatusOK, &s)
 }
 
 func HandleQueryUsers(c *gin.Context) {

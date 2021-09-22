@@ -1,6 +1,7 @@
 package namespace_test
 
 import (
+	"context"
 	"flywheel/account"
 	"flywheel/bizerror"
 	"flywheel/domain"
@@ -20,7 +21,7 @@ var _ = Describe("Projects", func() {
 	)
 	BeforeEach(func() {
 		testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
-		Expect(testDatabase.DS.GormDB().AutoMigrate(&domain.Project{}, &domain.ProjectMember{}).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).AutoMigrate(&domain.Project{}, &domain.ProjectMember{}).Error).To(BeNil())
 		persistence.ActiveDataSourceManager = testDatabase.DS
 	})
 	AfterEach(func() {
@@ -41,7 +42,7 @@ var _ = Describe("Projects", func() {
 			Expect(g.Creator).To(Equal(types.ID(1)))
 
 			var r []domain.ProjectMember
-			Expect(testDatabase.DS.GormDB().Find(&r).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB(context.Background()).Find(&r).Error).To(BeNil())
 			Expect(r).ToNot(BeNil())
 			Expect(len(r)).To(Equal(1))
 			Expect(r[0].ProjectId).To(Equal(g.ID))
@@ -50,7 +51,7 @@ var _ = Describe("Projects", func() {
 			Expect(r[0].CreateTime).ToNot(BeNil())
 
 			var q []domain.Project
-			Expect(testDatabase.DS.GormDB().Find(&q).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB(context.Background()).Find(&q).Error).To(BeNil())
 			Expect(q).ToNot(BeNil())
 			Expect(len(q)).To(Equal(1))
 			Expect(q[0].Name).To(Equal(g.Name))
@@ -69,14 +70,14 @@ var _ = Describe("Projects", func() {
 		})
 
 		It("should return error when database action failed", func() {
-			testDatabase.DS.GormDB().DropTable(&domain.ProjectMember{})
+			testDatabase.DS.GormDB(context.Background()).DropTable(&domain.ProjectMember{})
 
 			sec := testinfra.BuildSecCtx(types.ID(1), account.SystemAdminPermission.ID)
 			g, err := namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).ToNot(BeNil())
 			Expect(g).To(BeNil())
 
-			testDatabase.DS.GormDB().DropTable(&domain.Project{})
+			testDatabase.DS.GormDB(context.Background()).DropTable(&domain.Project{})
 			g, err = namespace.CreateProject(&domain.ProjectCreating{Name: "demo", Identifier: "DEM"}, sec)
 			Expect(err).ToNot(BeNil())
 			Expect(g).To(BeNil())
@@ -86,7 +87,7 @@ var _ = Describe("Projects", func() {
 	Describe("QueryProjects", func() {
 		It("only administrator can query all projects", func() {
 			t := time.Date(2021, 1, 1, 0, 0, 0, 0, time.Local)
-			testDatabase.DS.GormDB().Save(&domain.Project{ID: 123, Identifier: "TED", Name: "test", NextWorkId: 10, CreateTime: t, Creator: 1})
+			testDatabase.DS.GormDB(context.Background()).Save(&domain.Project{ID: 123, Identifier: "TED", Name: "test", NextWorkId: 10, CreateTime: t, Creator: 1})
 
 			b, err := namespace.QueryProjects(testinfra.BuildSecCtx(types.ID(2)))
 			Expect(b).To(BeNil())
@@ -98,7 +99,7 @@ var _ = Describe("Projects", func() {
 		})
 
 		It("should be able to return database error", func() {
-			testDatabase.DS.GormDB().DropTable(&domain.Project{})
+			testDatabase.DS.GormDB(context.Background()).DropTable(&domain.Project{})
 
 			b, err := namespace.QueryProjects(testinfra.BuildSecCtx(types.ID(2), account.SystemAdminPermission.ID))
 			Expect(b).To(BeNil())
@@ -110,7 +111,7 @@ var _ = Describe("Projects", func() {
 	Describe("UpdateProject", func() {
 		It("only administrator can update project", func() {
 			t := time.Date(2021, 1, 1, 0, 0, 0, 0, time.Local)
-			testDatabase.DS.GormDB().Save(&domain.Project{ID: 123, Identifier: "TED", Name: "test", NextWorkId: 10, CreateTime: t, Creator: 111})
+			testDatabase.DS.GormDB(context.Background()).Save(&domain.Project{ID: 123, Identifier: "TED", Name: "test", NextWorkId: 10, CreateTime: t, Creator: 111})
 
 			err := namespace.UpdateProject(123, &domain.ProjectUpdating{Name: "new name"}, testinfra.BuildSecCtx(types.ID(2)))
 			Expect(err).To(Equal(bizerror.ErrForbidden))
@@ -120,7 +121,7 @@ var _ = Describe("Projects", func() {
 			Expect(err).To(BeNil())
 
 			var q []domain.Project
-			Expect(testDatabase.DS.GormDB().Find(&q).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB(context.Background()).Find(&q).Error).To(BeNil())
 			Expect(q).ToNot(BeNil())
 			Expect(len(q)).To(Equal(1))
 			Expect(q[0].Name).To(Equal("new name"))
@@ -134,7 +135,7 @@ var _ = Describe("Projects", func() {
 
 	Describe("QueryProjectRole", func() {
 		It("should return actual role if project is accessible for user", func() {
-			Expect(testDatabase.DS.GormDB().Create(
+			Expect(testDatabase.DS.GormDB(context.Background()).Create(
 				&domain.ProjectMember{ProjectId: 1, MemberId: 2, Role: domain.ProjectRoleManager, CreateTime: time.Now()}).Error).To(BeNil())
 
 			b, err := namespace.QueryProjectRole(1, testinfra.BuildSecCtx(types.ID(2)))
@@ -142,7 +143,7 @@ var _ = Describe("Projects", func() {
 			Expect(err).To(BeNil())
 		})
 		It("should return empty if project is not accessible for user", func() {
-			Expect(testDatabase.DS.GormDB().Create(
+			Expect(testDatabase.DS.GormDB(context.Background()).Create(
 				&domain.ProjectMember{ProjectId: 1, MemberId: 3, Role: domain.ProjectRoleManager, CreateTime: time.Now()}).Error).To(BeNil())
 
 			b, err := namespace.QueryProjectRole(1, testinfra.BuildSecCtx(types.ID(2)))
@@ -165,44 +166,46 @@ var _ = Describe("Projects", func() {
 			g2, err := namespace.CreateProject(&domain.ProjectCreating{Name: "project2", Identifier: "G2"}, sec)
 			Expect(err).To(BeNil())
 
-			nextId, err := namespace.NextWorkIdentifier(g1.ID, testDatabase.DS.GormDB())
+			nextId, err := namespace.NextWorkIdentifier(g1.ID, testDatabase.DS.GormDB(context.Background()))
 			Expect(err).To(BeNil())
 			Expect(nextId).To(Equal("G1-1"))
 
 			record := &domain.Project{}
-			Expect(testDatabase.DS.GormDB().Where(&domain.Project{ID: g1.ID}).First(&record).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB(context.Background()).Where(&domain.Project{ID: g1.ID}).First(&record).Error).To(BeNil())
 			Expect(record.NextWorkId).To(Equal(2))
 			record = &domain.Project{}
-			Expect(testDatabase.DS.GormDB().Where(&domain.Project{ID: g2.ID}).First(&record).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB(context.Background()).Where(&domain.Project{ID: g2.ID}).First(&record).Error).To(BeNil())
 			Expect(record.NextWorkId).To(Equal(1))
 
-			nextId, err = namespace.NextWorkIdentifier(g1.ID, testDatabase.DS.GormDB())
+			nextId, err = namespace.NextWorkIdentifier(g1.ID, testDatabase.DS.GormDB(context.Background()))
 			Expect(err).To(BeNil())
 			Expect(nextId).To(Equal("G1-2"))
-			nextId, err = namespace.NextWorkIdentifier(g2.ID, testDatabase.DS.GormDB())
+			nextId, err = namespace.NextWorkIdentifier(g2.ID, testDatabase.DS.GormDB(context.Background()))
 			Expect(err).To(BeNil())
 			Expect(nextId).To(Equal("G2-1"))
 
 			record = &domain.Project{}
-			Expect(testDatabase.DS.GormDB().Where(&domain.Project{ID: g1.ID}).First(&record).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB(context.Background()).Where(&domain.Project{ID: g1.ID}).First(&record).Error).To(BeNil())
 			Expect(record.NextWorkId).To(Equal(3))
 			record = &domain.Project{}
-			Expect(testDatabase.DS.GormDB().Where(&domain.Project{ID: g2.ID}).First(&record).Error).To(BeNil())
+			Expect(testDatabase.DS.GormDB(context.Background()).Where(&domain.Project{ID: g2.ID}).First(&record).Error).To(BeNil())
 			Expect(record.NextWorkId).To(Equal(2))
 		})
 	})
 
 	Describe("QueryProjectNames", func() {
 		It("should return correct project names", func() {
-			ret, err := namespace.QueryProjectNames(nil)
+			s := testinfra.BuildSecCtx(types.ID(1), account.SystemAdminPermission.ID)
+
+			ret, err := namespace.QueryProjectNames(nil, s)
 			Expect(err).To(BeNil())
 			Expect(len(ret)).To(BeZero())
 
-			ret, err = namespace.QueryProjectNames([]types.ID{})
+			ret, err = namespace.QueryProjectNames([]types.ID{}, s)
 			Expect(err).To(BeNil())
 			Expect(len(ret)).To(BeZero())
 
-			db := testDatabase.DS.GormDB()
+			db := testDatabase.DS.GormDB(context.Background())
 			Expect(db.Save(&domain.Project{
 				ID: 1, Name: "p1", Identifier: "P1", NextWorkId: 10, CreateTime: time.Now(), Creator: 100}).Error).To(BeNil())
 			Expect(db.Save(&domain.Project{
@@ -210,7 +213,7 @@ var _ = Describe("Projects", func() {
 			Expect(db.Save(&domain.Project{
 				ID: 3, Name: "p3", Identifier: "P3", NextWorkId: 13, CreateTime: time.Now(), Creator: 300}).Error).To(BeNil())
 
-			ret, err = namespace.QueryProjectNames([]types.ID{1, 2, 4})
+			ret, err = namespace.QueryProjectNames([]types.ID{1, 2, 4}, s)
 			Expect(err).To(BeNil())
 			Expect(len(ret)).To(Equal(2))
 			Expect(ret).To(Equal(map[types.ID]string{1: "p1", 2: "p2"}))

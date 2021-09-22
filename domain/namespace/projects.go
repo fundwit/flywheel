@@ -20,27 +20,27 @@ var (
 	idWorker = sonyflake.NewSonyflake(sonyflake.Settings{})
 )
 
-func QueryProjects(sec *session.Session) (*[]domain.Project, error) {
-	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
+func QueryProjects(s *session.Session) (*[]domain.Project, error) {
+	if !s.Perms.HasRole(account.SystemAdminPermission.ID) {
 		return nil, bizerror.ErrForbidden
 	}
 
 	var projects []domain.Project
-	if err := persistence.ActiveDataSourceManager.GormDB().Find(&projects).Error; err != nil {
+	if err := persistence.ActiveDataSourceManager.GormDB(s.Context).Find(&projects).Error; err != nil {
 		return nil, err
 	}
 	return &projects, nil
 }
 
-func CreateProject(c *domain.ProjectCreating, sec *session.Session) (*domain.Project, error) {
-	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
+func CreateProject(c *domain.ProjectCreating, s *session.Session) (*domain.Project, error) {
+	if !s.Perms.HasRole(account.SystemAdminPermission.ID) {
 		return nil, bizerror.ErrForbidden
 	}
 
 	now := time.Now()
-	g := domain.Project{ID: idgen.NextID(idWorker), Name: c.Name, Identifier: c.Identifier, NextWorkId: 1, CreateTime: now, Creator: sec.Identity.ID}
-	r := domain.ProjectMember{ProjectId: g.ID, MemberId: sec.Identity.ID, Role: domain.ProjectRoleManager, CreateTime: now}
-	err := persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+	g := domain.Project{ID: idgen.NextID(idWorker), Name: c.Name, Identifier: c.Identifier, NextWorkId: 1, CreateTime: now, Creator: s.Identity.ID}
+	r := domain.ProjectMember{ProjectId: g.ID, MemberId: s.Identity.ID, Role: domain.ProjectRoleManager, CreateTime: now}
+	err := persistence.ActiveDataSourceManager.GormDB(s.Context).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(g).Error; err != nil {
 			return err
 		}
@@ -55,12 +55,12 @@ func CreateProject(c *domain.ProjectCreating, sec *session.Session) (*domain.Pro
 	return &g, nil
 }
 
-func UpdateProject(id types.ID, d *domain.ProjectUpdating, sec *session.Session) error {
-	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
+func UpdateProject(id types.ID, d *domain.ProjectUpdating, s *session.Session) error {
+	if !s.Perms.HasRole(account.SystemAdminPermission.ID) {
 		return bizerror.ErrForbidden
 	}
 
-	return persistence.ActiveDataSourceManager.GormDB().Transaction(func(tx *gorm.DB) error {
+	return persistence.ActiveDataSourceManager.GormDB(s.Context).Transaction(func(tx *gorm.DB) error {
 		var project domain.Project
 		if err := tx.Where(domain.Project{ID: id}).First(&project).Error; err != nil {
 			return err
@@ -73,9 +73,9 @@ func UpdateProject(id types.ID, d *domain.ProjectUpdating, sec *session.Session)
 	})
 }
 
-func QueryProjectRole(projectId types.ID, sec *session.Session) (string, error) {
-	gm := domain.ProjectMember{ProjectId: projectId, MemberId: sec.Identity.ID}
-	db := persistence.ActiveDataSourceManager.GormDB()
+func QueryProjectRole(projectId types.ID, s *session.Session) (string, error) {
+	gm := domain.ProjectMember{ProjectId: projectId, MemberId: s.Identity.ID}
+	db := persistence.ActiveDataSourceManager.GormDB(s.Context)
 	var founds []domain.ProjectMember
 	if err := db.Model(domain.ProjectMember{}).Where(&gm).Find(&founds).Error; err != nil || founds == nil || len(founds) == 0 {
 		return "", err
@@ -103,11 +103,11 @@ func NextWorkIdentifier(projectId types.ID, tx *gorm.DB) (string, error) {
 	return nextWorkID, nil
 }
 
-func QueryProjectNames(ids []types.ID) (map[types.ID]string, error) {
+func QueryProjectNames(ids []types.ID, s *session.Session) (map[types.ID]string, error) {
 	if len(ids) == 0 {
 		return map[types.ID]string{}, nil
 	}
-	db := persistence.ActiveDataSourceManager.GormDB()
+	db := persistence.ActiveDataSourceManager.GormDB(s.Context)
 	var records []domain.Project
 	if err := db.Model(&domain.Project{}).Where("id IN (?)", ids).Find(&records).Error; err != nil {
 		return nil, err

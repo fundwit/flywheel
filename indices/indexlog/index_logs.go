@@ -1,6 +1,7 @@
 package indexlog
 
 import (
+	"context"
 	"flywheel/persistence"
 
 	"github.com/fundwit/go-commons/types"
@@ -59,7 +60,7 @@ func CreateIndexLog(id types.ID, sourceType string, sourceId types.ID, sourceDes
 
 func FinishIndexLog(id types.ID) error {
 	changes := map[string]interface{}{"indexed_time": types.CurrentTimestamp(), "obsolete": false}
-	if err := persistence.ActiveDataSourceManager.GormDB().Model(&IndexLogRecord{}).Where("id = ?", id).Update(changes).Error; err != nil {
+	if err := persistence.ActiveDataSourceManager.GormDB(context.Background()).Model(&IndexLogRecord{}).Where("id = ?", id).Update(changes).Error; err != nil {
 		return err
 	}
 	return nil
@@ -67,7 +68,7 @@ func FinishIndexLog(id types.ID) error {
 
 func ObsoleteIndexLog(id types.ID) error {
 	changes := map[string]interface{}{"obsolete": true}
-	if err := persistence.ActiveDataSourceManager.GormDB().Model(&IndexLogRecord{}).Where("id = ?", id).Update(changes).Error; err != nil {
+	if err := persistence.ActiveDataSourceManager.GormDB(context.Background()).Model(&IndexLogRecord{}).Where("id = ?", id).Update(changes).Error; err != nil {
 		return err
 	}
 	return nil
@@ -75,7 +76,7 @@ func ObsoleteIndexLog(id types.ID) error {
 
 func LoadPendingIndexLog(page, size int) ([]IndexLogRecord, error) {
 	indexLogs := []IndexLogRecord{}
-	db := persistence.ActiveDataSourceManager.GormDB()
+	db := persistence.ActiveDataSourceManager.GormDB(context.Background())
 	offset := (page - 1) * size
 	if offset < 0 {
 		offset = 0

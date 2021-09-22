@@ -1,6 +1,7 @@
 package indices
 
 import (
+	"context"
 	"errors"
 	"flywheel/account"
 	"flywheel/authority"
@@ -36,8 +37,8 @@ var (
 	IndexlogRecoveryRoutineFunc = IndexlogRecoveryRoutine
 )
 
-func ScheduleNewSyncRun(sec *session.Session) (bool, error) {
-	if !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
+func ScheduleNewSyncRun(s *session.Session) (bool, error) {
+	if !s.Perms.HasRole(account.SystemAdminPermission.ID) {
 		return false, bizerror.ErrForbidden
 	}
 
@@ -68,8 +69,8 @@ var (
 	SyncBatchSize = 500
 )
 
-func IndexlogRecoveryRoutine(sec *session.Session) (err error) {
-	if !sec.Perms.HasRole(account.SystemRecoveryPermission.ID) && !sec.Perms.HasRole(account.SystemAdminPermission.ID) {
+func IndexlogRecoveryRoutine(s *session.Session) (err error) {
+	if !s.Perms.HasRole(account.SystemRecoveryPermission.ID) && !s.Perms.HasRole(account.SystemAdminPermission.ID) {
 		return bizerror.ErrForbidden
 	}
 
@@ -114,7 +115,7 @@ func IndexlogRecoveryRoutine(sec *session.Session) (err error) {
 		}
 
 		// IndexFunc will be invoked
-		if err := IndexWorks(workDetails); err != nil {
+		if err := IndexWorks(workDetails, s); err != nil {
 			logrus.Warnf("indices fully sync: error on index works(page = %d, pageSize = %d): %v", page, SyncBatchSize, err)
 		}
 		page++
@@ -160,7 +161,7 @@ func IndicesFullSync() (err error) {
 		}
 
 		// IndexFunc will be invoked
-		if err := IndexWorks(details); err != nil {
+		if err := IndexWorks(details, &session.Session{Context: context.Background()}); err != nil {
 			logrus.Warnf("indices fully sync: error on index works(page = %d, pageSize = %d): %v", page, SyncBatchSize, err)
 		}
 		page++
@@ -173,7 +174,7 @@ func IndexWorkEventHandle(e *event.EventRecord) *event.EventHandleResult {
 	}
 
 	if e.EventCategory == event.EventCategoryDeleted {
-		err := es.DeleteDocumentByIdFunc(WorkIndexName, e.Event.SourceId)
+		err := es.DeleteDocumentByIdFunc(WorkIndexName, e.Event.SourceId, &session.Session{Context: context.Background()})
 		if err != nil {
 			return &event.EventHandleResult{
 				Message:           fmt.Sprintf("delete work index %d, %v", e.Event.SourceId, err),
@@ -189,7 +190,7 @@ func IndexWorkEventHandle(e *event.EventRecord) *event.EventHandleResult {
 			}
 		}
 		// IndexWorks will invoke es.IndexFunc
-		if err := IndexWorks([]work.WorkDetail{*w}); err != nil {
+		if err := IndexWorks([]work.WorkDetail{*w}, &session.Session{Context: context.Background()}); err != nil {
 			return &event.EventHandleResult{
 				Message:           fmt.Sprintf("index work %d, %v", e.Event.SourceId, err),
 				HandlerIdentifier: WorkIndexEventHandlerName,

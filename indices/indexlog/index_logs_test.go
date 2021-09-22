@@ -1,6 +1,7 @@
 package indexlog
 
 import (
+	"context"
 	"errors"
 	"flywheel/persistence"
 	"flywheel/testinfra"
@@ -66,7 +67,7 @@ func TestCreateIndexLog(t *testing.T) {
 func indexLogPersistTestSetup(t *testing.T, testDatabase **testinfra.TestDatabase) {
 	db := testinfra.StartMysqlTestDatabase("flywheel")
 	*testDatabase = db
-	Expect(db.DS.GormDB().AutoMigrate(&IndexLogRecord{}).Error).To(BeNil())
+	Expect(db.DS.GormDB(context.Background()).AutoMigrate(&IndexLogRecord{}).Error).To(BeNil())
 	persistence.ActiveDataSourceManager = db.DS
 }
 func indexLogPersistTestTeardownTeardown(t *testing.T, testDatabase *testinfra.TestDatabase) {
@@ -89,10 +90,10 @@ func TestIndexLogPersistCreate(t *testing.T) {
 			Timestamp:   types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
 			IndexedTime: types.TimestampOfDate(2021, 1, 1, 12, 12, 13, 0, time.Local),
 		}
-		assert.Nil(t, indexLogPersistCreate(&indexlog1, testDatabase.DS.GormDB()))
+		assert.Nil(t, indexLogPersistCreate(&indexlog1, testDatabase.DS.GormDB(context.Background())))
 		// assert records in tables
 		records := []IndexLogRecord{}
-		Expect(testDatabase.DS.GormDB().Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
 		Expect(len(records)).To(Equal(1))
 		Expect(records[0]).To(Equal(indexlog1))
 
@@ -101,9 +102,9 @@ func TestIndexLogPersistCreate(t *testing.T) {
 			ID:        110,
 			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
 		}
-		assert.Nil(t, indexLogPersistCreate(&indexlog1a, testDatabase.DS.GormDB()))
+		assert.Nil(t, indexLogPersistCreate(&indexlog1a, testDatabase.DS.GormDB(context.Background())))
 		records = []IndexLogRecord{}
-		Expect(testDatabase.DS.GormDB().Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
 		Expect(len(records)).To(Equal(2))
 		Expect(records[1]).To(Equal(indexlog1a))
 
@@ -113,10 +114,10 @@ func TestIndexLogPersistCreate(t *testing.T) {
 			ID:        200,
 			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
 		}
-		assert.Nil(t, indexLogPersistCreate(&indexlog2, testDatabase.DS.GormDB()))
+		assert.Nil(t, indexLogPersistCreate(&indexlog2, testDatabase.DS.GormDB(context.Background())))
 		// assert records in tables
 		records = []IndexLogRecord{}
-		Expect(testDatabase.DS.GormDB().Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
 		Expect(len(records)).To(Equal(3))
 		Expect(records[2]).To(Equal(indexlog2))
 
@@ -126,10 +127,10 @@ func TestIndexLogPersistCreate(t *testing.T) {
 			ID:        300,
 			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
 		}
-		assert.Nil(t, indexLogPersistCreate(&indexlog1b, testDatabase.DS.GormDB()))
+		assert.Nil(t, indexLogPersistCreate(&indexlog1b, testDatabase.DS.GormDB(context.Background())))
 		// assert records in tables
 		records = []IndexLogRecord{}
-		Expect(testDatabase.DS.GormDB().Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
 		Expect(len(records)).To(Equal(4))
 		Expect(records[3]).To(Equal(indexlog1b))
 		Expect(records[2]).To(Equal(indexlog2)) // indexlog2 not changed cause of work id not match
@@ -153,10 +154,10 @@ func TestFinishIndexLog(t *testing.T) {
 			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
 			Obsolete:  true,
 		}
-		assert.Nil(t, indexLogPersistCreate(&indexlog1, testDatabase.DS.GormDB()))
+		assert.Nil(t, indexLogPersistCreate(&indexlog1, testDatabase.DS.GormDB(context.Background())))
 		Expect(FinishIndexLog(indexlog1.ID)).To(BeNil())
 		records := []IndexLogRecord{}
-		Expect(testDatabase.DS.GormDB().Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
 		Expect(time.Since(records[0].IndexedTime.Time()) < time.Second).To(BeTrue())
 		Expect(records[0].Obsolete).To(BeFalse())
 
@@ -165,7 +166,7 @@ func TestFinishIndexLog(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 		Expect(FinishIndexLog(indexlog1.ID)).To(BeNil())
 		records = []IndexLogRecord{}
-		Expect(testDatabase.DS.GormDB().Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
 		Expect(records[0].IndexedTime.Time().After(oldIndexedTime.Time())).To(BeTrue())
 		Expect(records[0].Obsolete).To(BeFalse())
 	})
@@ -184,10 +185,10 @@ func TestObsoleteIndexLog(t *testing.T) {
 			ID:        110,
 			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
 		}
-		assert.Nil(t, indexLogPersistCreate(&indexlog1, testDatabase.DS.GormDB()))
+		assert.Nil(t, indexLogPersistCreate(&indexlog1, testDatabase.DS.GormDB(context.Background())))
 		Expect(ObsoleteIndexLog(indexlog1.ID)).To(BeNil())
 		records := []IndexLogRecord{}
-		Expect(testDatabase.DS.GormDB().Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
 		Expect(records[0].IndexedTime).To(BeZero())
 		Expect(records[0].Obsolete).To(BeTrue())
 
@@ -195,7 +196,7 @@ func TestObsoleteIndexLog(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 		Expect(ObsoleteIndexLog(indexlog1.ID)).To(BeNil())
 		records = []IndexLogRecord{}
-		Expect(testDatabase.DS.GormDB().Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&IndexLogRecord{}).Find(&records).Error).To(BeNil())
 		Expect(records[0].IndexedTime).To(BeZero())
 		Expect(records[0].Obsolete).To(BeTrue())
 	})
@@ -214,7 +215,7 @@ func TestLoadPendingIndexLog(t *testing.T) {
 			ID:        101,
 			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
 		}
-		Expect(indexLogPersistCreate(&indexlog1, testDatabase.DS.GormDB())).To(BeNil())
+		Expect(indexLogPersistCreate(&indexlog1, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
 
 		indexlog2 := IndexLogRecord{
 			IndexLog:    IndexLog{SourceType: "WORK", SourceId: 10002, SourceDesc: "work10002", Deletion: false},
@@ -222,7 +223,7 @@ func TestLoadPendingIndexLog(t *testing.T) {
 			Timestamp:   types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
 			IndexedTime: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
 		}
-		Expect(indexLogPersistCreate(&indexlog2, testDatabase.DS.GormDB())).To(BeNil())
+		Expect(indexLogPersistCreate(&indexlog2, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
 
 		indexlog3 := IndexLogRecord{
 			IndexLog:  IndexLog{SourceType: "WORK", SourceId: 10003, SourceDesc: "work10003", Deletion: false},
@@ -230,21 +231,21 @@ func TestLoadPendingIndexLog(t *testing.T) {
 			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
 			Obsolete:  true,
 		}
-		Expect(indexLogPersistCreate(&indexlog3, testDatabase.DS.GormDB())).To(BeNil())
+		Expect(indexLogPersistCreate(&indexlog3, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
 
 		indexlog4 := IndexLogRecord{
 			IndexLog:  IndexLog{SourceType: "WORK", SourceId: 10004, SourceDesc: "work10004", Deletion: false},
 			ID:        104,
 			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
 		}
-		Expect(indexLogPersistCreate(&indexlog4, testDatabase.DS.GormDB())).To(BeNil())
+		Expect(indexLogPersistCreate(&indexlog4, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
 
 		indexlog5 := IndexLogRecord{
 			IndexLog:  IndexLog{SourceType: "WORK", SourceId: 10005, SourceDesc: "work10005", Deletion: false},
 			ID:        105,
 			Timestamp: types.TimestampOfDate(2021, 1, 1, 12, 12, 12, 0, time.Local),
 		}
-		Expect(indexLogPersistCreate(&indexlog5, testDatabase.DS.GormDB())).To(BeNil())
+		Expect(indexLogPersistCreate(&indexlog5, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
 
 		ret, err := LoadPendingIndexLog(1, 2)
 		Expect(err).To(BeNil())

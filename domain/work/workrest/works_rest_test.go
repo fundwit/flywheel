@@ -59,7 +59,7 @@ func TestCreateWorkAPI(t *testing.T) {
 	t.Run("should be able to serve create request", func(t *testing.T) {
 		beforeEach()
 
-		work.CreateWorkFunc = func(creation *domain.WorkCreation, sec *session.Session) (*work.WorkDetail, error) {
+		work.CreateWorkFunc = func(creation *domain.WorkCreation, s *session.Session) (*work.WorkDetail, error) {
 			detail := work.WorkDetail{
 				Work: domain.Work{
 					ID:            123,
@@ -120,7 +120,7 @@ func TestCreateWorkAPI(t *testing.T) {
 	t.Run("should return 500 when service process failed", func(t *testing.T) {
 		beforeEach()
 
-		work.CreateWorkFunc = func(creation *domain.WorkCreation, sec *session.Session) (*work.WorkDetail, error) {
+		work.CreateWorkFunc = func(creation *domain.WorkCreation, s *session.Session) (*work.WorkDetail, error) {
 			return nil, errors.New("a mocked error")
 		}
 		req := httptest.NewRequest(http.MethodPost, "/v1/works",
@@ -137,7 +137,7 @@ func TestQueryWorkAPI(t *testing.T) {
 	t.Run("should be able to serve query request", func(t *testing.T) {
 		beforeEach()
 
-		search.SearchWorksFunc = func(q domain.WorkQuery, sec *session.Session) ([]work.WorkDetail, error) {
+		search.SearchWorksFunc = func(q domain.WorkQuery, s *session.Session) ([]work.WorkDetail, error) {
 			works := []work.WorkDetail{
 				{
 					Work: domain.Work{ID: 1, Name: "work1", Identifier: "W-1", ProjectID: types.ID(333), FlowID: 1, CreateTime: demoTime, OrderInState: demoTime.Time().UnixNano() / 1e6,
@@ -171,7 +171,7 @@ func TestQueryWorkAPI(t *testing.T) {
 		beforeEach()
 
 		query := &domain.WorkQuery{}
-		search.SearchWorksFunc = func(q domain.WorkQuery, sec *session.Session) ([]work.WorkDetail, error) {
+		search.SearchWorksFunc = func(q domain.WorkQuery, s *session.Session) ([]work.WorkDetail, error) {
 			*query = q
 			return []work.WorkDetail{}, nil
 		}
@@ -187,7 +187,7 @@ func TestQueryWorkAPI(t *testing.T) {
 	t.Run("should return 500 when service failed", func(t *testing.T) {
 		beforeEach()
 
-		search.SearchWorksFunc = func(q domain.WorkQuery, sec *session.Session) ([]work.WorkDetail, error) {
+		search.SearchWorksFunc = func(q domain.WorkQuery, s *session.Session) ([]work.WorkDetail, error) {
 			return []work.WorkDetail{}, errors.New("a mocked error")
 		}
 
@@ -204,7 +204,7 @@ func TestDetailWorkAPI(t *testing.T) {
 	t.Run("should return 500 when service failed", func(t *testing.T) {
 		beforeEach()
 
-		work.DetailWorkFunc = func(id string, sec *session.Session) (*work.WorkDetail, error) {
+		work.DetailWorkFunc = func(id string, s *session.Session) (*work.WorkDetail, error) {
 			return nil, errors.New("a mocked error")
 		}
 		req := httptest.NewRequest(http.MethodGet, "/v1/works/123", nil)
@@ -216,7 +216,7 @@ func TestDetailWorkAPI(t *testing.T) {
 	t.Run("should return work detail as expected when everything is ok", func(t *testing.T) {
 		beforeEach()
 
-		work.DetailWorkFunc = func(id string, sec *session.Session) (*work.WorkDetail, error) {
+		work.DetailWorkFunc = func(id string, s *session.Session) (*work.WorkDetail, error) {
 			return &work.WorkDetail{
 				Work: domain.Work{
 					ID: 123, Name: "test work", Identifier: "W-1", ProjectID: 100, CreateTime: demoTime, FlowID: demoWorkflow.ID, OrderInState: 999,
@@ -264,7 +264,7 @@ func TestUpdateWorkAPI(t *testing.T) {
 	t.Run("should failed when service failed", func(t *testing.T) {
 		beforeEach()
 
-		work.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *session.Session) (*domain.Work, error) {
+		work.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, s *session.Session) (*domain.Work, error) {
 			return nil, errors.New("a mocked error")
 		}
 		req := httptest.NewRequest(http.MethodPut, "/v1/works/100", bytes.NewReader([]byte(
@@ -277,7 +277,7 @@ func TestUpdateWorkAPI(t *testing.T) {
 	t.Run("should be able to update work successfully", func(t *testing.T) {
 		beforeEach()
 
-		work.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, sec *session.Session) (*domain.Work, error) {
+		work.UpdateWorkFunc = func(id types.ID, u *domain.WorkUpdating, s *session.Session) (*domain.Work, error) {
 			return &domain.Work{ID: 100, Name: "new-name", Identifier: "W-1", ProjectID: types.ID(333), CreateTime: demoTime,
 				FlowID: 1, OrderInState: demoTime.Time().UnixNano() / 1e6,
 				StateName: "PENDING", StateCategory: domain.StatePending.Category}, nil
@@ -299,7 +299,7 @@ func TestDeleteWorkAPI(t *testing.T) {
 	t.Run("should be able to handle delete work", func(t *testing.T) {
 		beforeEach()
 
-		work.DeleteWorkFunc = func(id types.ID, sec *session.Session) error {
+		work.DeleteWorkFunc = func(id types.ID, s *session.Session) error {
 			return nil
 		}
 		req := httptest.NewRequest(http.MethodDelete, "/v1/works/123", nil)
@@ -320,7 +320,7 @@ func TestDeleteWorkAPI(t *testing.T) {
 	t.Run("should be able to handle exception of unexpected", func(t *testing.T) {
 		beforeEach()
 
-		work.DeleteWorkFunc = func(id types.ID, sec *session.Session) error {
+		work.DeleteWorkFunc = func(id types.ID, s *session.Session) error {
 			return errors.New("unexpected exception")
 		}
 		req := httptest.NewRequest(http.MethodDelete, "/v1/works/123", nil)
@@ -336,7 +336,7 @@ func TestCreateArchivedWorksAPI(t *testing.T) {
 	t.Run("should be able to handle archive work", func(t *testing.T) {
 		beforeEach()
 
-		work.ArchiveWorksFunc = func(id []types.ID, sec *session.Session) error {
+		work.ArchiveWorksFunc = func(id []types.ID, s *session.Session) error {
 			return nil
 		}
 
@@ -372,7 +372,7 @@ func TestCreateArchivedWorksAPI(t *testing.T) {
 	t.Run("should be able to handle exception of unexpected", func(t *testing.T) {
 		beforeEach()
 
-		work.ArchiveWorksFunc = func(id []types.ID, sec *session.Session) error {
+		work.ArchiveWorksFunc = func(id []types.ID, s *session.Session) error {
 			return errors.New("unexpected exception")
 		}
 		req := httptest.NewRequest(http.MethodPost, "/v1/archived-works",
@@ -399,7 +399,7 @@ func TestUpdateWorkOrdersAPI(t *testing.T) {
 	t.Run("should be able to handle process error", func(t *testing.T) {
 		beforeEach()
 
-		work.UpdateStateRangeOrdersFunc = func(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *session.Session) error {
+		work.UpdateStateRangeOrdersFunc = func(wantedOrders *[]domain.WorkOrderRangeUpdating, s *session.Session) error {
 			return errors.New("unexpected exception")
 		}
 		req := httptest.NewRequest(http.MethodPut, "/v1/work-orders", bytes.NewReader([]byte(`[]`)))
@@ -411,7 +411,7 @@ func TestUpdateWorkOrdersAPI(t *testing.T) {
 	t.Run("should be able to handle update", func(t *testing.T) {
 		beforeEach()
 
-		work.UpdateStateRangeOrdersFunc = func(wantedOrders *[]domain.WorkOrderRangeUpdating, sec *session.Session) error {
+		work.UpdateStateRangeOrdersFunc = func(wantedOrders *[]domain.WorkOrderRangeUpdating, s *session.Session) error {
 			return nil
 		}
 		req := httptest.NewRequest(http.MethodPut, "/v1/work-orders", bytes.NewReader([]byte(`[]`)))

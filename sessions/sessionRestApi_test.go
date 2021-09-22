@@ -1,6 +1,7 @@
 package sessions_test
 
 import (
+	"context"
 	"flywheel/account"
 	"flywheel/authority"
 	"flywheel/bizerror"
@@ -33,7 +34,7 @@ func TestDetailSessionSecurityContext(t *testing.T) {
 		defer afterEachSessionRestApiCase(t, testDatabase)
 		router, testDatabase = beforeEachSessionRestApiCase(t)
 
-		Expect(testDatabase.DS.GormDB().Save(&account.User{ID: 2, Name: "ann", Secret: account.HashSha256("abc123")}).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Save(&account.User{ID: 2, Name: "ann", Secret: account.HashSha256("abc123")}).Error).To(BeNil())
 
 		begin := time.Now()
 		time.Sleep(1 * time.Millisecond)
@@ -82,7 +83,7 @@ func TestDetailSessionSecurityContext(t *testing.T) {
 		defer afterEachSessionRestApiCase(t, testDatabase)
 		router, testDatabase = beforeEachSessionRestApiCase(t)
 
-		Expect(testDatabase.DS.GormDB().Save(&account.User{ID: 2, Name: "ann", Secret: account.HashSha256("abc123")}).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Save(&account.User{ID: 2, Name: "ann", Secret: account.HashSha256("abc123")}).Error).To(BeNil())
 		token := uuid.New().String()
 		session.TokenCache.Set(token, &session.Session{Token: token, Identity: session.Identity{Name: "ann", ID: 1},
 			Perms: []string{domain.ProjectRoleManager + "_1"}, ProjectRoles: []domain.ProjectRole{{
@@ -106,7 +107,7 @@ func beforeEachSessionRestApiCase(t *testing.T) (*gin.Engine, *testinfra.TestDat
 	testDatabase := testinfra.StartMysqlTestDatabase("flywheel")
 	persistence.ActiveDataSourceManager = testDatabase.DS
 
-	Expect(testDatabase.DS.GormDB().AutoMigrate(&account.User{}, &domain.ProjectMember{},
+	Expect(testDatabase.DS.GormDB(context.Background()).AutoMigrate(&account.User{}, &domain.ProjectMember{},
 		&account.Role{}, &account.Permission{}, &account.UserRoleBinding{}, &account.RolePermissionBinding{}).Error).To(BeNil())
 
 	return router, testDatabase

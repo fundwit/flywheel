@@ -38,7 +38,7 @@ func SimpleLoginHandler(c *gin.Context) {
 		return
 	}
 	identity := session.Identity{}
-	db := persistence.ActiveDataSourceManager.GormDB()
+	db := persistence.ActiveDataSourceManager.GormDB(c.Request.Context())
 	if err := db.Model(&account.User{}).Where(&account.User{Name: login.Name, Secret: account.HashSha256(login.Password)}).Scan(&identity).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			panic(bizerror.ErrUnauthenticated)

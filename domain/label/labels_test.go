@@ -1,6 +1,7 @@
 package label_test
 
 import (
+	"context"
 	"errors"
 	"flywheel/account"
 	"flywheel/authority"
@@ -20,7 +21,7 @@ import (
 func setup(t *testing.T, testDatabase **testinfra.TestDatabase) {
 	db := testinfra.StartMysqlTestDatabase("flywheel")
 	*testDatabase = db
-	Expect(db.DS.GormDB().AutoMigrate(&label.Label{}).Error).To(BeNil())
+	Expect(db.DS.GormDB(context.Background()).AutoMigrate(&label.Label{}).Error).To(BeNil())
 
 	persistence.ActiveDataSourceManager = db.DS
 }
@@ -98,7 +99,7 @@ func TestCreateLabel(t *testing.T) {
 		Expect(err).To(BeNil())
 
 		r := label.Label{}
-		Expect(persistence.ActiveDataSourceManager.GormDB().Where("id = ?", l.ID).First(&r).Error).To(BeNil())
+		Expect(persistence.ActiveDataSourceManager.GormDB(context.Background()).Where("id = ?", l.ID).First(&r).Error).To(BeNil())
 		Expect(r).To(Equal(*l))
 
 		Expect(time.Since(l.CreateTime.Time()) < time.Second).To(BeTrue())
@@ -170,7 +171,7 @@ func TestDeleteLabel(t *testing.T) {
 		Expect(labelToDeleted).To(Equal(*l))
 
 		r := label.Label{}
-		Expect(persistence.ActiveDataSourceManager.GormDB().
+		Expect(persistence.ActiveDataSourceManager.GormDB(context.Background()).
 			Where("id = ?", l.ID).First(&r).Error).To(Equal(gorm.ErrRecordNotFound))
 	})
 
@@ -191,7 +192,7 @@ func TestDeleteLabel(t *testing.T) {
 		Expect(err).To(Equal(labelReferencedByWork))
 
 		r := label.Label{}
-		Expect(persistence.ActiveDataSourceManager.GormDB().Where("id = ?", l.ID).First(&r).Error).To(BeNil())
+		Expect(persistence.ActiveDataSourceManager.GormDB(context.Background()).Where("id = ?", l.ID).First(&r).Error).To(BeNil())
 		Expect(r).To(Equal(*l))
 	})
 }

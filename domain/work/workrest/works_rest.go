@@ -1,7 +1,6 @@
 package workrest
 
 import (
-	"context"
 	"errors"
 	"flywheel/bizerror"
 	"flywheel/domain"
@@ -57,7 +56,6 @@ func handleCreate(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
-	context.Background()
 	detail, err := work.CreateWorkFunc(&creation, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		panic(err)

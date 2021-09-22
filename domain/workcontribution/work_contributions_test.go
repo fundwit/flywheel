@@ -1,6 +1,7 @@
 package workcontribution_test
 
 import (
+	"context"
 	"errors"
 	"flywheel/account"
 	"flywheel/authority"
@@ -24,7 +25,7 @@ func workContributionTestSetup(t *testing.T, testDatabase **testinfra.TestDataba
 	db := testinfra.StartMysqlTestDatabase("flywheel")
 	*testDatabase = db
 	// migration
-	Expect(db.DS.GormDB().AutoMigrate(
+	Expect(db.DS.GormDB(context.Background()).AutoMigrate(
 		&workcontribution.WorkContributionRecord{},
 		&domain.Work{}, &account.User{}).Error).To(BeNil())
 
@@ -35,16 +36,16 @@ func workContributionTestSetup(t *testing.T, testDatabase **testinfra.TestDataba
 
 	// given a work and a user
 	grantedUser := &account.User{ID: 10, Name: "testUser", Nickname: "Test User", Secret: "123"}
-	Expect(db.DS.GormDB().Save(grantedUser).Error).To(BeNil())
+	Expect(db.DS.GormDB(context.Background()).Save(grantedUser).Error).To(BeNil())
 
 	ungrantedUser := &account.User{ID: 11, Name: "test user 11", Secret: "123"}
-	Expect(db.DS.GormDB().Save(ungrantedUser).Error).To(BeNil())
+	Expect(db.DS.GormDB(context.Background()).Save(ungrantedUser).Error).To(BeNil())
 
 	givenWork := &domain.Work{ID: 20, Identifier: "TES-1", Name: "test work", ProjectID: 30, FlowID: 40}
-	Expect(db.DS.GormDB().Save(givenWork).Error).To(BeNil())
+	Expect(db.DS.GormDB(context.Background()).Save(givenWork).Error).To(BeNil())
 
 	sessionUser := &account.User{ID: 999, Name: "test user 999", Secret: "123"}
-	Expect(db.DS.GormDB().Save(sessionUser).Error).To(BeNil())
+	Expect(db.DS.GormDB(context.Background()).Save(sessionUser).Error).To(BeNil())
 
 	return grantedUser, ungrantedUser, givenWork, sessionUser
 }
@@ -175,7 +176,7 @@ func TestBeginWorkContribution(t *testing.T) {
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 		testErr := errors.New("test error")
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return nil, nil, testErr
 		}
 		id, err := workcontribution.BeginWorkContribution(
@@ -189,7 +190,7 @@ func TestBeginWorkContribution(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 
@@ -201,7 +202,7 @@ func TestBeginWorkContribution(t *testing.T) {
 			ID:               1000, ContributorName: "user 200", BeginTime: types.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
 			EndTime: types.TimestampOfDate(2021, 1, 2, 12, 0, 0, 0, time.Local), Effective: false,
 		}
-		Expect(testDatabase.DS.GormDB().Save(&givenRecord1).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Save(&givenRecord1).Error).To(BeNil())
 		time.Sleep(10 * time.Millisecond)
 
 		// begin new contribution for check item 1
@@ -231,7 +232,7 @@ func TestBeginWorkContribution(t *testing.T) {
 		Expect(id).ToNot(BeZero())
 		Expect(id).ToNot(Equal(givenRecord1))
 		record := workcontribution.WorkContributionRecord{ID: id}
-		Expect(testDatabase.DS.GormDB().Where(&record).First(&record).Error).To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Where(&record).First(&record).Error).To(BeNil())
 		Expect(record.ID).To(Equal(id))
 		Expect(record.WorkKey).To(Equal(givenWork.Identifier))
 		Expect(record.ContributorId).To(Equal(types.ID(300)))
@@ -253,7 +254,7 @@ func TestBeginWorkContribution(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 
@@ -263,7 +264,7 @@ func TestBeginWorkContribution(t *testing.T) {
 			WorkContribution: workcontribution.WorkContribution{WorkKey: "TEST-100", CheckitemId: 2, ContributorId: 200},
 			ID:               1002, ContributorName: "user 200", BeginTime: types.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local), Effective: true,
 		}
-		db := testDatabase.DS.GormDB()
+		db := testDatabase.DS.GormDB(context.Background())
 		Expect(db.Save(&givenRecord2).Error).To(BeNil())
 		givenRecord1 := workcontribution.WorkContributionRecord{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: "TEST-100", ContributorId: 200},
@@ -299,11 +300,11 @@ func TestBeginWorkContribution(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 
-		db := testDatabase.DS.GormDB()
+		db := testDatabase.DS.GormDB(context.Background())
 		sec := &session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}}
 
 		givenRecord2 := workcontribution.WorkContributionRecord{
@@ -347,11 +348,11 @@ func TestBeginWorkContribution(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
 
-		db := testDatabase.DS.GormDB()
+		db := testDatabase.DS.GormDB(context.Background())
 		sec := &session.Session{Identity: session.Identity{ID: sessionUser.ID}, Perms: []string{account.SystemAdminPermission.ID}}
 
 		givenRecord2 := workcontribution.WorkContributionRecord{
@@ -403,7 +404,7 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 		testErr := errors.New("test error")
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return nil, nil, testErr
 		}
 		err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{Effective: true,
@@ -416,10 +417,10 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
-		db := testDatabase.DS.GormDB()
+		db := testDatabase.DS.GormDB(context.Background())
 
 		// case1
 		givenRecord1 := workcontribution.WorkContributionRecord{
@@ -452,10 +453,10 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
-		db := testDatabase.DS.GormDB()
+		db := testDatabase.DS.GormDB(context.Background())
 
 		givenRecord2 := workcontribution.WorkContributionRecord{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, CheckitemId: 2, ContributorId: grantedUser.ID},
@@ -496,10 +497,10 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
-		db := testDatabase.DS.GormDB()
+		db := testDatabase.DS.GormDB(context.Background())
 
 		givenRecord2 := workcontribution.WorkContributionRecord{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, CheckitemId: 2, ContributorId: grantedUser.ID},
@@ -528,10 +529,10 @@ func TestFinishWorkContributionEffective(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
-		db := testDatabase.DS.GormDB()
+		db := testDatabase.DS.GormDB(context.Background())
 
 		givenRecord2 := workcontribution.WorkContributionRecord{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, CheckitemId: 2, ContributorId: grantedUser.ID},
@@ -577,7 +578,7 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 		testErr := errors.New("test error")
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return nil, nil, testErr
 		}
 		err := workcontribution.FinishWorkContribution(&workcontribution.WorkContributionFinishBody{
@@ -590,10 +591,10 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
-		db := testDatabase.DS.GormDB()
+		db := testDatabase.DS.GormDB(context.Background())
 
 		// case1
 		givenRecord1 := workcontribution.WorkContributionRecord{
@@ -625,10 +626,10 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
-		db := testDatabase.DS.GormDB()
+		db := testDatabase.DS.GormDB(context.Background())
 
 		givenRecord2 := workcontribution.WorkContributionRecord{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, CheckitemId: 2, ContributorId: grantedUser.ID},
@@ -669,10 +670,10 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
-		db := testDatabase.DS.GormDB()
+		db := testDatabase.DS.GormDB(context.Background())
 
 		givenRecord2 := workcontribution.WorkContributionRecord{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, CheckitemId: 2, ContributorId: grantedUser.ID},
@@ -712,10 +713,10 @@ func TestFinishWorkContributionDiscard(t *testing.T) {
 		defer workContributionTestTeardown(t, testDatabase)
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
-		db := testDatabase.DS.GormDB()
+		db := testDatabase.DS.GormDB(context.Background())
 		givenRecord1 := workcontribution.WorkContributionRecord{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID},
 			ID:               1002, ContributorName: "user 200", BeginTime: types.TimestampOfDate(2021, 1, 1, 12, 0, 0, 0, time.Local),
@@ -775,10 +776,10 @@ func TestQueryWorkContributions(t *testing.T) {
 	t.Run("should be able to get correct result", func(t *testing.T) {
 		grantedUser, _, givenWork, sessionUser := workContributionTestSetup(t, &testDatabase)
 
-		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, sec *session.Session) (*domain.Work, *account.User, error) {
+		workcontribution.CheckContributorWorkPermissionFunc = func(workKey string, contributorId types.ID, s *session.Session) (*domain.Work, *account.User, error) {
 			return givenWork, grantedUser, nil
 		}
-		db := testDatabase.DS.GormDB()
+		db := testDatabase.DS.GormDB(context.Background())
 
 		givenRecord1 := workcontribution.WorkContributionRecord{
 			WorkContribution: workcontribution.WorkContribution{WorkKey: givenWork.Identifier, ContributorId: grantedUser.ID},

@@ -1,6 +1,7 @@
 package checklist_test
 
 import (
+	"context"
 	"flywheel/account"
 	"flywheel/authority"
 	"flywheel/bizerror"
@@ -27,7 +28,7 @@ func checkitemsTestSetup(t *testing.T, testDatabase **testinfra.TestDatabase) (*
 	db := testinfra.StartMysqlTestDatabase("flywheel")
 	*testDatabase = db
 	// migration
-	Expect(db.DS.GormDB().AutoMigrate(&checklist.CheckItem{}, &domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
+	Expect(db.DS.GormDB(context.Background()).AutoMigrate(&checklist.CheckItem{}, &domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error).To(BeNil())
 
 	persistence.ActiveDataSourceManager = db.DS
@@ -118,7 +119,7 @@ func TestCreateCheckitem(t *testing.T) {
 		Expect(ci.Done).To(Equal(false))
 
 		r := checklist.CheckItem{}
-		Expect(persistence.ActiveDataSourceManager.GormDB().
+		Expect(persistence.ActiveDataSourceManager.GormDB(context.Background()).
 			Where(checklist.CheckItem{WorkId: w1.ID, Name: "item1"}).First(&r).Error).
 			To(BeNil())
 		Expect(*ci).To(Equal(r))
@@ -232,7 +233,7 @@ func TestUpdateCheckitem(t *testing.T) {
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 
 		// case2: should be failed if work is not found
-		persistence.ActiveDataSourceManager.GormDB().Delete(&domain.Work{ID: w1.ID})
+		persistence.ActiveDataSourceManager.GormDB(context.Background()).Delete(&domain.Work{ID: w1.ID})
 		Expect(checklist.UpdateCheckItem(ci1.ID, checklist.CheckItemUpdate{Name: "item1-update"}, &c1)).
 			To(Equal(gorm.ErrRecordNotFound))
 
@@ -336,7 +337,7 @@ func TestDeleteCheckitems(t *testing.T) {
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 
 		// case2: should be failed if work is not found
-		persistence.ActiveDataSourceManager.GormDB().Delete(&domain.Work{ID: w1.ID})
+		persistence.ActiveDataSourceManager.GormDB(context.Background()).Delete(&domain.Work{ID: w1.ID})
 		Expect(checklist.DeleteCheckItem(ci1.ID, &c1)).To(Equal(gorm.ErrRecordNotFound))
 	})
 
@@ -416,7 +417,7 @@ func TestCleanWorkCheckitems(t *testing.T) {
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 
 		// case2: should be failed if work is not found
-		persistence.ActiveDataSourceManager.GormDB().Delete(&domain.Work{ID: w1.ID})
+		persistence.ActiveDataSourceManager.GormDB(context.Background()).Delete(&domain.Work{ID: w1.ID})
 		Expect(checklist.CleanWorkCheckItems(w1.ID, &c1)).To(Equal(gorm.ErrRecordNotFound))
 	})
 
@@ -470,14 +471,14 @@ func TestCleanWorkCheckitems(t *testing.T) {
 	})
 }
 
-func buildWork(workName string, flowId, gid types.ID, secCtx *session.Session) *work.WorkDetail {
+func buildWork(workName string, flowId, gid types.ID, s *session.Session) *work.WorkDetail {
 	workCreation := &domain.WorkCreation{
 		Name:             workName,
 		ProjectID:        gid,
 		FlowID:           flowId,
 		InitialStateName: domain.StatePending.Name,
 	}
-	detail, err := work.CreateWork(workCreation, secCtx)
+	detail, err := work.CreateWork(workCreation, s)
 	Expect(err).To(BeNil())
 	Expect(detail).ToNot(BeNil())
 	Expect(detail.StateName).To(Equal("PENDING"))

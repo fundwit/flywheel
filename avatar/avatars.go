@@ -39,8 +39,8 @@ func DetailAvatar(id types.ID) ([]byte, error) {
 	return ioutil.ReadAll(r)
 }
 
-func CreateAvatar(id types.ID, r io.Reader, sec *session.Session) error {
-	if id != sec.Identity.ID {
+func CreateAvatar(id types.ID, r io.Reader, s *session.Session) error {
+	if id != s.Identity.ID {
 		return bizerror.ErrForbidden
 	}
 

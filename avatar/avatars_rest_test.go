@@ -20,7 +20,7 @@ func TestHandleGetAvatar(t *testing.T) {
 	engine.Use(bizerror.ErrorHandling())
 	RegisterAvatarAPI(engine)
 
-	DetailAvatarFunc = func(id types.ID) ([]byte, error) {
+	DetailAvatarFunc = func(id types.ID, s *session.Session) ([]byte, error) {
 		return []byte(id.String() + ":abcd"), nil
 	}
 

@@ -1,8 +1,8 @@
 package indices
 
 import (
+	"flywheel/client/es"
 	"flywheel/domain/work"
-	"flywheel/es"
 	"flywheel/session"
 	"fmt"
 

@@ -26,7 +26,7 @@ func HandleGetAvatar(c *gin.Context) {
 		panic(err)
 	}
 
-	bytes, err := DetailAvatarFunc(id)
+	bytes, err := DetailAvatarFunc(id, &session.Session{Context: c.Request.Context()})
 	if err != nil {
 		panic(err)
 	}

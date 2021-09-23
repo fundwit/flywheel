@@ -2,7 +2,7 @@ package avatar
 
 import (
 	"flywheel/bizerror"
-	"flywheel/common"
+	"flywheel/client/s3"
 	"flywheel/session"
 	"io"
 	"io/ioutil"
@@ -11,25 +11,8 @@ import (
 	"github.com/fundwit/go-commons/types"
 )
 
-var (
-	AvatarBucket  *oss.Bucket
-	GetObjectFunc func(string, ...oss.Option) (io.ReadCloser, error)
-	PutObjectFunc func(string, io.Reader, ...oss.Option) error
-)
-
-func Bootstrap() {
-	var err error
-	AvatarBucket, err = common.BuildBucketFromEnv()
-	if err != nil {
-		panic(err)
-	}
-
-	GetObjectFunc = AvatarBucket.GetObject
-	PutObjectFunc = AvatarBucket.PutObject
-}
-
-func DetailAvatar(id types.ID) ([]byte, error) {
-	r, err := GetObjectFunc("avatars/" + id.String() + ".png")
+func DetailAvatar(id types.ID, s *session.Session) ([]byte, error) {
+	r, err := s3.GetObjectFunc("avatars/"+id.String()+".png", s)
 	if err != nil {
 		if serErr, ok := err.(oss.ServiceError); ok && serErr.Code == "NoSuchKey" {
 			return nil, bizerror.ErrNotFound
@@ -44,5 +27,5 @@ func CreateAvatar(id types.ID, r io.Reader, s *session.Session) error {
 		return bizerror.ErrForbidden
 	}
 
-	return PutObjectFunc("avatars/"+id.String()+".png", r)
+	return s3.PutObjectFunc("avatars/"+id.String()+".png", r, s)
 }

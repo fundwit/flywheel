@@ -3,9 +3,9 @@ package indices_test
 import (
 	"context"
 	"encoding/json"
+	"flywheel/client/es"
 	"flywheel/domain"
 	"flywheel/domain/work"
-	"flywheel/es"
 	"flywheel/indices"
 	"flywheel/session"
 	"strings"

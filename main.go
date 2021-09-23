@@ -5,6 +5,8 @@ import (
 	"flywheel/account"
 	"flywheel/avatar"
 	"flywheel/bizerror"
+	"flywheel/client/es"
+	"flywheel/client/s3"
 	"flywheel/domain"
 	"flywheel/domain/flow"
 	"flywheel/domain/label"
@@ -13,7 +15,6 @@ import (
 	"flywheel/domain/work/checklist"
 	"flywheel/domain/work/workrest"
 	"flywheel/domain/workcontribution"
-	"flywheel/es"
 	"flywheel/event"
 	"flywheel/indices"
 	"flywheel/indices/indexlog"
@@ -109,7 +110,7 @@ func main() {
 	workcontribution.RegisterWorkContributionsHandlers(engine, securityMiddle)
 
 	avatar.RegisterAvatarAPI(engine, securityMiddle)
-	avatar.Bootstrap()
+	s3.Bootstrap()
 
 	err = engine.Run(":80")
 	if err != nil {

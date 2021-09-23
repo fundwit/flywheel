@@ -2,11 +2,11 @@ package search
 
 import (
 	"context"
+	"flywheel/client/es"
 	"flywheel/domain"
 	"flywheel/domain/state"
 	"flywheel/domain/work"
 	"flywheel/domain/work/checklist"
-	"flywheel/es"
 	"flywheel/indices"
 	"flywheel/session"
 	"strings"

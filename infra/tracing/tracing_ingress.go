@@ -11,13 +11,14 @@ func TracingIngress() gin.HandlerFunc {
 		tracer := opentracing.GlobalTracer()
 		spanCtx, _ := tracer.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(ctx.Request.Header))
 		serverSpan := tracer.StartSpan(ctx.Request.Method+" "+ctx.FullPath(), ext.RPCServerOption(spanCtx))
+		ext.HTTPMethod.Set(serverSpan, ctx.Request.Method)
 		defer serverSpan.Finish()
 
 		ctx.Request = ctx.Request.WithContext(opentracing.ContextWithSpan(ctx.Request.Context(), serverSpan))
 		ctx.Next()
 
 		ext.HTTPStatusCode.Set(serverSpan, uint16(ctx.Writer.Status()))
-		ext.Error.Set(serverSpan, ctx.Writer.Status() >= 200 && ctx.Writer.Status() < 400)
+		ext.Error.Set(serverSpan, ctx.Writer.Status() >= 400)
 		ext.HTTPUrl.Set(serverSpan, ctx.Request.RequestURI)
 	}
 }

@@ -165,35 +165,58 @@ func extendWorkIndexedInfo(w *WorkDetail, c *session.Session) error {
 // ExtendWorks append Work.state type and labels
 func ExtendWorks(workDetails []WorkDetail, s *session.Session) ([]WorkDetail, error) {
 	var err error
-	workflowCache := map[types.ID]*domain.WorkflowDetail{}
 	c := len(workDetails)
+
+	workflowMap := map[types.ID]*domain.WorkflowDetail{}
+	var workIds []types.ID
+	for i := 0; i < c; i++ {
+		w := workDetails[i] // w is a copy, not a reference
+		workflowMap[w.FlowID] = nil
+		workIds = append(workIds, w.ID)
+	}
+
+	// load workflow
+	workflowCache := map[types.ID]*domain.WorkflowDetail{}
+	for flowId, workflow := range workflowMap {
+		if workflow == nil {
+			workflow, err = flow.DetailWorkflowFunc(flowId, s)
+			if err != nil {
+				return nil, err
+			}
+			workflowCache[flowId] = workflow
+			workflowMap[flowId] = workflow
+		}
+	}
+
+	// load labels
+	wls, err := QueryLabelBriefsOfWorkFunc(workIds, s)
+	if err != nil {
+		return nil, err
+	}
+
 	for i := 0; i < c; i++ {
 		w := workDetails[i] // w is a copy, not a reference
 
 		// using w.FlowID to append workflow, state, stateCategory
 		workflow := workflowCache[w.FlowID]
-		if workflow == nil {
-			workflow, err = flow.DetailWorkflowFunc(w.FlowID, s)
-			if err != nil {
-				return nil, err
+		if workflow != nil {
+			w.Type = &workflow.Workflow
+			stateFound, found := workflow.FindState(w.StateName)
+			if !found {
+				return nil, bizerror.ErrStateInvalid
 			}
-			workflowCache[w.FlowID] = workflow
+			w.State = stateFound
+			w.StateCategory = stateFound.Category
 		}
-		w.Type = &workflow.Workflow
 
-		stateFound, found := workflow.FindState(w.StateName)
-		if !found {
-			return nil, bizerror.ErrStateInvalid
+		// append labels
+		var ls []label.LabelBrief
+		for _, l := range wls {
+			if l.WorkID == w.ID {
+				ls = append(ls, label.LabelBrief{ID: l.LabelID, Name: l.LabelName, ThemeColor: l.LabelThemeColor})
+			}
 		}
-		w.State = stateFound
-		w.StateCategory = stateFound.Category
-
-		// using w.ID to append labels
-		wls, err := QueryLabelBriefsOfWorkFunc(w.ID, s)
-		if err != nil {
-			return nil, err
-		}
-		w.Labels = wls
+		w.Labels = ls
 
 		// at last, put the copy w into slice
 		workDetails[i] = w

@@ -65,7 +65,7 @@ func setup(t *testing.T, testDatabase **testinfra.TestDatabase) (*domain.Workflo
 		handedEvents = append(handedEvents, *record)
 		return nil
 	}
-	work.QueryLabelBriefsOfWorkFunc = func(workId types.ID, s *session.Session) ([]label.LabelBrief, error) {
+	work.QueryLabelBriefsOfWorkFunc = func(workIds []types.ID, s *session.Session) ([]work.WorkLabelBrief, error) {
 		return nil, nil
 	}
 	flow.DetailWorkflowFunc = flow.DetailWorkflow
@@ -149,10 +149,10 @@ func TestCreateWork(t *testing.T) {
 		Expect(time.Since((*persistedEvents)[0].Timestamp.Time()) < time.Second).To(BeTrue())
 		Expect(*handedEvents).To(Equal(*persistedEvents))
 
-		work.QueryLabelBriefsOfWorkFunc = func(workId types.ID, s *session.Session) ([]label.LabelBrief, error) {
-			return []label.LabelBrief{
-				{ID: 100, Name: "label100", ThemeColor: "red"},
-				{ID: 200, Name: "label200", ThemeColor: "green"},
+		work.QueryLabelBriefsOfWorkFunc = func(workIds []types.ID, s *session.Session) ([]work.WorkLabelBrief, error) {
+			return []work.WorkLabelBrief{
+				{WorkID: workIds[0], LabelID: 100, LabelName: "label100", LabelThemeColor: "red"},
+				{WorkID: workIds[0], LabelID: 200, LabelName: "label200", LabelThemeColor: "green"},
 			}, nil
 		}
 		checklist.ListCheckItemsFunc = func(workId types.ID, c *session.Session) ([]checklist.CheckItem, error) {
@@ -728,7 +728,7 @@ func TestExtendWorks(t *testing.T) {
 				}},
 			}, nil
 		}
-		work.QueryLabelBriefsOfWorkFunc = func(workId types.ID, s *session.Session) ([]label.LabelBrief, error) {
+		work.QueryLabelBriefsOfWorkFunc = func(workIds []types.ID, s *session.Session) ([]work.WorkLabelBrief, error) {
 			return nil, nil
 		}
 

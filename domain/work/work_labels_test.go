@@ -194,15 +194,15 @@ func TestDeleteWorkLabelRelation(t *testing.T) {
 		// assert LabelDeleteCheckFuncs is registered
 		Expect(label.DeleteLabel(l.ID, &c)).To(Equal(bizerror.ErrLabelIsReferenced))
 		// assert query label briefs of work
-		b, err := work.QueryLabelBriefsOfWork(w.ID, &c)
+		b, err := work.QueryLabelBriefsOfWork([]types.ID{w.ID}, &c)
 		Expect(err).To(BeNil())
-		Expect(b).To(Equal([]label.LabelBrief{{ID: l.ID, Name: l.Name, ThemeColor: l.ThemeColor}}))
+		Expect(b).To(Equal([]work.WorkLabelBrief{{WorkID: w.ID, LabelID: l.ID, LabelName: l.Name, LabelThemeColor: l.ThemeColor}}))
 
 		// do delete work-label-relation
 		Expect(work.DeleteWorkLabelRelation(req, &c)).To(BeNil())
 		Expect(work.IsLabelReferencedByWork(*l, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
 
-		b, err = work.QueryLabelBriefsOfWork(w.ID, &c)
+		b, err = work.QueryLabelBriefsOfWork([]types.ID{w.ID}, &c)
 		Expect(err).To(BeNil())
 		Expect(len(b)).To(BeZero())
 

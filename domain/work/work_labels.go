@@ -8,8 +8,15 @@ import (
 
 	"github.com/fundwit/go-commons/types"
 	"github.com/jinzhu/gorm"
-	otgorm "github.com/smacker/opentracing-gorm"
 )
+
+type WorkLabelBrief struct {
+	WorkID types.ID `json:"workId"`
+
+	LabelID         types.ID `json:"labelId"`
+	LabelName       string   `json:"labelName"`
+	LabelThemeColor string   `json:"labelThemeColor"`
+}
 
 type WorkLabelRelation struct {
 	LabelId types.ID `json:"labelId" gorm:"primary_key" sql:"type:BIGINT UNSIGNED NOT NULL" binding:"required"`
@@ -39,16 +46,16 @@ func IsLabelReferencedByWork(l label.Label, tx *gorm.DB) error {
 	return bizerror.ErrLabelIsReferenced
 }
 
-func QueryLabelBriefsOfWork(workId types.ID, s *session.Session) ([]label.LabelBrief, error) {
-	var labelBriefs []label.LabelBrief
-	if workId.IsZero() {
+func QueryLabelBriefsOfWork(workIds []types.ID, s *session.Session) ([]WorkLabelBrief, error) {
+	var labelBriefs []WorkLabelBrief
+	if len(workIds) == 0 {
 		return labelBriefs, nil
 	}
 
-	db := otgorm.SetSpanToGorm(s.Context, persistence.ActiveDataSourceManager.GormDB(s.Context))
-	if err := db.Model(&WorkLabelRelation{}).
-		Select("labels.id, labels.name, labels.theme_color").
-		Where(&WorkLabelRelation{WorkId: workId}).
+	db := persistence.ActiveDataSourceManager.GormDB(s.Context)
+	if err := db.LogMode(true).Model(&WorkLabelRelation{}).
+		Select("work_label_relations.work_id, work_label_relations.label_id, labels.name as label_name, labels.theme_color as label_theme_color").
+		Where("work_label_relations.work_id IN (?)", workIds).
 		Joins("INNER JOIN labels ON labels.id = work_label_relations.label_id").
 		Scan(&labelBriefs).Error; err != nil {
 		return nil, err

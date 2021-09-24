@@ -28,6 +28,7 @@ func (t *TracingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 			res, err := t.Transport.RoundTrip(req)
 
 			ext.HTTPStatusCode.Set(childSpan, uint16(res.StatusCode))
+			ext.Error.Set(childSpan, res.StatusCode >= 200 && res.StatusCode < 400)
 
 			return res, err
 		}

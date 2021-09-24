@@ -16,6 +16,8 @@ func TracingIngress() gin.HandlerFunc {
 		ctx.Request = ctx.Request.WithContext(opentracing.ContextWithSpan(ctx.Request.Context(), serverSpan))
 		ctx.Next()
 
+		ext.HTTPStatusCode.Set(serverSpan, uint16(ctx.Writer.Status()))
+		ext.Error.Set(serverSpan, ctx.Writer.Status() >= 200 && ctx.Writer.Status() < 400)
 		ext.HTTPUrl.Set(serverSpan, ctx.Request.RequestURI)
 	}
 }

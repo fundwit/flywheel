@@ -78,8 +78,8 @@ func main() {
 	es.CreateClientFromEnv()
 
 	engine := gin.Default()
-	engine.Use(bizerror.ErrorHandling())
 	engine.Use(tracing.TracingIngress())
+	engine.Use(bizerror.ErrorHandling())
 
 	engine.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "flywheel")

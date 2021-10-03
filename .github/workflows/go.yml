@@ -84,14 +84,38 @@ jobs:
            docker push $imageName
         fi
 
-    - name: deploy
+    - name: update kubernetes manifests
       if: ${{ github.event_name == 'push' && (github.event.ref == 'refs/heads/master' || github.event.ref == 'refs/heads/stage') }}
-      uses: stefanprodan/kube-tools@v1.5.0
-      with:
-        command:  |
-          mkdir -p ~/.kube
-          cat >> ~/.kube/config <<EOF
-          ${{secrets.FUNDWIT_DEPLOY_KUBECONFIG}}
-          EOF
-          kubectl set image deployment/flywheel flywheel=${IMAGE_NAME} --record
+      run: |
+        rm -rf deploy
+        mkdir deploy
+        cd deploy
+        git init
+        git config --local credential.helper store
+        cat >> ~/.git-credentials <<EOF
+        https://${{secrets.FUNDWIT_CODE_USERNAME_PASSWORD}}@code.fundwit.com
+        EOF
+
+        git remote add origin https://code.fundwit.com/infra/flywheel.git
+
+        git -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 origin master
+        git checkout --progress --force -B master refs/remotes/origin/master
+        git log -1
+        git config --local user.name ci-bot
+        git config --local user.email fundwit@qq.com
+        sed -i "s|image: registry.cn-beijing.aliyuncs.com/fundwit/flywheel-ui:.*|image: ${IMAGE_NAME}|g" deploy.yaml
+        git add deploy.yaml
+        git commit -a -m "update version to '$GITHUB_SHA'"
+        git push
+
+    # - name: deploy
+    #   if: ${{ github.event_name == 'push' && (github.event.ref == 'refs/heads/master' || github.event.ref == 'refs/heads/stage') }}
+    #   uses: stefanprodan/kube-tools@v1.5.0
+    #   with:
+    #     command:  |
+    #       mkdir -p ~/.kube
+    #       cat >> ~/.kube/config <<EOF
+    #       ${{secrets.FUNDWIT_DEPLOY_KUBECONFIG}}
+    #       EOF
+    #       kubectl set image deployment/flywheel flywheel=${IMAGE_NAME} --record
         

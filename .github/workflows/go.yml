@@ -103,7 +103,7 @@ jobs:
         git log -1
         git config --local user.name ci-bot
         git config --local user.email fundwit@qq.com
-        sed -i "s|image: registry.cn-beijing.aliyuncs.com/fundwit/flywheel-ui:.*|image: ${IMAGE_NAME}|g" deploy.yaml
+        sed -i "s|image: registry.cn-beijing.aliyuncs.com/fundwit/flywheel:.*|image: ${IMAGE_NAME}|g" deploy.yaml
         git add deploy.yaml
         git commit -a -m "update version to '$GITHUB_SHA'"
         git push

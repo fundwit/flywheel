@@ -51,7 +51,7 @@ func TestCreateWorkflowPropertyRestAPI(t *testing.T) {
 			return nil, errors.New("a mocked error")
 		}
 		req := httptest.NewRequest(http.MethodPost, "/v1/workflows/100/properties", bytes.NewReader([]byte(
-			`{"name":"test", "type": "string", "title": "Test"}`)))
+			`{"name":"test", "type": "text", "title": "Test"}`)))
 		status, body, _ := testinfra.ExecuteRequest(req, router)
 		Expect(status).To(Equal(http.StatusInternalServerError))
 		Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
@@ -63,10 +63,10 @@ func TestCreateWorkflowPropertyRestAPI(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodPost, "/v1/workflows/100/properties", bytes.NewReader([]byte(
-			`{"name":"test", "type": "string", "title": "Test"}`)))
+			`{"name":"test", "type": "text", "title": "Test"}`)))
 		status, body, _ := testinfra.ExecuteRequest(req, router)
 		Expect(status).To(Equal(http.StatusCreated))
-		Expect(body).To(MatchJSON(`{"id":"123", "workflowId":"100", "name":"test", "type": "string", "title": "Test"}`))
+		Expect(body).To(MatchJSON(`{"id":"123", "workflowId":"100", "name":"test", "type": "text", "title": "Test"}`))
 	})
 }
 

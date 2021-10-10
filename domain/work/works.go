@@ -47,7 +47,7 @@ type WorkDetail struct {
 }
 
 func CreateWork(c *domain.WorkCreation, s *session.Session) (*WorkDetail, error) {
-	if !s.Perms.HasRoleSuffix("_" + c.ProjectID.String()) {
+	if !s.Perms.HasAnyProjectRole(c.ProjectID) {
 		return nil, bizerror.ErrForbidden
 	}
 
@@ -277,7 +277,7 @@ func findWorkAndCheckPerms(db *gorm.DB, id types.ID, s *session.Session) (*domai
 	if err := db.Where("id = ?", id).First(&work).Error; err != nil {
 		return nil, err
 	}
-	if s == nil || !s.Perms.HasRoleSuffix("_"+work.ProjectID.String()) {
+	if s == nil || !s.Perms.HasAnyProjectRole(work.ProjectID) {
 		return nil, bizerror.ErrForbidden
 	}
 	return &work, nil

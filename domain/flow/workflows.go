@@ -34,7 +34,7 @@ var (
 )
 
 func CreateWorkflow(c *WorkflowCreation, s *session.Session) (*domain.WorkflowDetail, error) {
-	if !s.Perms.HasRoleSuffix("_" + c.ProjectID.String()) {
+	if !s.Perms.HasAnyProjectRole(c.ProjectID) {
 		return nil, bizerror.ErrForbidden
 	}
 
@@ -134,7 +134,7 @@ func DeleteWorkflow(id types.ID, s *session.Session) error {
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&wf).Error; err != nil {
 			return err
 		}
-		if !s.Perms.HasRoleSuffix(domain.ProjectRoleManager + "_" + wf.ProjectID.String()) {
+		if !s.Perms.HasProjectRole(domain.ProjectRoleManager, wf.ProjectID) {
 			return bizerror.ErrForbidden
 		}
 
@@ -185,7 +185,7 @@ func UpdateWorkflowBase(id types.ID, c *WorkflowBaseUpdation, s *session.Session
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&wf).Error; err != nil {
 			return err
 		}
-		if !s.Perms.HasRoleSuffix(domain.ProjectRoleManager + "_" + wf.ProjectID.String()) {
+		if !s.Perms.HasProjectRole(domain.ProjectRoleManager, wf.ProjectID) {
 			return bizerror.ErrForbidden
 		}
 		if err := tx.Model(&domain.Workflow{}).Where(&domain.Workflow{ID: id}).
@@ -258,7 +258,7 @@ func UpdateWorkflowState(id types.ID, updating WorkflowStateUpdating, s *session
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&workflow).Error; err != nil {
 			return err
 		}
-		if !s.Perms.HasRoleSuffix(domain.ProjectRoleManager + "_" + workflow.ProjectID.String()) {
+		if !s.Perms.HasProjectRole(domain.ProjectRoleManager, workflow.ProjectID) {
 			return bizerror.ErrForbidden
 		}
 
@@ -398,7 +398,7 @@ func checkPerms(id types.ID, s *session.Session) error {
 		Where(&domain.Workflow{ID: id}).First(&workflow).Error; err != nil {
 		return err
 	}
-	if s == nil || !s.Perms.HasRoleSuffix("_"+workflow.ProjectID.String()) {
+	if s == nil || !s.Perms.HasAnyProjectRole(workflow.ProjectID) {
 		return bizerror.ErrForbidden
 	}
 	return nil
@@ -411,7 +411,7 @@ func CreateWorkflowStateTransitions(id types.ID, transitions []state.Transition,
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&workflow).Error; err != nil {
 			return err
 		}
-		if !s.Perms.HasRoleSuffix(domain.ProjectRoleManager + "_" + workflow.ProjectID.String()) {
+		if !s.Perms.HasProjectRole(domain.ProjectRoleManager, workflow.ProjectID) {
 			return bizerror.ErrForbidden
 		}
 
@@ -449,7 +449,7 @@ func DeleteWorkflowStateTransitions(id types.ID, transitions []state.Transition,
 		if err := tx.Where(&domain.Workflow{ID: id}).First(&wf).Error; err != nil {
 			return err
 		}
-		if !s.Perms.HasRoleSuffix(domain.ProjectRoleManager + "_" + wf.ProjectID.String()) {
+		if !s.Perms.HasProjectRole(domain.ProjectRoleManager, wf.ProjectID) {
 			return bizerror.ErrForbidden
 		}
 

@@ -2,6 +2,7 @@ package authority
 
 import (
 	"flywheel/domain"
+	"fmt"
 	"strings"
 
 	"github.com/fundwit/go-commons/types"
@@ -18,6 +19,21 @@ func (c Permissions) HasRole(role string) bool {
 	return false
 }
 
+func (c Permissions) HasAnyProjectRole(projectId types.ID) bool {
+	suffix := strings.ToLower("_" + projectId.String())
+
+	for _, v := range c {
+		if strings.HasSuffix(strings.ToLower(v), suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c Permissions) HasProjectRole(role string, projectId types.ID) bool {
+	return c.HasRole(fmt.Sprintf("%s_%d", role, projectId))
+}
+
 func (c Permissions) HasGlobalViewRole() bool {
 	for _, v := range c {
 		if strings.HasPrefix(strings.ToLower(v), "system:") {
@@ -27,26 +43,8 @@ func (c Permissions) HasGlobalViewRole() bool {
 	return false
 }
 
-func (c Permissions) HasRolePrefix(prefix string) bool {
-	for _, v := range c {
-		if strings.HasPrefix(strings.ToLower(v), strings.ToLower(prefix)) {
-			return true
-		}
-	}
-	return false
-}
-
 func (c Permissions) HasProjectViewPerm(projectId types.ID) bool {
-	return c.HasGlobalViewRole() || c.HasRoleSuffix(projectId.String())
-}
-
-func (c Permissions) HasRoleSuffix(suffix string) bool {
-	for _, v := range c {
-		if strings.HasSuffix(strings.ToLower(v), strings.ToLower(suffix)) {
-			return true
-		}
-	}
-	return false
+	return c.HasGlobalViewRole() || c.HasAnyProjectRole(projectId)
 }
 
 type ProjectRoles []domain.ProjectRole

@@ -70,7 +70,7 @@ func CreateWorkStateTransition(c *domain.WorkProcessStepCreation, s *session.Ses
 		if err := tx.Where(&work).First(&work).Error; err != nil {
 			return err
 		}
-		if !s.Perms.HasRoleSuffix("_" + work.ProjectID.String()) {
+		if !s.Perms.HasAnyProjectRole(work.ProjectID) {
 			return bizerror.ErrForbidden
 		}
 		if !work.ArchiveTime.IsZero() {

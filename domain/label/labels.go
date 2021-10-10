@@ -52,7 +52,7 @@ var (
 )
 
 func CreateLabel(l LabelCreation, s *session.Session) (*Label, error) {
-	if !s.Perms.HasRoleSuffix("_" + l.ProjectID.String()) {
+	if !s.Perms.HasAnyProjectRole(l.ProjectID) {
 		return nil, bizerror.ErrForbidden
 	}
 
@@ -67,7 +67,7 @@ func CreateLabel(l LabelCreation, s *session.Session) (*Label, error) {
 }
 
 func QueryLabels(q LabelQuery, s *session.Session) ([]Label, error) {
-	if !s.Perms.HasRoleSuffix("_" + q.ProjectID.String()) {
+	if !s.Perms.HasAnyProjectRole(q.ProjectID) {
 		return nil, bizerror.ErrForbidden
 	}
 
@@ -105,7 +105,7 @@ func findLabelAndCheckPerms(db *gorm.DB, id types.ID, s *session.Session) (*Labe
 	if err := db.Where("id = ?", id).First(&l).Error; err != nil {
 		return nil, err
 	}
-	if s == nil || !s.Perms.HasRoleSuffix("_"+l.ProjectID.String()) {
+	if s == nil || !s.Perms.HasAnyProjectRole(l.ProjectID) {
 		return nil, bizerror.ErrForbidden
 	}
 	return &l, nil

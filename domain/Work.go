@@ -26,16 +26,5 @@ type Work struct {
 	ProcessBeginTime types.Timestamp `json:"processBeginTime" sql:"type:DATETIME(6)"`
 	ProcessEndTime   types.Timestamp `json:"processEndTime" sql:"type:DATETIME(6)"`
 
-	// Properties []PropertyAssign `json:"properties"`
-
 	ArchiveTime types.Timestamp `json:"archivedTime" sql:"type:DATETIME(6)"`
-}
-
-type PropertyDefinition struct {
-	Name string `json:"name"`
-}
-
-type PropertyAssign struct {
-	Definition *PropertyDefinition `json:"definition"`
-	Value      string              `json:"value"`
 }

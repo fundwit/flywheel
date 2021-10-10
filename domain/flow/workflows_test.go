@@ -19,17 +19,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	testDatabase *testinfra.TestDatabase
-)
-
-func setup(t *testing.T) {
-	testDatabase = testinfra.StartMysqlTestDatabase("flywheel")
-	assert.Nil(t, testDatabase.DS.GormDB(context.Background()).AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{},
+func setup(t *testing.T, testDatabase **testinfra.TestDatabase) {
+	db := testinfra.StartMysqlTestDatabase("flywheel")
+	assert.Nil(t, db.DS.GormDB(context.Background()).AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error)
-	persistence.ActiveDataSourceManager = testDatabase.DS
+	persistence.ActiveDataSourceManager = db.DS
+	*testDatabase = db
 }
-func teardown(t *testing.T) {
+func teardown(t *testing.T, testDatabase *testinfra.TestDatabase) {
 	if testDatabase != nil {
 		testinfra.StopMysqlTestDatabase(testDatabase)
 	}
@@ -45,10 +42,11 @@ var creationDemo = &flow.WorkflowCreation{Name: "test workflow", ProjectID: type
 
 func TestCreateWorkflow(t *testing.T) {
 	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
 
 	t.Run("should forbid to create to other project", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		creation := &flow.WorkflowCreation{Name: "test workflow", ProjectID: types.ID(1), StateMachine: creationDemo.StateMachine}
 		workflow, err := flow.CreateWorkflow(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_2"))
@@ -57,8 +55,8 @@ func TestCreateWorkflow(t *testing.T) {
 	})
 
 	t.Run("should catch database errors", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		testDatabase.DS.GormDB(context.Background()).DropTable(&domain.WorkflowStateTransition{})
 		_, err := flow.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
@@ -77,8 +75,8 @@ func TestCreateWorkflow(t *testing.T) {
 	})
 
 	t.Run("should return created workflow and all data are persisted", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		workflow, err := flow.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
 		Expect(err).To(BeNil())
@@ -128,10 +126,11 @@ func TestCreateWorkflow(t *testing.T) {
 
 func TestDetailWorkflow(t *testing.T) {
 	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
 
 	t.Run("should forbid to get workflow detail with permissions", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 		workflow, err := flow.CreateWorkflow(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
@@ -144,8 +143,8 @@ func TestDetailWorkflow(t *testing.T) {
 	})
 
 	t.Run("should return 404 when workflow not exist", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		detail, err := flow.DetailWorkflow(404, testinfra.BuildSecCtx(123))
 		Expect(err).To(Equal(gorm.ErrRecordNotFound))
@@ -153,8 +152,8 @@ func TestDetailWorkflow(t *testing.T) {
 	})
 
 	t.Run("should be able to return workflow detail if everything is ok", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 			StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -175,8 +174,8 @@ func TestDetailWorkflow(t *testing.T) {
 	})
 
 	t.Run("should be able to catch database error", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 		creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
@@ -206,18 +205,19 @@ func TestDetailWorkflow(t *testing.T) {
 
 func TestDeleteWorkflow(t *testing.T) {
 	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
 
 	t.Run("should return 404 when workflow not exist", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		err := flow.DeleteWorkflow(404, testinfra.BuildSecCtx(123))
 		Expect(err).To(Equal(gorm.ErrRecordNotFound))
 	})
 
 	t.Run("should forbid to delete workflow without correct permissions", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 		workflow, err := flow.CreateWorkflow(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
@@ -235,8 +235,8 @@ func TestDeleteWorkflow(t *testing.T) {
 	})
 
 	t.Run("should forbid to delete workflow if it still be referenced by work", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 		workflow, err := flow.CreateWorkflow(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
@@ -251,8 +251,8 @@ func TestDeleteWorkflow(t *testing.T) {
 	})
 
 	t.Run("should forbid to delete workflow if it still be referenced by workProcessStep", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 		workflow, err := flow.CreateWorkflow(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
@@ -264,8 +264,8 @@ func TestDeleteWorkflow(t *testing.T) {
 	})
 
 	t.Run("should be able to delete workflow if everything is ok", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 			StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -305,8 +305,8 @@ func TestDeleteWorkflow(t *testing.T) {
 	})
 
 	t.Run("should be able to catch database error", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 		creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
@@ -338,10 +338,11 @@ func TestDeleteWorkflow(t *testing.T) {
 
 func TestQueryWorkflows(t *testing.T) {
 	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
 
 	t.Run("should query all workflows successfully", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		_, err := flow.CreateWorkflow(
 			&flow.WorkflowCreation{Name: "test workflow1", ProjectID: types.ID(1), ThemeColor: "blue", ThemeIcon: "foo", StateMachine: creationDemo.StateMachine},
@@ -377,8 +378,8 @@ func TestQueryWorkflows(t *testing.T) {
 	})
 
 	t.Run("should query by name and project id", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		_, err := flow.CreateWorkflow(
 			&flow.WorkflowCreation{Name: "test workflow1", ProjectID: types.ID(1), ThemeColor: "blue", ThemeIcon: "icon", StateMachine: creationDemo.StateMachine},
@@ -411,10 +412,11 @@ func TestQueryWorkflows(t *testing.T) {
 
 func TestUpdateWorkflowBase(t *testing.T) {
 	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
 
 	t.Run("should return 404 when workflow not exist", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		wf, err := flow.UpdateWorkflowBase(404, &flow.WorkflowBaseUpdation{}, testinfra.BuildSecCtx(123))
 		Expect(err).To(Equal(gorm.ErrRecordNotFound))
@@ -422,8 +424,8 @@ func TestUpdateWorkflowBase(t *testing.T) {
 	})
 
 	t.Run("should forbid to update workflow basic info without correct permissions", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
 		workflow, err := flow.CreateWorkflow(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
@@ -443,8 +445,8 @@ func TestUpdateWorkflowBase(t *testing.T) {
 	})
 
 	t.Run("should be able to update workflow if everything is ok", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 			StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -487,8 +489,8 @@ func TestUpdateWorkflowBase(t *testing.T) {
 	})
 
 	t.Run("should be able to catch database error", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 		creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
@@ -506,10 +508,11 @@ func TestUpdateWorkflowBase(t *testing.T) {
 
 func TestCreateState(t *testing.T) {
 	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
 
 	t.Run("should return 404 when workflow not exist when creating state", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		err := flow.CreateState(404, &flow.StateCreating{Name: "NEW", Category: 1, Order: 101, Transitions: []state.Transition{}}, sec)
@@ -517,8 +520,8 @@ func TestCreateState(t *testing.T) {
 	})
 
 	t.Run("should be forbidden without correct permissions when creating state", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 		workflow, err := flow.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(333),
@@ -538,8 +541,8 @@ func TestCreateState(t *testing.T) {
 	})
 
 	t.Run("should failed when state in transitions not exist", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		workflow, err := flow.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1),
@@ -558,8 +561,8 @@ func TestCreateState(t *testing.T) {
 	})
 
 	t.Run("should success if everything is ok when creating state", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		workflow, err := flow.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1),
@@ -593,8 +596,8 @@ func TestCreateState(t *testing.T) {
 	})
 
 	t.Run("should be able to catch database error when creating state", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 		workflow, err := flow.CreateWorkflow(&flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
@@ -618,10 +621,11 @@ func TestCreateState(t *testing.T) {
 
 func TestUpdateWorkflowState(t *testing.T) {
 	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
 
 	t.Run("should return 404 when workflow not exist", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		err := flow.UpdateWorkflowState(404, flow.WorkflowStateUpdating{}, sec)
@@ -629,8 +633,8 @@ func TestUpdateWorkflowState(t *testing.T) {
 	})
 
 	t.Run("should be forbidden without correct permissions", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -649,8 +653,8 @@ func TestUpdateWorkflowState(t *testing.T) {
 	})
 
 	t.Run("should failed when origin state not exist", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -663,8 +667,8 @@ func TestUpdateWorkflowState(t *testing.T) {
 	})
 
 	t.Run("should failed when new state exist", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -682,8 +686,8 @@ func TestUpdateWorkflowState(t *testing.T) {
 	})
 
 	t.Run("should be able to update workflow state if everything is ok", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		handedEvents := []event.EventRecord{}
 		event.InvokeHandlersFunc = func(record *event.EventRecord) []event.EventHandleResult {
@@ -779,8 +783,8 @@ func TestUpdateWorkflowState(t *testing.T) {
 	})
 
 	t.Run("should be able to catch database error", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 		creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
@@ -814,10 +818,11 @@ func TestUpdateWorkflowState(t *testing.T) {
 
 func TestUpdateStateRangeOrders(t *testing.T) {
 	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
 
 	t.Run("should return 404 when workflow not exist", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		err := flow.UpdateStateRangeOrders(404, &[]flow.StateOrderRangeUpdating{{State: "UNKNOWN", OldOlder: 100, NewOlder: 101}}, sec)
@@ -825,8 +830,8 @@ func TestUpdateStateRangeOrders(t *testing.T) {
 	})
 
 	t.Run("should be forbidden without correct permissions", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 		creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(333), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -847,8 +852,8 @@ func TestUpdateStateRangeOrders(t *testing.T) {
 	})
 
 	t.Run("should failed when origin state not exist", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -861,8 +866,8 @@ func TestUpdateStateRangeOrders(t *testing.T) {
 	})
 
 	t.Run("should success if changes is empty or nil", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -877,8 +882,8 @@ func TestUpdateStateRangeOrders(t *testing.T) {
 	})
 
 	t.Run("should be able to update state orders if everything is ok", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 		sm := state.NewStateMachine([]state.State{
@@ -912,8 +917,8 @@ func TestUpdateStateRangeOrders(t *testing.T) {
 	})
 
 	t.Run("should be able to catch database error", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 		creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
@@ -933,10 +938,11 @@ func TestUpdateStateRangeOrders(t *testing.T) {
 
 func TestCreateWorkflowStateTransitions(t *testing.T) {
 	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
 
 	t.Run("should return 404 when workflow not exist", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		err := flow.CreateWorkflowStateTransitions(404, []state.Transition{}, sec)
@@ -944,8 +950,8 @@ func TestCreateWorkflowStateTransitions(t *testing.T) {
 	})
 
 	t.Run("should be forbidden without correct permissions", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -964,8 +970,8 @@ func TestCreateWorkflowStateTransitions(t *testing.T) {
 	})
 
 	t.Run("should be failed when from state or to state not exist", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -984,8 +990,8 @@ func TestCreateWorkflowStateTransitions(t *testing.T) {
 	})
 
 	t.Run("should be able to create workflow transitions if everything is ok", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 		sm := state.NewStateMachine([]state.State{domain.StatePending, domain.StateDoing, domain.StateDone}, []state.Transition{
@@ -1017,8 +1023,8 @@ func TestCreateWorkflowStateTransitions(t *testing.T) {
 	})
 
 	t.Run("should be able to catch database error", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 		creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
@@ -1047,10 +1053,11 @@ func TestCreateWorkflowStateTransitions(t *testing.T) {
 
 func TestDeleteWorkflowStateTransitions(t *testing.T) {
 	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
 
 	t.Run("should return 404 when workflow not exist", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		err := flow.DeleteWorkflowStateTransitions(404, []state.Transition{}, sec)
@@ -1058,8 +1065,8 @@ func TestDeleteWorkflowStateTransitions(t *testing.T) {
 	})
 
 	t.Run("should be forbidden without correct permissions", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1")
 		creation := &flow.WorkflowCreation{Name: "test work", ProjectID: types.ID(1), StateMachine: domain.GenericWorkflowTemplate.StateMachine}
@@ -1078,8 +1085,8 @@ func TestDeleteWorkflowStateTransitions(t *testing.T) {
 	})
 
 	t.Run("should be able to delete workflow transitions if everything is ok", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 		sm := state.NewStateMachine([]state.State{domain.StatePending, domain.StateDoing, domain.StateDone}, []state.Transition{
@@ -1114,8 +1121,8 @@ func TestDeleteWorkflowStateTransitions(t *testing.T) {
 	})
 
 	t.Run("should be able to catch database error", func(t *testing.T) {
-		defer teardown(t)
-		setup(t)
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
 
 		sec := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 		creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),

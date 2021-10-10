@@ -62,7 +62,7 @@ func main() {
 
 	// database migration (race condition)
 	err = ds.GormDB(context.Background()).AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{}, &checklist.CheckItem{},
-		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{},
+		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}, &flow.WorkflowPropertyDefinition{},
 		&workcontribution.WorkContributionRecord{}, &event.EventRecord{}, &indexlog.IndexLogRecord{},
 		&account.User{}, &domain.Project{}, &domain.ProjectMember{},
 		&account.Role{}, &account.Permission{}, &label.Label{}, &work.WorkLabelRelation{},

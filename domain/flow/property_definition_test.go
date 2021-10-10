@@ -85,6 +85,27 @@ func TestCreatePropertyDefinition(t *testing.T) {
 		Expect(len(properties)).To(Equal(1))
 		Expect(properties[0]).To(Equal(*pd))
 	})
+
+	t.Run("property name must be unique within workflow", func(t *testing.T) {
+		defer propertyDefinitionTeardown(t, testDatabase)
+		propertyDefinitionTestSetup(t, &testDatabase)
+
+		workflow, err := flow.CreateWorkflow(creationDemo, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
+		Expect(err).To(BeNil())
+
+		pd1, err := flow.CreatePropertyDefinition(workflow.ID,
+			domain.PropertyDefinition{Name: "testProperty", Type: "text", Title: "Test Property"},
+			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
+		Expect(err).To(BeNil())
+		Expect(pd1).ToNot(BeNil())
+
+		pd2, err := flow.CreatePropertyDefinition(workflow.ID,
+			domain.PropertyDefinition{Name: "testProperty", Type: "text", Title: "Test Property2"},
+			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
+		Expect(pd2).To(BeNil())
+		Expect(err.Error()).To(Equal(`Error 1062: Duplicate entry '` + workflow.ID.String() +
+			`-testProperty' for key 'workflow_property_definitions.uni_workflow_prop'`))
+	})
 }
 
 func TestQueryPropertyDefinitions(t *testing.T) {

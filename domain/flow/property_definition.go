@@ -19,7 +19,7 @@ var (
 
 type WorkflowPropertyDefinition struct {
 	ID         types.ID `json:"id"`
-	WorkflowID types.ID `json:"workflowId"`
+	WorkflowID types.ID `json:"workflowId" gorm:"unique_index:uni_workflow_prop"`
 
 	domain.PropertyDefinition
 }

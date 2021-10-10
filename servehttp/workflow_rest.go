@@ -43,8 +43,9 @@ func RegisterWorkflowHandler(r *gin.Engine, middleWares ...gin.HandlerFunc) {
 	g.POST(":flowId/transitions", handler.handleCreateStateMachineTransitions)
 	g.DELETE(":flowId/transitions", handler.handleDeleteStateMachineTransitions)
 
-	g.GET(":flowId/properties", queryStateMachinePropertyRestAPI)
-	g.POST(":flowId/properties", createStateMachinePropertyRestAPI)
+	g.GET(":flowId/properties", queryWorkflowPropertyRestAPI)
+	g.POST(":flowId/properties", createWorkflowPropertyRestAPI)
+	g.DELETE("properties/:id", deleteWorkflowPropertyRestAPI)
 }
 
 type workflowHandler struct {

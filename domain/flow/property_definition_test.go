@@ -2,6 +2,7 @@ package flow_test
 
 import (
 	"context"
+	"flywheel/account"
 	"flywheel/bizerror"
 	"flywheel/domain"
 	"flywheel/domain/flow"
@@ -157,4 +158,81 @@ func TestQueryPropertyDefinitions(t *testing.T) {
 		Expect(properties[0]).To(Equal(*pd1))
 		Expect(properties[1]).To(Equal(*pd2))
 	})
+}
+
+func TestDeletePropertyDefinitions(t *testing.T) {
+	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
+
+	t.Run("return permission error if session user is not manager of workflow containing project", func(t *testing.T) {
+		defer propertyDefinitionTeardown(t, testDatabase)
+		propertyDefinitionTestSetup(t, &testDatabase)
+
+		creation := &flow.WorkflowCreation{Name: "test workflow", ProjectID: types.ID(1), StateMachine: creationDemo.StateMachine}
+		workflow, err := flow.CreateWorkflow(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
+		Expect(err).To(BeNil())
+
+		prop, err := flow.CreatePropertyDefinition(workflow.ID,
+			domain.PropertyDefinition{Name: "testProperty1", Type: "text", Title: "Test Property1"},
+			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
+		Expect(err).To(BeNil())
+
+		err = flow.DeletePropertyDefinition(prop.ID, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_2"))
+		Expect(err).To(Equal(bizerror.ErrForbidden))
+
+		err = flow.DeletePropertyDefinition(prop.ID, testinfra.BuildSecCtx(100, domain.ProjectRoleCommon+"_1"))
+		Expect(err).To(Equal(bizerror.ErrForbidden))
+
+		err = flow.DeletePropertyDefinition(prop.ID, testinfra.BuildSecCtx(100, account.SystemAdminPermission.ID))
+		Expect(err).To(Equal(bizerror.ErrForbidden))
+	})
+
+	t.Run("return true if property is not found", func(t *testing.T) {
+		defer propertyDefinitionTeardown(t, testDatabase)
+		propertyDefinitionTestSetup(t, &testDatabase)
+
+		err := flow.DeletePropertyDefinition(404, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_2"))
+		Expect(err).To(BeNil())
+	})
+
+	t.Run("delete directly if workflow is not found", func(t *testing.T) {
+		defer propertyDefinitionTeardown(t, testDatabase)
+		propertyDefinitionTestSetup(t, &testDatabase)
+
+		db := testDatabase.DS.GormDB(context.Background())
+		r := flow.WorkflowPropertyDefinition{
+			ID:                 123,
+			WorkflowID:         1001,
+			PropertyDefinition: domain.PropertyDefinition{Name: "test", Type: "text", Title: "Test"},
+		}
+		Expect(db.Create(&r).Error).To(BeNil())
+
+		Expect(flow.DeletePropertyDefinition(123, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))).To(BeNil())
+
+		// assert record not found already
+		Expect(db.Model(&r).First(&r).Error).To(Equal(gorm.ErrRecordNotFound))
+	})
+
+	t.Run("success if session user is manager of workflow containing project", func(t *testing.T) {
+		defer propertyDefinitionTeardown(t, testDatabase)
+		propertyDefinitionTestSetup(t, &testDatabase)
+
+		creation := &flow.WorkflowCreation{Name: "test workflow", ProjectID: types.ID(1), StateMachine: creationDemo.StateMachine}
+		workflow, err := flow.CreateWorkflow(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
+		Expect(err).To(BeNil())
+
+		prop, err := flow.CreatePropertyDefinition(workflow.ID,
+			domain.PropertyDefinition{Name: "testProperty1", Type: "text", Title: "Test Property1"},
+			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
+		Expect(err).To(BeNil())
+
+		err = flow.DeletePropertyDefinition(prop.ID, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
+		Expect(err).To(BeNil())
+
+		// assert record not found already
+		db := testDatabase.DS.GormDB(context.Background())
+		r := flow.WorkflowPropertyDefinition{}
+		Expect(db.Model(&r).First(&r).Error).To(Equal(gorm.ErrRecordNotFound))
+	})
+
 }

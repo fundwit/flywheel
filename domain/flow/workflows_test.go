@@ -22,6 +22,7 @@ import (
 func setup(t *testing.T, testDatabase **testinfra.TestDatabase) {
 	db := testinfra.StartMysqlTestDatabase("flywheel")
 	assert.Nil(t, db.DS.GormDB(context.Background()).AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{},
+		&flow.WorkflowPropertyDefinition{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}).Error)
 	persistence.ActiveDataSourceManager = db.DS
 	*testDatabase = db
@@ -266,10 +267,11 @@ func TestDeleteWorkflow(t *testing.T) {
 	t.Run("should be able to delete workflow if everything is ok", func(t *testing.T) {
 		defer teardown(t, testDatabase)
 		setup(t, &testDatabase)
+		s := testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333")
 
 		creation := &flow.WorkflowCreation{Name: "test work", ThemeColor: "blue", ThemeIcon: "foo", ProjectID: types.ID(333),
 			StateMachine: domain.GenericWorkflowTemplate.StateMachine}
-		workflow, err := flow.CreateWorkflow(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_333"))
+		workflow, err := flow.CreateWorkflow(creation, s)
 		Expect(err).To(BeNil())
 
 		flowCount := 0
@@ -285,23 +287,38 @@ func TestDeleteWorkflow(t *testing.T) {
 			Where(&domain.WorkflowStateTransition{WorkflowID: workflow.ID}).Count(&flowStateTransitionCount).Error).To(BeNil())
 		Expect(flowStateTransitionCount).To(Equal(5))
 
+		_, err = flow.CreatePropertyDefinition(workflow.ID,
+			domain.PropertyDefinition{Name: "testProperty1", Type: "text", Title: "Test Property1"},
+			s)
+		Expect(err).To(BeNil())
+		propertyCount := 0
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&flow.WorkflowPropertyDefinition{}).
+			Where(&flow.WorkflowPropertyDefinition{WorkflowID: workflow.ID}).Count(&propertyCount).Error).To(BeNil())
+		Expect(propertyCount).To(Equal(1))
+
 		// do delete
 		err = flow.DeleteWorkflow(workflow.ID, testinfra.BuildSecCtx(123, domain.ProjectRoleManager+"_333"))
 		Expect(err).To(BeNil())
 
-		// validate: record have be deleted
-		flowCount = 1
+		// validate: related record have been deleted
+		flowCount = 999
 		Expect(testDatabase.DS.GormDB(context.Background()).Model(&domain.Workflow{}).Where(&domain.Workflow{ID: workflow.ID}).Count(&flowCount).Error).To(BeNil())
 		Expect(flowCount).To(Equal(0))
 
-		flowStateCount = 1
+		flowStateCount = 999
 		Expect(testDatabase.DS.GormDB(context.Background()).Model(&domain.WorkflowState{}).Where(&domain.WorkflowState{WorkflowID: workflow.ID}).Count(&flowStateCount).Error).To(BeNil())
 		Expect(flowStateCount).To(Equal(0))
 
-		flowStateTransitionCount = 1
+		flowStateTransitionCount = 999
 		Expect(testDatabase.DS.GormDB(context.Background()).Model(&domain.WorkflowStateTransition{}).
 			Where(&domain.WorkflowStateTransition{WorkflowID: workflow.ID}).Count(&flowStateTransitionCount).Error).To(BeNil())
 		Expect(flowStateTransitionCount).To(Equal(0))
+
+		propertyCount = 999
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&flow.WorkflowPropertyDefinition{}).
+			Where(&flow.WorkflowPropertyDefinition{WorkflowID: workflow.ID}).Count(&propertyCount).Error).To(BeNil())
+		Expect(propertyCount).To(Equal(0))
+
 	})
 
 	t.Run("should be able to catch database error", func(t *testing.T) {

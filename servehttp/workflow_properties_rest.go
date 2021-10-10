@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
-func createStateMachinePropertyRestAPI(c *gin.Context) {
+func createWorkflowPropertyRestAPI(c *gin.Context) {
 	id, err := types.ParseID(c.Param("flowId"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
@@ -35,7 +35,7 @@ func createStateMachinePropertyRestAPI(c *gin.Context) {
 	c.JSON(http.StatusCreated, p)
 }
 
-func queryStateMachinePropertyRestAPI(c *gin.Context) {
+func queryWorkflowPropertyRestAPI(c *gin.Context) {
 	id, err := types.ParseID(c.Param("flowId"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("flowId") + "'"})
@@ -49,4 +49,20 @@ func queryStateMachinePropertyRestAPI(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, props)
+}
+
+func deleteWorkflowPropertyRestAPI(c *gin.Context) {
+	id, err := types.ParseID(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, &misc.ErrorBody{Code: "common.bad_param", Message: "invalid id '" + c.Param("id") + "'"})
+		return
+	}
+
+	err = flow.DeletePropertyDefinitionFunc(id, session.ExtractSessionFromGinContext(c))
+	if err != nil {
+		_ = c.Error(err)
+		c.Abort()
+		return
+	}
+	c.Status(http.StatusNoContent)
 }

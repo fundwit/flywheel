@@ -153,6 +153,12 @@ func DeleteWorkflow(id types.ID, s *session.Session) error {
 			Delete(&domain.WorkflowStateTransition{}).Error; err != nil {
 			return err
 		}
+
+		if err := tx.Model(&WorkflowPropertyDefinition{}).Where("workflow_id = ?", wf.ID).
+			Delete(&WorkflowPropertyDefinition{}).Error; err != nil {
+			return err
+		}
+
 		return nil
 	})
 	return err

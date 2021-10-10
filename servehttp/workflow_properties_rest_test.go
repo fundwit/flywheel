@@ -57,7 +57,7 @@ func TestCreateWorkflowPropertyRestAPI(t *testing.T) {
 		Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
 	})
 
-	t.Run("should be able to create transition", func(t *testing.T) {
+	t.Run("should be able to create successfully", func(t *testing.T) {
 		flow.CreatePropertyDefinitionFunc = func(workflowId types.ID, p domain.PropertyDefinition, s *session.Session) (*flow.WorkflowPropertyDefinition, error) {
 			return &flow.WorkflowPropertyDefinition{ID: 123, WorkflowID: workflowId, PropertyDefinition: p}, nil
 		}
@@ -94,7 +94,7 @@ func TestQueryWorkflowPropertiesRestAPI(t *testing.T) {
 		Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
 	})
 
-	t.Run("should be able to query process steps", func(t *testing.T) {
+	t.Run("should be able to query result successfully", func(t *testing.T) {
 		flow.QueryPropertyDefinitionsFunc = func(workflowId types.ID, s *session.Session) ([]flow.WorkflowPropertyDefinition, error) {
 			return []flow.WorkflowPropertyDefinition{
 				{ID: 101, WorkflowID: workflowId, PropertyDefinition: domain.PropertyDefinition{Name: "prop1", Type: "string", Title: "Prop1"}},
@@ -109,5 +109,41 @@ func TestQueryWorkflowPropertiesRestAPI(t *testing.T) {
 			{"id":"101", "workflowId":"100", "name":"prop1", "type": "string", "title": "Prop1"},
 			{"id":"102", "workflowId":"100", "name":"prop2", "type": "string", "title": "Prop2"}
 		]`))
+	})
+}
+
+func TestDeleteWorkflowPropertiesRestAPI(t *testing.T) {
+	RegisterTestingT(t)
+
+	router := gin.Default()
+	router.Use(bizerror.ErrorHandling())
+	servehttp.RegisterWorkflowHandler(router)
+
+	t.Run("should be able to handle bind error", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/properties/bad", nil)
+		status, body, _ := testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusBadRequest))
+		Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":"invalid id 'bad'","data":null}`))
+	})
+
+	t.Run("should be able to handle service error", func(t *testing.T) {
+		flow.DeletePropertyDefinitionFunc = func(workflowId types.ID, s *session.Session) error {
+			return errors.New("a mocked error")
+		}
+		req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/properties/100", nil)
+		status, body, _ := testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusInternalServerError))
+		Expect(body).To(MatchJSON(`{"code":"common.internal_server_error","message":"a mocked error","data":null}`))
+	})
+
+	t.Run("should be able to delete successfully", func(t *testing.T) {
+		flow.DeletePropertyDefinitionFunc = func(workflowId types.ID, s *session.Session) error {
+			return nil
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/v1/workflows/properties/100", nil)
+		status, body, _ := testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusNoContent))
+		Expect(body).To(BeZero())
 	})
 }

@@ -19,6 +19,9 @@ var ErrWorkProcessStepStateInvalid = errors.New("state of work process step is i
 var ErrLabelNotFound = errors.New("label not found")
 var ErrLabelIsReferenced = errors.New("label is referenced")
 
+var ErrPropertyDefinitionNotFound = errors.New("property definition not found")
+var ErrPropertyDefinitionIsReferenced = errors.New("property definition is referenced")
+
 var ErrNotFound = errors.New("not found")
 var ErrNoContent = errors.New("no content")
 var ErrInvalidPassword = errors.New("invalid password")

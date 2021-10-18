@@ -62,7 +62,8 @@ func main() {
 
 	// database migration (race condition)
 	err = ds.GormDB(context.Background()).AutoMigrate(&domain.Work{}, &domain.WorkProcessStep{}, &checklist.CheckItem{},
-		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}, &flow.WorkflowPropertyDefinition{},
+		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{},
+		&flow.WorkflowPropertyDefinition{}, &work.WorkPropertyValueRecord{},
 		&workcontribution.WorkContributionRecord{}, &event.EventRecord{}, &indexlog.IndexLogRecord{},
 		&account.User{}, &domain.Project{}, &domain.ProjectMember{},
 		&account.Role{}, &account.Permission{}, &label.Label{}, &work.WorkLabelRelation{},
@@ -96,6 +97,7 @@ func main() {
 
 	label.RegisterLabelsRestAPI(engine, securityMiddle)
 	work.RegisterWorkLabelRelationsRestAPI(engine, securityMiddle)
+	work.RegisterWorkPropertiesRestAPI(engine, securityMiddle)
 	label.LabelDeleteCheckFuncs = append(label.LabelDeleteCheckFuncs, work.IsLabelReferencedByWork)
 	workrest.RegisterWorksRestAPI(engine, securityMiddle)
 	checklist.RegisterCheckItemsRestAPI(engine, securityMiddle)

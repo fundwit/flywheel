@@ -46,6 +46,7 @@ type WorksPropertyValueDetail struct {
 
 var (
 	AssignWorkPropertyValueFunc = AssignWorkPropertyValue
+	QueryWorkPropertyValuesFunc = QueryWorkPropertyValues
 )
 
 func AssignWorkPropertyValue(req WorkPropertyAssign, c *session.Session) (*WorkPropertyValueRecord, error) {
@@ -103,7 +104,7 @@ type workIdWithFlowId struct {
 }
 
 func QueryWorkPropertyValues(reqWorkIds []types.ID, s *session.Session) ([]WorksPropertyValueDetail, error) {
-	var worksPropertyValues []WorksPropertyValueDetail
+	worksPropertyValues := []WorksPropertyValueDetail{}
 	if len(reqWorkIds) == 0 {
 		return worksPropertyValues, nil
 	}

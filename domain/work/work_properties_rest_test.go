@@ -3,6 +3,7 @@ package work_test
 import (
 	"errors"
 	"flywheel/bizerror"
+	"flywheel/domain"
 	"flywheel/domain/work"
 	"flywheel/session"
 	"flywheel/testinfra"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/fundwit/go-commons/types"
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/gomega"
 )
@@ -68,6 +70,61 @@ func TestAssignWorkPropertyValueAPI(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPatch, work.PathWorkProperties, strings.NewReader(reqBody))
 		status, body, _ := testinfra.ExecuteRequest(req, router)
 		Expect(body).To(MatchJSON(`{"workId": "123", "name": "propName", "value": "propValue", "type":"text", "propertyDefinitionId":"3000"}`))
+		Expect(status).To(Equal(http.StatusOK))
+	})
+}
+
+func TestQueryWorkPropertyValuesAPI(t *testing.T) {
+	RegisterTestingT(t)
+
+	router := gin.Default()
+	router.Use(bizerror.ErrorHandling())
+	work.RegisterWorkPropertiesRestAPI(router)
+
+	t.Run("should be able to validate parameters", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, work.PathWorkProperties, nil)
+		status, body, _ := testinfra.ExecuteRequest(req, router)
+
+		Expect(body).To(MatchJSON(`{"code":"common.bad_param",
+		"message": "Key: 'workPropertyValuesQuery.WorkIds' Error:Field validation for 'WorkIds' failed on the 'gte' tag",
+		"data": null}`))
+		Expect(status).To(Equal(http.StatusBadRequest))
+	})
+
+	t.Run("should be able to handle error", func(t *testing.T) {
+		work.QueryWorkPropertyValuesFunc = func(reqWorkIds []types.ID, s *session.Session) ([]work.WorksPropertyValueDetail, error) {
+			return nil, errors.New("some error")
+		}
+
+		req := httptest.NewRequest(http.MethodGet, work.PathWorkProperties+"?workId=123", nil)
+		status, body, _ := testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusInternalServerError))
+		Expect(body).To(MatchJSON(`{"code":"common.internal_server_error", "message":"some error", "data":null}`))
+	})
+
+	t.Run("should be able to query work property values successfully", func(t *testing.T) {
+		work.QueryWorkPropertyValuesFunc = func(reqWorkIds []types.ID, s *session.Session) ([]work.WorksPropertyValueDetail, error) {
+			return []work.WorksPropertyValueDetail{
+				{
+					WorkId: reqWorkIds[0],
+					PropertyValues: []work.WorkPropertyValueDetail{
+						{PropertyDefinitionId: 1245, Value: "value of test prop", PropertyDefinition: domain.PropertyDefinition{
+							Name: "testProp", Type: "text", Title: "Test Property",
+						}},
+					},
+				},
+			}, nil
+		}
+
+		req := httptest.NewRequest(http.MethodGet, work.PathWorkProperties+"?workId=1111", nil)
+		status, body, _ := testinfra.ExecuteRequest(req, router)
+		Expect(body).To(MatchJSON(`
+		[{
+			"workId": "1111",
+			"propertyValues": [{
+				"name": "testProp", "value": "value of test prop", "type":"text", "propertyDefinitionId":"1245", "title": "Test Property"
+			}]
+		}]`))
 		Expect(status).To(Equal(http.StatusOK))
 	})
 }

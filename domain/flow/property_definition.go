@@ -18,6 +18,8 @@ var (
 	CreatePropertyDefinitionFunc = CreatePropertyDefinition
 	QueryPropertyDefinitionsFunc = QueryPropertyDefinitions
 	DeletePropertyDefinitionFunc = DeletePropertyDefinition
+
+	PropertyDefinitionDeleteCheckFuncs = []func(d WorkflowPropertyDefinition, db *gorm.DB) error{}
 )
 
 type WorkflowPropertyDefinition struct {
@@ -96,7 +98,16 @@ func DeletePropertyDefinition(id types.ID, s *session.Session) error {
 		return bizerror.ErrForbidden
 	}
 
-	// TODO block delete action if any value of this property defintion already assigned to works
+	dbErr := db.Transaction(func(tx *gorm.DB) error {
+		for _, checkFunc := range PropertyDefinitionDeleteCheckFuncs {
+			err := checkFunc(p, tx)
+			if err != nil {
+				return err
+			}
+		}
 
-	return db.Where("id = ?", id).Delete(&WorkflowPropertyDefinition{ID: id}).Error
+		return db.Where("id = ?", id).Delete(&WorkflowPropertyDefinition{ID: id}).Error
+	})
+
+	return dbErr
 }

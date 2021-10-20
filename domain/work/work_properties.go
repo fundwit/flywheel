@@ -49,6 +49,15 @@ var (
 	QueryWorkPropertyValuesFunc = QueryWorkPropertyValues
 )
 
+func init() {
+	flow.PropertyDefinitionDeleteCheckFuncs = append(
+		flow.PropertyDefinitionDeleteCheckFuncs,
+		func(d flow.WorkflowPropertyDefinition, db *gorm.DB) error {
+			return IsPropertyDefinitionReferencedByWork(d.ID, db)
+		},
+	)
+}
+
 func AssignWorkPropertyValue(req WorkPropertyAssign, c *session.Session) (*WorkPropertyValueRecord, error) {
 	var r *WorkPropertyValueRecord
 	txErr := persistence.ActiveDataSourceManager.GormDB(c.Context).Transaction(func(tx *gorm.DB) error {

@@ -2,6 +2,7 @@ package flow_test
 
 import (
 	"context"
+	"errors"
 	"flywheel/account"
 	"flywheel/bizerror"
 	"flywheel/domain"
@@ -235,4 +236,29 @@ func TestDeletePropertyDefinitions(t *testing.T) {
 		Expect(db.Model(&r).First(&r).Error).To(Equal(gorm.ErrRecordNotFound))
 	})
 
+	t.Run("block delete process if delete check func return errors", func(t *testing.T) {
+		defer propertyDefinitionTeardown(t, testDatabase)
+		propertyDefinitionTestSetup(t, &testDatabase)
+
+		creation := &flow.WorkflowCreation{Name: "test workflow", ProjectID: types.ID(1), StateMachine: creationDemo.StateMachine}
+		workflow, err := flow.CreateWorkflow(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
+		Expect(err).To(BeNil())
+
+		prop, err := flow.CreatePropertyDefinition(workflow.ID,
+			domain.PropertyDefinition{Name: "testProperty1", Type: "text", Title: "Test Property1"},
+			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
+		Expect(err).To(BeNil())
+
+		flow.PropertyDefinitionDeleteCheckFuncs = append(flow.PropertyDefinitionDeleteCheckFuncs, func(d flow.WorkflowPropertyDefinition, db *gorm.DB) error {
+			return errors.New("some error")
+		})
+
+		err = flow.DeletePropertyDefinition(prop.ID, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
+		Expect(err).To(Equal(errors.New("some error")))
+
+		// assert record still exist
+		db := testDatabase.DS.GormDB(context.Background())
+		r := flow.WorkflowPropertyDefinition{}
+		Expect(db.Model(&r).First(&r).Error).To(BeNil())
+	})
 }

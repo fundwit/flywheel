@@ -137,6 +137,9 @@ func TestAssignWorkPropertyValueAndQueryWOrkPropertyValues(t *testing.T) {
 		Expect(work.IsPropertyDefinitionReferencedByWork(pd2.ID, testDatabase.DS.GormDB(context.Background()))).
 			To(Equal(bizerror.ErrPropertyDefinitionIsReferenced))
 
+		// assert the property definition can not be deleted
+		Expect(flow.DeletePropertyDefinition(pd2.ID, &c)).To(Equal(bizerror.ErrPropertyDefinitionIsReferenced))
+
 		propValues, err := work.QueryWorkPropertyValues([]types.ID{w.ID, types.ID(404)}, &c)
 		Expect(err).To(BeNil())
 		Expect(len(propValues)).To(Equal(1))

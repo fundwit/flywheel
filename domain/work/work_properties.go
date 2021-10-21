@@ -16,7 +16,7 @@ type WorkPropertyValueRecord struct {
 	Name   string   `json:"name" gorm:"primary_key" binding:"required"`
 
 	Value string `json:"value"`
-	Type  string `json:"type" binding:"required,oneof=text number"`
+	Type  string `json:"type" binding:"required,oneof=text textarea number time"`
 
 	PropertyDefinitionId types.ID `json:"propertyDefinitionId" sql:"type:BIGINT UNSIGNED NOT NULL" binding:"required"`
 }
@@ -69,6 +69,10 @@ func AssignWorkPropertyValue(req WorkPropertyAssign, c *session.Session) (*WorkP
 		if err := tx.Model(&d).Where("workflow_id = ? AND name LIKE ?", w.FlowID, req.Name).First(&d).Error; err == gorm.ErrRecordNotFound {
 			return bizerror.ErrPropertyDefinitionNotFound
 		} else if err != nil {
+			return err
+		}
+
+		if _, err := d.ValidateValue(req.Value); err != nil {
 			return err
 		}
 

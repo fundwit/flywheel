@@ -2,6 +2,7 @@ package work_test
 
 import (
 	"context"
+	"errors"
 	"flywheel/account"
 	"flywheel/authority"
 	"flywheel/bizerror"
@@ -15,6 +16,7 @@ import (
 	"flywheel/persistence"
 	"flywheel/session"
 	"flywheel/testinfra"
+	"strconv"
 	"testing"
 
 	"github.com/fundwit/go-commons/types"
@@ -101,6 +103,27 @@ func TestAssignWorkPropertyValueAndQueryWOrkPropertyValues(t *testing.T) {
 		// case3: property definition not found within project scope
 		_, err = work.AssignWorkPropertyValue(work.WorkPropertyAssign{WorkId: w1.ID, Name: "prop1", Value: "xxx"}, &c1)
 		Expect(err).To(Equal(bizerror.ErrPropertyDefinitionNotFound))
+	})
+
+	t.Run("should be able to return error if failed to validate value", func(t *testing.T) {
+		defer workPropertiesTestTeardown(t, testDatabase)
+		workflow1, p1, _, _, _ := workPropertiesTestSetup(t, &testDatabase)
+
+		// prepare work
+		c := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
+			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
+		w := buildWork("test work", workflow1.ID, p1.ID, &c)
+
+		// prepare property
+		pd1, err := flow.CreatePropertyDefinition(w.FlowID, domain.PropertyDefinition{Name: "prop1", Type: "number", Title: "Prop1"}, &c)
+		Expect(err).To(BeNil())
+		Expect(work.IsPropertyDefinitionReferencedByWork(pd1.ID, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
+
+		// assign value to work property
+		req := work.WorkPropertyAssign{WorkId: w.ID, Name: "prop1", Value: "prop2 value"}
+		r, err := work.AssignWorkPropertyValue(req, &c)
+		Expect(r).To(BeNil())
+		Expect(errors.Unwrap(err)).To(Equal(strconv.ErrSyntax))
 	})
 
 	t.Run("should be able to assign value for work property", func(t *testing.T) {

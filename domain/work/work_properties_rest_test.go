@@ -122,7 +122,8 @@ func TestQueryWorkPropertyValuesAPI(t *testing.T) {
 		[{
 			"workId": "1111",
 			"propertyValues": [{
-				"name": "testProp", "value": "value of test prop", "type":"text", "propertyDefinitionId":"1245", "title": "Test Property"
+				"name": "testProp", "value": "value of test prop", "type":"text", "propertyDefinitionId":"1245",
+				"title": "Test Property", "options": null
 			}]
 		}]`))
 		Expect(status).To(Equal(http.StatusOK))

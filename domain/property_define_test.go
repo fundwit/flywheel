@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"flywheel/bizerror"
 	"strconv"
 	"testing"
 	"time"
@@ -59,5 +60,80 @@ func TestPropertyDefinition_ValidateValue(t *testing.T) {
 
 		_, err = PropertyDefinition{Type: PropTypeTime}.ValidateValue("2020-02-03 20:30")
 		Expect(err.Error()).To(Equal(`invalid parameter: "2020-02-03 20:30"`))
+	})
+
+	t.Run("be able to validate select value", func(t *testing.T) {
+		ops := map[string]interface{}{OptionKeySelectEnum: []string{"Cat", "Dog"}}
+		v, err := PropertyDefinition{Type: PropTypeSelect, Options: ops}.ValidateValue("Cat")
+		Expect(v).To(Equal("Cat"))
+		Expect(err).To(BeNil())
+
+		v, err = PropertyDefinition{Type: PropTypeSelect, Options: ops}.ValidateValue("Fish")
+		Expect(v).To(BeZero())
+		Expect(err.Error()).To(Equal(`invalid parameter: "Fish"`))
+
+		ops = map[string]interface{}{OptionKeySelectEnum: []int{100, 200}}
+		v, err = PropertyDefinition{Type: PropTypeSelect, Options: ops}.ValidateValue("Fish")
+		Expect(v).To(BeZero())
+		Expect(err.Error()).To(Equal(`invalid property definition`))
+	})
+}
+
+func TestPropertyDefinition_ValidateOptions(t *testing.T) {
+	RegisterTestingT(t)
+
+	t.Run("be able to validate options", func(t *testing.T) {
+		d := PropertyDefinition{Type: PropTypeSelect,
+			Options: map[string]interface{}{OptionKeySelectEnum: []string{"Cat", "Dog"}}}
+		Expect(d.ValidateOptions()).To(BeNil())
+
+		Expect(PropertyDefinition{Type: PropTypeSelect,
+			Options: map[string]interface{}{OptionKeySelectEnum: []string{}}}.ValidateOptions()).
+			To(Equal(bizerror.ErrInvalidArguments))
+
+		Expect(PropertyDefinition{Type: PropTypeSelect,
+			Options: map[string]interface{}{OptionKeySelectEnum: []string{"Cat", ""}}}.ValidateOptions()).
+			To(Equal(bizerror.ErrInvalidArguments))
+
+		Expect(PropertyDefinition{Type: PropTypeSelect,
+			Options: map[string]interface{}{OptionKeySelectEnum: []string{" Cat "}}}.ValidateOptions()).
+			To(Equal(bizerror.ErrInvalidArguments))
+
+		Expect(PropertyDefinition{Type: PropTypeSelect,
+			Options: map[string]interface{}{OptionKeySelectEnum: []string{"Cat", "cat"}}}.ValidateOptions()).
+			To(Equal(bizerror.ErrInvalidArguments))
+
+		Expect(PropertyDefinition{Type: PropTypeSelect,
+			Options: map[string]interface{}{OptionKeySelectEnum: []int{123}}}.ValidateOptions()).
+			To(Equal(bizerror.ErrInvalidArguments))
+	})
+}
+
+func TestPropertyOptions_Value(t *testing.T) {
+	RegisterTestingT(t)
+
+	t.Run("value func should work as expected", func(t *testing.T) {
+		d := PropertyDefinition{Type: PropTypeSelect,
+			Options: map[string]interface{}{OptionKeySelectEnum: []string{"Cat", "Dog"}}}
+		Expect(d.Options.Value()).To(MatchJSON(`{"select_enums": ["Cat", "Dog"]}`))
+
+	})
+}
+
+func TestPropertyOptions_Scan(t *testing.T) {
+	RegisterTestingT(t)
+
+	t.Run("scan func should work as expected", func(t *testing.T) {
+		json := `{"select_enums": ["Cat", "Dog"]}`
+
+		options := PropertyOptions{}
+		Expect(options.Scan(json)).To(BeNil())
+		Expect(options).To(Equal(PropertyOptions(map[string]interface{}{OptionKeySelectEnum: []interface{}{"Cat", "Dog"}})))
+
+		options = PropertyOptions{}
+		Expect(options.Scan([]byte(json))).To(BeNil())
+		Expect(options).To(Equal(PropertyOptions(map[string]interface{}{OptionKeySelectEnum: []interface{}{"Cat", "Dog"}})))
+
+		Expect(options.Scan(123)).To(Equal(errors.New("type is neither string nor []byte: int 123")))
 	})
 }

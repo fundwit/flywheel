@@ -26,6 +26,10 @@ func createWorkflowPropertyRestAPI(c *gin.Context) {
 		panic(&bizerror.ErrBadParam{Cause: err})
 	}
 
+	if err := prop.ValidateOptions(); err != nil {
+		panic(&bizerror.ErrBadParam{Cause: err})
+	}
+
 	p, err := flow.CreatePropertyDefinitionFunc(id, prop, session.ExtractSessionFromGinContext(c))
 	if err != nil {
 		_ = c.Error(err)

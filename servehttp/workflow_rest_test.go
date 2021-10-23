@@ -156,8 +156,8 @@ func TestDetailWorkflowsRestAPI(t *testing.T) {
 		Expect(status).To(Equal(http.StatusOK))
 		Expect(body).To(MatchJSON(`{"id": "10", "name": "test workflow", "themeColor": "blue", "themeIcon": "some-icon", "projectId": "100", "createTime": "` + timeString + `",
 			"propertyDefinitions":[
-				{"name": "description", "type":"", "title":""},
-				{"name": "creatorId",   "type":"", "title":""}
+				{"name": "description", "type":"", "title":"", "options":null},
+				{"name": "creatorId",   "type":"", "title":"", "options":null}
 			],
 			"stateMachine": {
 				"states": [{"name":"PENDING", "category": 1, "order": 1}, {"name":"DOING", "category": 2, "order": 2},

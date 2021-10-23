@@ -74,13 +74,14 @@ func TestCreatePropertyDefinition(t *testing.T) {
 		Expect(err).To(BeNil())
 
 		pd, err := flow.CreatePropertyDefinition(workflow.ID,
-			domain.PropertyDefinition{Name: "testProperty", Type: "text", Title: "Test Property"},
+			domain.PropertyDefinition{Name: "testProperty", Type: "text", Title: "Test Property", Options: domain.PropertyOptions{"length": "255"}},
 			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
 		Expect(err).To(BeNil())
 
 		Expect(pd.ID).ToNot(BeZero())
 		Expect(pd.WorkflowID).To(Equal(workflow.ID))
-		Expect(pd.PropertyDefinition).To(Equal(domain.PropertyDefinition{Name: "testProperty", Type: "text", Title: "Test Property"}))
+		Expect(pd.PropertyDefinition).To(Equal(domain.PropertyDefinition{Name: "testProperty", Type: "text", Title: "Test Property",
+			Options: domain.PropertyOptions{"length": "255"}}))
 
 		var properties []flow.WorkflowPropertyDefinition
 		Expect(testDatabase.DS.GormDB(context.Background()).Model(&flow.WorkflowPropertyDefinition{}).Scan(&properties).Error).To(BeNil())
@@ -144,7 +145,8 @@ func TestQueryPropertyDefinitions(t *testing.T) {
 		Expect(err).To(BeNil())
 
 		pd1, err := flow.CreatePropertyDefinition(workflow1.ID,
-			domain.PropertyDefinition{Name: "testProperty1", Type: "text", Title: "Test Property1"},
+			domain.PropertyDefinition{Name: "testProperty1", Type: "text", Title: "Test Property1",
+				Options: domain.PropertyOptions{"length": "255"}},
 			testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_1"))
 		Expect(err).To(BeNil())
 

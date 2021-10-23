@@ -44,6 +44,13 @@ func TestCreateWorkflowPropertyRestAPI(t *testing.T) {
 		Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":
 			"Key: 'PropertyDefinition.Name' Error:Field validation for 'Name' failed on the 'required' tag\n` +
 			`Key: 'PropertyDefinition.Type' Error:Field validation for 'Type' failed on the 'required' tag","data":null}`))
+
+		req = httptest.NewRequest(http.MethodPost, "/v1/workflows/100/properties", bytes.NewReader([]byte(
+			`{"name":"test", "type": "select", "title": "Test", "options": {"select_enums": []}}`)))
+		status, body, _ = testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusBadRequest))
+		Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":
+				"invalid arguments","data":null}`))
 	})
 
 	t.Run("should be able to handle service error", func(t *testing.T) {
@@ -63,10 +70,11 @@ func TestCreateWorkflowPropertyRestAPI(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodPost, "/v1/workflows/100/properties", bytes.NewReader([]byte(
-			`{"name":"test", "type": "text", "title": "Test"}`)))
+			`{"name":"test", "type": "text", "title": "Test", "options": {"name": "ann", "age": 10}}`)))
 		status, body, _ := testinfra.ExecuteRequest(req, router)
 		Expect(status).To(Equal(http.StatusCreated))
-		Expect(body).To(MatchJSON(`{"id":"123", "workflowId":"100", "name":"test", "type": "text", "title": "Test"}`))
+		Expect(body).To(MatchJSON(`{"id":"123", "workflowId":"100", "name":"test", "type": "text", "title": "Test",
+			"options": {"name": "ann", "age": 10}}`))
 	})
 }
 
@@ -97,8 +105,10 @@ func TestQueryWorkflowPropertiesRestAPI(t *testing.T) {
 	t.Run("should be able to query result successfully", func(t *testing.T) {
 		flow.QueryPropertyDefinitionsFunc = func(workflowId types.ID, s *session.Session) ([]flow.WorkflowPropertyDefinition, error) {
 			return []flow.WorkflowPropertyDefinition{
-				{ID: 101, WorkflowID: workflowId, PropertyDefinition: domain.PropertyDefinition{Name: "prop1", Type: "string", Title: "Prop1"}},
-				{ID: 102, WorkflowID: workflowId, PropertyDefinition: domain.PropertyDefinition{Name: "prop2", Type: "string", Title: "Prop2"}},
+				{ID: 101, WorkflowID: workflowId, PropertyDefinition: domain.PropertyDefinition{Name: "prop1", Type: "string", Title: "Prop1",
+					Options: map[string]interface{}{"name": "ann", "age": 10}}},
+				{ID: 102, WorkflowID: workflowId, PropertyDefinition: domain.PropertyDefinition{Name: "prop2", Type: "string", Title: "Prop2",
+					Options: map[string]interface{}{"name": "ann", "age": 10}}},
 			}, nil
 		}
 
@@ -106,8 +116,8 @@ func TestQueryWorkflowPropertiesRestAPI(t *testing.T) {
 		status, body, _ := testinfra.ExecuteRequest(req, router)
 		Expect(status).To(Equal(http.StatusOK))
 		Expect(body).To(MatchJSON(`[
-			{"id":"101", "workflowId":"100", "name":"prop1", "type": "string", "title": "Prop1"},
-			{"id":"102", "workflowId":"100", "name":"prop2", "type": "string", "title": "Prop2"}
+			{"id":"101", "workflowId":"100", "name":"prop1", "type": "string", "title": "Prop1", "options": {"name": "ann", "age": 10}},
+			{"id":"102", "workflowId":"100", "name":"prop2", "type": "string", "title": "Prop2", "options": {"name": "ann", "age": 10}}
 		]`))
 	})
 }

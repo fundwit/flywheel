@@ -16,7 +16,7 @@ type WorkPropertyValueRecord struct {
 	Name   string   `json:"name" gorm:"primary_key" binding:"required"`
 
 	Value string `json:"value"`
-	Type  string `json:"type" binding:"required,oneof=text textarea number time"`
+	Type  string `json:"type" binding:"required,oneof=text textarea number time select"`
 
 	PropertyDefinitionId types.ID `json:"propertyDefinitionId" sql:"type:BIGINT UNSIGNED NOT NULL" binding:"required"`
 }

@@ -136,7 +136,8 @@ func TestAssignWorkPropertyValueAndQueryWOrkPropertyValues(t *testing.T) {
 		w := buildWork("test work", workflow1.ID, p1.ID, &c)
 
 		// prepare property
-		pd1, err := flow.CreatePropertyDefinition(w.FlowID, domain.PropertyDefinition{Name: "prop1", Type: "text", Title: "Prop1"}, &c)
+		pd1, err := flow.CreatePropertyDefinition(w.FlowID, domain.PropertyDefinition{Name: "prop1", Type: "text", Title: "Prop1",
+			Options: domain.PropertyOptions{"length": "255"}}, &c)
 		Expect(err).To(BeNil())
 		pd2, err := flow.CreatePropertyDefinition(w.FlowID, domain.PropertyDefinition{Name: "prop2", Type: "text", Title: "Prop2"}, &c)
 		Expect(err).To(BeNil())
@@ -173,7 +174,8 @@ func TestAssignWorkPropertyValueAndQueryWOrkPropertyValues(t *testing.T) {
 					PropertyValues: []work.WorkPropertyValueDetail{
 						{
 							PropertyDefinitionId: pd1.ID, Value: "",
-							PropertyDefinition: domain.PropertyDefinition{Name: "prop1", Type: "text", Title: "Prop1"},
+							PropertyDefinition: domain.PropertyDefinition{Name: "prop1", Type: "text", Title: "Prop1",
+								Options: domain.PropertyOptions{"length": "255"}},
 						},
 						{
 							PropertyDefinitionId: pd2.ID, Value: "prop2 value",
@@ -208,7 +210,8 @@ func TestAssignWorkPropertyValueAndQueryWOrkPropertyValues(t *testing.T) {
 					PropertyValues: []work.WorkPropertyValueDetail{
 						{
 							PropertyDefinitionId: pd1.ID, Value: "",
-							PropertyDefinition: domain.PropertyDefinition{Name: "prop1", Type: "text", Title: "Prop1"},
+							PropertyDefinition: domain.PropertyDefinition{Name: "prop1", Type: "text", Title: "Prop1",
+								Options: domain.PropertyOptions{"length": "255"}},
 						},
 						{
 							PropertyDefinitionId: pd2.ID, Value: "prop2 new value",
@@ -243,7 +246,8 @@ func TestAssignWorkPropertyValueAndQueryWOrkPropertyValues(t *testing.T) {
 					PropertyValues: []work.WorkPropertyValueDetail{
 						{
 							PropertyDefinitionId: pd1.ID, Value: "",
-							PropertyDefinition: domain.PropertyDefinition{Name: "prop1", Type: "text", Title: "Prop1"},
+							PropertyDefinition: domain.PropertyDefinition{Name: "prop1", Type: "text", Title: "Prop1",
+								Options: domain.PropertyOptions{"length": "255"}},
 						},
 						{
 							PropertyDefinitionId: pd2.ID, Value: "",
@@ -279,7 +283,8 @@ func TestAssignWorkPropertyValueAndQueryWOrkPropertyValues(t *testing.T) {
 					PropertyValues: []work.WorkPropertyValueDetail{
 						{
 							PropertyDefinitionId: pd1.ID, Value: "",
-							PropertyDefinition: domain.PropertyDefinition{Name: "prop1", Type: "text", Title: "Prop1"},
+							PropertyDefinition: domain.PropertyDefinition{Name: "prop1", Type: "text", Title: "Prop1",
+								Options: domain.PropertyOptions{"length": "255"}},
 						},
 						{
 							PropertyDefinitionId: pd2.ID, Value: "",

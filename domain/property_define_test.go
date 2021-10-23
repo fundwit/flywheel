@@ -45,12 +45,19 @@ func TestPropertyDefinition_ValidateValue(t *testing.T) {
 		rts, _ = v.(types.Timestamp)
 		Expect(rts.Time().Equal(ts.Time())).To(BeTrue())
 		Expect(err).To(BeNil())
+
+		localTZ := time.Now().Format(time.RFC3339)[19:]
+		v, err = PropertyDefinition{Type: PropTypeTime}.ValidateValue("2020-02-03T20:30:40.123" + localTZ)
+		rts, _ = v.(types.Timestamp)
+		Expect(rts.Time().Equal(ts.Time())).To(BeTrue())
+		Expect(err).To(BeNil())
+
 		v, err = PropertyDefinition{Type: PropTypeTime}.ValidateValue("2020-02-03 20:30:40")
 		rts, _ = v.(types.Timestamp)
 		Expect(rts.Time().Equal(ts0.Time())).To(BeTrue())
 		Expect(err).To(BeNil())
 
 		_, err = PropertyDefinition{Type: PropTypeTime}.ValidateValue("2020-02-03 20:30")
-		Expect(err.Error()).To(Equal(`parsing time "2020-02-03 20:30" as "2006-01-02 15:04:05.000000000": cannot parse "" as ":"`))
+		Expect(err.Error()).To(Equal(`invalid parameter: "2020-02-03 20:30"`))
 	})
 }

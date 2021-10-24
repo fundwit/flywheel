@@ -34,8 +34,24 @@ type PropertyOptions map[string]interface{}
 
 func (t PropertyDefinition) ValidateOptions() error {
 	if t.Type == PropTypeSelect {
-		enums, ok := t.Options[OptionKeySelectEnum].([]string)
-		if !ok || len(enums) == 0 {
+		val := t.Options[OptionKeySelectEnum]
+		enums, ok := val.([]string)
+		if !ok {
+			enumsIfs, ok := val.([]interface{})
+			if !ok {
+				return bizerror.ErrInvalidArguments
+			}
+			enums = []string{}
+			for _, e := range enumsIfs {
+				str, ok := e.(string)
+				if !ok {
+					return bizerror.ErrInvalidArguments
+				}
+				enums = append(enums, str)
+			}
+		}
+
+		if len(enums) == 0 {
 			return bizerror.ErrInvalidArguments
 		}
 

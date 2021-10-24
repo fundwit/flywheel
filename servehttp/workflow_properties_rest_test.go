@@ -75,6 +75,13 @@ func TestCreateWorkflowPropertyRestAPI(t *testing.T) {
 		Expect(status).To(Equal(http.StatusCreated))
 		Expect(body).To(MatchJSON(`{"id":"123", "workflowId":"100", "name":"test", "type": "text", "title": "Test",
 			"options": {"name": "ann", "age": 10}}`))
+
+		req = httptest.NewRequest(http.MethodPost, "/v1/workflows/100/properties", bytes.NewReader([]byte(
+			`{"type":"select","name":"aaa","title":"AAA","options":{"selectEnums":["aaa"]}}`)))
+		status, body, _ = testinfra.ExecuteRequest(req, router)
+		Expect(status).To(Equal(http.StatusCreated))
+		Expect(body).To(MatchJSON(`{"id":"123", "workflowId":"100", "name":"aaa", "type": "select", "title": "AAA",
+			"options":{"selectEnums":["aaa"]}}`))
 	})
 }
 

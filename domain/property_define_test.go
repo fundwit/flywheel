@@ -83,10 +83,16 @@ func TestPropertyDefinition_ValidateOptions(t *testing.T) {
 	RegisterTestingT(t)
 
 	t.Run("be able to validate options", func(t *testing.T) {
-		d := PropertyDefinition{Type: PropTypeSelect,
-			Options: map[string]interface{}{OptionKeySelectEnum: []string{"Cat", "Dog"}}}
-		Expect(d.ValidateOptions()).To(BeNil())
+		// valid cases
+		Expect(PropertyDefinition{Type: PropTypeSelect,
+			Options: map[string]interface{}{OptionKeySelectEnum: []string{"Cat", "Dog"}}}.ValidateOptions()).
+			To(BeNil())
 
+		Expect(PropertyDefinition{Type: PropTypeSelect,
+			Options: map[string]interface{}{OptionKeySelectEnum: []interface{}{"Cat", "Dog"}}}.ValidateOptions()).
+			To(BeNil())
+
+		// invalid cases
 		Expect(PropertyDefinition{Type: PropTypeSelect,
 			Options: map[string]interface{}{OptionKeySelectEnum: []string{}}}.ValidateOptions()).
 			To(Equal(bizerror.ErrInvalidArguments))
@@ -105,6 +111,10 @@ func TestPropertyDefinition_ValidateOptions(t *testing.T) {
 
 		Expect(PropertyDefinition{Type: PropTypeSelect,
 			Options: map[string]interface{}{OptionKeySelectEnum: []int{123}}}.ValidateOptions()).
+			To(Equal(bizerror.ErrInvalidArguments))
+
+		Expect(PropertyDefinition{Type: PropTypeSelect,
+			Options: map[string]interface{}{OptionKeySelectEnum: []interface{}{100, 200}}}.ValidateOptions()).
 			To(Equal(bizerror.ErrInvalidArguments))
 	})
 }

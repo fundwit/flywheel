@@ -19,7 +19,7 @@ const (
 	PropTypeTime     = "time"
 	PropTypeSelect   = "select"
 
-	OptionKeySelectEnum = "select_enums"
+	OptionKeySelectEnum = "selectEnums"
 )
 
 type PropertyDefinition struct {

@@ -46,7 +46,7 @@ func TestCreateWorkflowPropertyRestAPI(t *testing.T) {
 			`Key: 'PropertyDefinition.Type' Error:Field validation for 'Type' failed on the 'required' tag","data":null}`))
 
 		req = httptest.NewRequest(http.MethodPost, "/v1/workflows/100/properties", bytes.NewReader([]byte(
-			`{"name":"test", "type": "select", "title": "Test", "options": {"select_enums": []}}`)))
+			`{"name":"test", "type": "select", "title": "Test", "options": {"selectEnums": []}}`)))
 		status, body, _ = testinfra.ExecuteRequest(req, router)
 		Expect(status).To(Equal(http.StatusBadRequest))
 		Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":

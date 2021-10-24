@@ -115,7 +115,7 @@ func TestPropertyOptions_Value(t *testing.T) {
 	t.Run("value func should work as expected", func(t *testing.T) {
 		d := PropertyDefinition{Type: PropTypeSelect,
 			Options: map[string]interface{}{OptionKeySelectEnum: []string{"Cat", "Dog"}}}
-		Expect(d.Options.Value()).To(MatchJSON(`{"select_enums": ["Cat", "Dog"]}`))
+		Expect(d.Options.Value()).To(MatchJSON(`{"selectEnums": ["Cat", "Dog"]}`))
 
 	})
 }
@@ -124,7 +124,7 @@ func TestPropertyOptions_Scan(t *testing.T) {
 	RegisterTestingT(t)
 
 	t.Run("scan func should work as expected", func(t *testing.T) {
-		json := `{"select_enums": ["Cat", "Dog"]}`
+		json := `{"selectEnums": ["Cat", "Dog"]}`
 
 		options := PropertyOptions{}
 		Expect(options.Scan(json)).To(BeNil())

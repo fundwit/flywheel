@@ -82,11 +82,14 @@ func TestPropertyDefinition_ValidateValue(t *testing.T) {
 func TestPropertyDefinition_ValidateOptions(t *testing.T) {
 	RegisterTestingT(t)
 
-	t.Run("be able to validate options", func(t *testing.T) {
+	t.Run("be able to validate select options", func(t *testing.T) {
 		// valid cases
-		Expect(PropertyDefinition{Type: PropTypeSelect,
-			Options: map[string]interface{}{OptionKeySelectEnum: []string{"Cat", "Dog"}}}.ValidateOptions()).
-			To(BeNil())
+		d := PropertyDefinition{Type: PropTypeSelect,
+			Options: map[string]interface{}{OptionKeySelectEnum: []string{"Cat", "Dog"}}}
+		Expect(d.ValidateOptions()).To(BeNil())
+		v, err := d.ValidateSelectOptions()
+		Expect(err).To(BeNil())
+		Expect(v).To(Equal([]string{"Cat", "Dog"}))
 
 		Expect(PropertyDefinition{Type: PropTypeSelect,
 			Options: map[string]interface{}{OptionKeySelectEnum: []interface{}{"Cat", "Dog"}}}.ValidateOptions()).
@@ -95,27 +98,27 @@ func TestPropertyDefinition_ValidateOptions(t *testing.T) {
 		// invalid cases
 		Expect(PropertyDefinition{Type: PropTypeSelect,
 			Options: map[string]interface{}{OptionKeySelectEnum: []string{}}}.ValidateOptions()).
-			To(Equal(bizerror.ErrInvalidArguments))
+			To(Equal(bizerror.ErrPropertyDefinitionInvalid))
 
 		Expect(PropertyDefinition{Type: PropTypeSelect,
 			Options: map[string]interface{}{OptionKeySelectEnum: []string{"Cat", ""}}}.ValidateOptions()).
-			To(Equal(bizerror.ErrInvalidArguments))
+			To(Equal(bizerror.ErrPropertyDefinitionInvalid))
 
 		Expect(PropertyDefinition{Type: PropTypeSelect,
 			Options: map[string]interface{}{OptionKeySelectEnum: []string{" Cat "}}}.ValidateOptions()).
-			To(Equal(bizerror.ErrInvalidArguments))
+			To(Equal(bizerror.ErrPropertyDefinitionInvalid))
 
 		Expect(PropertyDefinition{Type: PropTypeSelect,
 			Options: map[string]interface{}{OptionKeySelectEnum: []string{"Cat", "cat"}}}.ValidateOptions()).
-			To(Equal(bizerror.ErrInvalidArguments))
+			To(Equal(bizerror.ErrPropertyDefinitionInvalid))
 
 		Expect(PropertyDefinition{Type: PropTypeSelect,
 			Options: map[string]interface{}{OptionKeySelectEnum: []int{123}}}.ValidateOptions()).
-			To(Equal(bizerror.ErrInvalidArguments))
+			To(Equal(bizerror.ErrPropertyDefinitionInvalid))
 
 		Expect(PropertyDefinition{Type: PropTypeSelect,
 			Options: map[string]interface{}{OptionKeySelectEnum: []interface{}{100, 200}}}.ValidateOptions()).
-			To(Equal(bizerror.ErrInvalidArguments))
+			To(Equal(bizerror.ErrPropertyDefinitionInvalid))
 	})
 }
 

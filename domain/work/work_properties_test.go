@@ -295,4 +295,34 @@ func TestAssignWorkPropertyValueAndQueryWOrkPropertyValues(t *testing.T) {
 			}))
 
 	})
+
+	t.Run("should be able to assign select value for work property", func(t *testing.T) {
+		defer workPropertiesTestTeardown(t, testDatabase)
+		workflow1, p1, _, _, _ := workPropertiesTestSetup(t, &testDatabase)
+
+		// prepare work
+		c := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
+			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
+		w := buildWork("test work", workflow1.ID, p1.ID, &c)
+
+		// prepare property
+		_, err := flow.CreatePropertyDefinition(w.FlowID, domain.PropertyDefinition{Name: "prop1", Type: "select", Title: "Prop1",
+			Options: domain.PropertyOptions{"selectEnums": []string{"A", "B"}}}, &c)
+		Expect(err).To(BeNil())
+
+		// assign value to work property
+		req := work.WorkPropertyAssign{WorkId: w.ID, Name: "prop1", Value: "C"}
+		r, err := work.AssignWorkPropertyValue(req, &c)
+		Expect(r).To(BeNil())
+		Expect(err.Error()).To(Equal(`invalid parameter: "C"`))
+
+		req = work.WorkPropertyAssign{WorkId: w.ID, Name: "prop1", Value: "A"}
+		r, err = work.AssignWorkPropertyValue(req, &c)
+		Expect(err).To(BeNil())
+
+		q := []work.WorkPropertyValueRecord{}
+		Expect(testDatabase.DS.GormDB(context.Background()).Where(&work.WorkPropertyValueRecord{WorkId: w.ID}).Find(&q).Error).To(BeNil())
+		Expect(len(q)).To(Equal(1))
+		Expect(q[0]).To(Equal(*r))
+	})
 }

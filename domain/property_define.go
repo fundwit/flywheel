@@ -34,41 +34,50 @@ type PropertyOptions map[string]interface{}
 
 func (t PropertyDefinition) ValidateOptions() error {
 	if t.Type == PropTypeSelect {
-		val := t.Options[OptionKeySelectEnum]
-		enums, ok := val.([]string)
-		if !ok {
-			enumsIfs, ok := val.([]interface{})
-			if !ok {
-				return bizerror.ErrInvalidArguments
-			}
-			enums = []string{}
-			for _, e := range enumsIfs {
-				str, ok := e.(string)
-				if !ok {
-					return bizerror.ErrInvalidArguments
-				}
-				enums = append(enums, str)
-			}
-		}
-
-		if len(enums) == 0 {
-			return bizerror.ErrInvalidArguments
-		}
-
-		uniSet := map[string]bool{}
-		for _, item := range enums {
-			if len(item) == 0 || strings.TrimSpace(item) != item {
-				return bizerror.ErrInvalidArguments
-			}
-
-			if _, ok := uniSet[strings.ToLower(item)]; ok {
-				return bizerror.ErrInvalidArguments
-			}
-
-			uniSet[strings.ToLower(item)] = true
+		_, err := t.ValidateSelectOptions()
+		if err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+func (t PropertyDefinition) ValidateSelectOptions() ([]string, error) {
+	val := t.Options[OptionKeySelectEnum]
+	enums, ok := val.([]string)
+	if !ok {
+		enumsIfs, ok := val.([]interface{})
+		if !ok {
+			return nil, bizerror.ErrPropertyDefinitionInvalid
+		}
+		enums = []string{}
+		for _, e := range enumsIfs {
+			str, ok := e.(string)
+			if !ok {
+				return nil, bizerror.ErrPropertyDefinitionInvalid
+			}
+			enums = append(enums, str)
+		}
+	}
+
+	if len(enums) == 0 {
+		return nil, bizerror.ErrPropertyDefinitionInvalid
+	}
+
+	uniSet := map[string]bool{}
+	for _, item := range enums {
+		if len(item) == 0 || strings.TrimSpace(item) != item {
+			return nil, bizerror.ErrPropertyDefinitionInvalid
+		}
+
+		if _, ok := uniSet[strings.ToLower(item)]; ok {
+			return nil, bizerror.ErrPropertyDefinitionInvalid
+		}
+
+		uniSet[strings.ToLower(item)] = true
+	}
+
+	return enums, nil
 }
 
 func (t PropertyOptions) Value() (driver.Value, error) {
@@ -141,13 +150,14 @@ func (d PropertyDefinition) ValidateTimeValue(raw string) (types.Timestamp, erro
 }
 
 func (d PropertyDefinition) ValidateSelectValue(raw string) (string, error) {
-	enums, ok := d.Options[OptionKeySelectEnum].([]string)
-	if !ok {
-		return "", errors.New("invalid property definition")
+	enums, err := d.ValidateSelectOptions()
+	if err != nil {
+		return "", err
 	}
 
+	rawLower := strings.ToLower(raw)
 	for _, r := range enums {
-		if r == raw {
+		if strings.ToLower(r) == rawLower {
 			return raw, nil
 		}
 	}

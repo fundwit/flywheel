@@ -50,7 +50,7 @@ func TestCreateWorkflowPropertyRestAPI(t *testing.T) {
 		status, body, _ = testinfra.ExecuteRequest(req, router)
 		Expect(status).To(Equal(http.StatusBadRequest))
 		Expect(body).To(MatchJSON(`{"code":"common.bad_param","message":
-				"invalid arguments","data":null}`))
+				"invalid property definition","data":null}`))
 	})
 
 	t.Run("should be able to handle service error", func(t *testing.T) {

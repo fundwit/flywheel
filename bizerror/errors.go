@@ -6,6 +6,7 @@ import (
 )
 
 var ErrInvalidArguments = errors.New("invalid arguments")
+
 var ErrUnauthenticated = errors.New("unauthenticated")
 var ErrForbidden = errors.New("forbidden")
 var ErrWorkflowIsReferenced = errors.New("workflow is referenced")
@@ -19,6 +20,7 @@ var ErrWorkProcessStepStateInvalid = errors.New("state of work process step is i
 var ErrLabelNotFound = errors.New("label not found")
 var ErrLabelIsReferenced = errors.New("label is referenced")
 
+var ErrPropertyDefinitionInvalid = errors.New("invalid property definition")
 var ErrPropertyDefinitionNotFound = errors.New("property definition not found")
 var ErrPropertyDefinitionIsReferenced = errors.New("property definition is referenced")
 

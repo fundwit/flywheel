@@ -34,6 +34,7 @@ type WorkLabelRelationReq struct {
 var (
 	CreateWorkLabelRelationFunc = CreateWorkLabelRelation
 	DeleteWorkLabelRelationFunc = DeleteWorkLabelRelation
+	ClearWorkLabelRelationsFunc = clearWorkLabelRelations
 )
 
 func IsLabelReferencedByWork(l label.Label, tx *gorm.DB) error {
@@ -115,4 +116,11 @@ func DeleteWorkLabelRelation(req WorkLabelRelationReq, c *session.Session) error
 		return err1
 	}
 	return nil
+}
+
+func clearWorkLabelRelations(workID types.ID, tx *gorm.DB) error {
+	if workID == types.ID(0) {
+		return nil
+	}
+	return tx.Delete(&WorkLabelRelation{}, "work_id = ?", workID).Error
 }

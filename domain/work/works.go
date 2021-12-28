@@ -358,6 +358,9 @@ func DeleteWork(id types.ID, s *session.Session) error {
 		if err := checklist.CleanWorkCheckItemsDirectlyFunc(id, tx); err != nil {
 			return err
 		}
+		if err := ClearWorkLabelRelationsFunc(work.ID, tx); err != nil {
+			return err
+		}
 		return nil
 	})
 	if err1 != nil {

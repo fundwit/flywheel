@@ -56,7 +56,37 @@ jobs:
         TZ='Asia/Shanghai' go test -race -coverprofile=coverage.txt -covermode=atomic ./...
         bash <(curl -s https://codecov.io/bash)
 
-    - name: Generte Build Info File
+    - name: code coverage gate
+      run: |
+        curl -s -o jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+        chmod +x jq
+        jq --version
+
+        sleep 20
+        cov_data=$(curl -s -H "Authorization: $CODECOV_TOKEN" \
+                  https://codecov.io/api/gh/fundwit/flywheel/commit/${GITHUB_SHA})
+
+        parent_cov=$(echo $cov_data | jq -r .commit.parent_totals.c)
+        current_cov=$(echo $cov_data | jq -r .commit.totals.c)
+        if [ "$current_cov" == "" -o "$current_cov" == "null" ]; then
+          echo "error: coverage data not found"
+          echo $cov_data
+          exit 1
+        fi
+
+        if [ "$parent_cov" == "" -o "$parent_cov" == "null" ]; then
+           echo "coverage of parent not found, set to 0"
+           parent_cov=0
+        fi
+
+        echo "coverage change: ${parent_cov} => ${current_cov} " $(echo "$current_cov - $parent_cov" | bc)
+
+        if [ `echo "${current_cov} < ${parent_cov}"|bc` -eq 1 ] ; then
+          echo  "error: coverage of current commit must equal or greater than coverage of parent commit"
+          exit 1
+        fi
+
+    - name: Generate Build Info File
       run:  |
         timestamp=$(TZ='Asia/Shanghai' date -d today +"%Y-%m-%dT%H:%M:%S+08:00")
         echo "BUILD_TIMESTAMP=${timestamp}" >> $GITHUB_ENV

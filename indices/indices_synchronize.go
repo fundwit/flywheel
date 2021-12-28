@@ -136,7 +136,7 @@ func IndicesFullSync() (err error) {
 
 	page := 1
 	for {
-		works, err := work.LoadWorksFunc(page, SyncBatchSize)
+		works, err := work.InnerLoadWorksFunc(page, SyncBatchSize)
 		if err != nil {
 			logrus.Warnf("indices fully sync: error on retrive works(page = %d, pageSize = %d): %v", page, SyncBatchSize, err)
 			page++
@@ -151,6 +151,12 @@ func IndicesFullSync() (err error) {
 		workDetails := make([]work.WorkDetail, 0, len(works))
 		for _, w := range works {
 			workDetails = append(workDetails, work.WorkDetail{Work: w})
+		}
+
+		if err := work.InnerAppendChecklistsFunc(workDetails, indexRobot); err != nil {
+			logrus.Warnf("indices fully sync: error on append checklist(page = %d, pageSize = %d): %v", page, SyncBatchSize, err)
+			page++
+			continue
 		}
 
 		details, err := work.ExtendWorksFunc(workDetails, indexRobot)

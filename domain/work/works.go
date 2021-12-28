@@ -28,13 +28,14 @@ var (
 	UpdateWorkFunc = UpdateWork
 	DetailWorkFunc = DetailWork
 
-	LoadWorksFunc              = LoadWorks
+	InnerLoadWorksFunc         = InnerLoadWorks
 	ArchiveWorksFunc           = ArchiveWorks
 	DeleteWorkFunc             = DeleteWork
 	UpdateStateRangeOrdersFunc = UpdateStateRangeOrders
 	QueryLabelBriefsOfWorkFunc = QueryLabelBriefsOfWork
 
-	ExtendWorksFunc = ExtendWorks
+	ExtendWorksFunc           = ExtendWorks
+	InnerAppendChecklistsFunc = InnerAppendChecklists
 )
 
 type WorkDetail struct {
@@ -139,26 +140,45 @@ func DetailWork(identifier string, s *session.Session) (*WorkDetail, error) {
 		return nil, bizerror.ErrForbidden
 	}
 
-	ws, err := ExtendWorks([]WorkDetail{{Work: w}}, s)
+	ws, err := ExtendWorksFunc([]WorkDetail{{Work: w}}, s)
 	if err != nil {
 		return nil, err
 	}
 
-	wd := &ws[0]
-	if err := extendWorkIndexedInfo(wd, s); err != nil {
+	if err := InnerAppendChecklistsFunc(ws, s); err != nil {
 		return nil, err
 	}
 
-	return wd, nil
+	return &ws[0], nil
 }
 
-func extendWorkIndexedInfo(w *WorkDetail, c *session.Session) error {
+func InnerAppendChecklists(works []WorkDetail, c *session.Session) error {
 	// append checklist
-	cl, err := checklist.ListCheckItemsFunc(w.ID, c)
+	ids := []types.ID{}
+	for _, work := range works {
+		ids = append(ids, work.ID)
+	}
+
+	cls, err := checklist.InnerListWorksCheckItemsFunc(ids, persistence.ActiveDataSourceManager.GormDB(c.Context))
 	if err != nil {
 		return err
 	}
-	w.CheckList = cl
+
+	workCheckItems := map[types.ID][]checklist.CheckItem{}
+	for _, ci := range cls {
+		cis, ok := workCheckItems[ci.WorkId]
+		if !ok {
+			cis = []checklist.CheckItem{}
+		}
+		cis = append(cis, ci)
+		workCheckItems[ci.WorkId] = cis
+	}
+
+	size := len(works)
+	for i := 0; i < size; i++ {
+		works[i].CheckList = workCheckItems[works[i].ID]
+	}
+
 	return nil
 }
 
@@ -418,7 +438,7 @@ func UpdateStateRangeOrders(wantedOrders *[]domain.WorkOrderRangeUpdating, s *se
 	return nil
 }
 
-func LoadWorks(page, size int) ([]domain.Work, error) {
+func InnerLoadWorks(page, size int) ([]domain.Work, error) {
 	works := []domain.Work{}
 	db := persistence.ActiveDataSourceManager.GormDB(context.Background())
 	offset := (page - 1) * size

@@ -9,6 +9,7 @@ import (
 	"flywheel/domain"
 	"flywheel/domain/state"
 	"flywheel/domain/work"
+	"flywheel/domain/work/checklist"
 	"flywheel/event"
 	"flywheel/indices"
 	"flywheel/indices/indexlog"
@@ -181,13 +182,13 @@ func TestIndicesFullSync(t *testing.T) {
 
 	t.Run("should recover panic to error", func(t *testing.T) {
 		raisedErr := errors.New("error on load works")
-		work.LoadWorksFunc = func(page, size int) ([]domain.Work, error) {
+		work.InnerLoadWorksFunc = func(page, size int) ([]domain.Work, error) {
 			panic(raisedErr)
 		}
 		err := indices.IndicesFullSync()
 		Expect(err).To(Equal(raisedErr))
 
-		work.LoadWorksFunc = func(page, size int) ([]domain.Work, error) {
+		work.InnerLoadWorksFunc = func(page, size int) ([]domain.Work, error) {
 			panic("error on load works")
 		}
 		err = indices.IndicesFullSync()
@@ -202,7 +203,7 @@ func TestIndicesFullSync(t *testing.T) {
 			return nil
 		}
 		total := 5
-		work.LoadWorksFunc = func(page, size int) ([]domain.Work, error) {
+		work.InnerLoadWorksFunc = func(page, size int) ([]domain.Work, error) {
 			works := []domain.Work{}
 			cur := size * (page - 1)
 			n := 0
@@ -220,13 +221,21 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return details, nil
 		}
+		work.InnerAppendChecklistsFunc = func(details []work.WorkDetail, s *session.Session) error {
+			c := len(details)
+			for i := 0; i < c; i++ {
+				details[i].CheckList = []checklist.CheckItem{{Name: "checkitem"}}
+			}
+			return nil
+		}
 
 		indices.SyncBatchSize = 2
 		Expect(indices.IndicesFullSync()).To(BeNil())
 
 		wantedDocs := []indexResult{}
 		for i := 0; i < total; i++ {
-			d := work.WorkDetail{Work: domain.Work{ID: types.ID(i + 1)}, State: state.State{Name: "test"}}
+			d := work.WorkDetail{Work: domain.Work{ID: types.ID(i + 1)}, State: state.State{Name: "test"},
+				CheckList: []checklist.CheckItem{{Name: "checkitem"}}}
 			wantedDocs = append(wantedDocs, indexResult{indices.WorkIndexName, types.ID(i + 1),
 				indices.WorkDocument{d},
 			})
@@ -243,7 +252,7 @@ func TestIndicesFullSync(t *testing.T) {
 			return nil
 		}
 		total := 5
-		work.LoadWorksFunc = func(page, size int) ([]domain.Work, error) {
+		work.InnerLoadWorksFunc = func(page, size int) ([]domain.Work, error) {
 			if page == 2 {
 				return nil, errors.New("error on load works")
 			}
@@ -264,6 +273,13 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return details, nil
 		}
+		work.InnerAppendChecklistsFunc = func(details []work.WorkDetail, s *session.Session) error {
+			c := len(details)
+			for i := 0; i < c; i++ {
+				details[i].CheckList = []checklist.CheckItem{{Name: "checkitem"}}
+			}
+			return nil
+		}
 
 		indices.SyncBatchSize = 2
 		Expect(indices.IndicesFullSync()).To(BeNil())
@@ -273,7 +289,118 @@ func TestIndicesFullSync(t *testing.T) {
 			if i/indices.SyncBatchSize == 1 {
 				continue
 			}
-			d := work.WorkDetail{Work: domain.Work{ID: types.ID(i + 1)}, State: state.State{Name: "test"}}
+			d := work.WorkDetail{Work: domain.Work{ID: types.ID(i + 1)}, State: state.State{Name: "test"},
+				CheckList: []checklist.CheckItem{{Name: "checkitem"}}}
+			wantedDocs = append(wantedDocs, indexResult{indices.WorkIndexName, types.ID(i + 1),
+				indices.WorkDocument{d},
+			})
+		}
+		Expect(len(docs)).To(Equal(3))
+		Expect(docs).To(Equal(wantedDocs))
+	})
+
+	t.Run("should continue to next batch when failed in append checklists", func(t *testing.T) {
+		docs := []indexResult{}
+
+		es.IndexFunc = func(index string, id types.ID, doc interface{}, s *session.Session) error {
+			docs = append(docs, indexResult{index, id, doc})
+			return nil
+		}
+		total := 5
+		work.InnerLoadWorksFunc = func(page, size int) ([]domain.Work, error) {
+			works := []domain.Work{}
+			cur := size * (page - 1)
+			n := 0
+			for cur < total && n < size {
+				works = append(works, domain.Work{ID: types.ID(cur + 1)})
+				cur++
+				n++
+			}
+			return works, nil
+		}
+		work.InnerAppendChecklistsFunc = func(details []work.WorkDetail, s *session.Session) error {
+			c := len(details)
+			for i := 0; i < c; i++ {
+				if int(details[i].ID-1)/indices.SyncBatchSize == 1 {
+					return errors.New("error on append check lists")
+				}
+				details[i].CheckList = []checklist.CheckItem{{Name: "checkitem"}}
+			}
+			return nil
+		}
+		work.ExtendWorksFunc = func(details []work.WorkDetail, s *session.Session) ([]work.WorkDetail, error) {
+			c := len(details)
+			for i := 0; i < c; i++ {
+				details[i].State = state.State{Name: "test"}
+			}
+			return details, nil
+		}
+
+		indices.SyncBatchSize = 2
+		Expect(indices.IndicesFullSync()).To(BeNil())
+
+		wantedDocs := []indexResult{}
+		for i := 0; i < total; i++ {
+			if i/indices.SyncBatchSize == 1 {
+				continue
+			}
+			d := work.WorkDetail{Work: domain.Work{ID: types.ID(i + 1)}, State: state.State{Name: "test"},
+				CheckList: []checklist.CheckItem{{Name: "checkitem"}}}
+			wantedDocs = append(wantedDocs, indexResult{indices.WorkIndexName, types.ID(i + 1),
+				indices.WorkDocument{d},
+			})
+		}
+		Expect(len(docs)).To(Equal(3))
+		Expect(docs).To(Equal(wantedDocs))
+	})
+
+	t.Run("should continue to next batch when failed in extend work details", func(t *testing.T) {
+		docs := []indexResult{}
+
+		es.IndexFunc = func(index string, id types.ID, doc interface{}, s *session.Session) error {
+			docs = append(docs, indexResult{index, id, doc})
+			return nil
+		}
+		total := 5
+		work.InnerLoadWorksFunc = func(page, size int) ([]domain.Work, error) {
+			works := []domain.Work{}
+			cur := size * (page - 1)
+			n := 0
+			for cur < total && n < size {
+				works = append(works, domain.Work{ID: types.ID(cur + 1)})
+				cur++
+				n++
+			}
+			return works, nil
+		}
+		work.InnerAppendChecklistsFunc = func(details []work.WorkDetail, s *session.Session) error {
+			c := len(details)
+			for i := 0; i < c; i++ {
+				details[i].CheckList = []checklist.CheckItem{{Name: "checkitem"}}
+			}
+			return nil
+		}
+		work.ExtendWorksFunc = func(details []work.WorkDetail, s *session.Session) ([]work.WorkDetail, error) {
+			c := len(details)
+			for i := 0; i < c; i++ {
+				if int(details[i].ID-1)/indices.SyncBatchSize == 1 {
+					return nil, errors.New("error on extend work details")
+				}
+				details[i].State = state.State{Name: "test"}
+			}
+			return details, nil
+		}
+
+		indices.SyncBatchSize = 2
+		Expect(indices.IndicesFullSync()).To(BeNil())
+
+		wantedDocs := []indexResult{}
+		for i := 0; i < total; i++ {
+			if i/indices.SyncBatchSize == 1 {
+				continue
+			}
+			d := work.WorkDetail{Work: domain.Work{ID: types.ID(i + 1)}, State: state.State{Name: "test"},
+				CheckList: []checklist.CheckItem{{Name: "checkitem"}}}
 			wantedDocs = append(wantedDocs, indexResult{indices.WorkIndexName, types.ID(i + 1),
 				indices.WorkDocument{d},
 			})
@@ -293,7 +420,7 @@ func TestIndicesFullSync(t *testing.T) {
 			return nil
 		}
 		total := 5
-		work.LoadWorksFunc = func(page, size int) ([]domain.Work, error) {
+		work.InnerLoadWorksFunc = func(page, size int) ([]domain.Work, error) {
 			works := []domain.Work{}
 			cur := size * (page - 1)
 			n := 0
@@ -311,6 +438,13 @@ func TestIndicesFullSync(t *testing.T) {
 			}
 			return details, nil
 		}
+		work.InnerAppendChecklistsFunc = func(details []work.WorkDetail, s *session.Session) error {
+			c := len(details)
+			for i := 0; i < c; i++ {
+				details[i].CheckList = []checklist.CheckItem{{Name: "checkitem"}}
+			}
+			return nil
+		}
 
 		indices.SyncBatchSize = 2
 		Expect(indices.IndicesFullSync()).To(BeNil())
@@ -320,7 +454,8 @@ func TestIndicesFullSync(t *testing.T) {
 			if i/indices.SyncBatchSize == 1 {
 				continue
 			}
-			d := work.WorkDetail{Work: domain.Work{ID: types.ID(i + 1)}, State: state.State{Name: "test"}}
+			d := work.WorkDetail{Work: domain.Work{ID: types.ID(i + 1)}, State: state.State{Name: "test"},
+				CheckList: []checklist.CheckItem{{Name: "checkitem"}}}
 			wantedDocs = append(wantedDocs, indexResult{indices.WorkIndexName, types.ID(i + 1),
 				indices.WorkDocument{d},
 			})

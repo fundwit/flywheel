@@ -155,8 +155,11 @@ func TestCreateWork(t *testing.T) {
 				{WorkID: workIds[0], LabelID: 200, LabelName: "label200", LabelThemeColor: "green"},
 			}, nil
 		}
-		checklist.ListCheckItemsFunc = func(workId types.ID, c *session.Session) ([]checklist.CheckItem, error) {
-			return []checklist.CheckItem{{Name: "test1"}}, nil
+		work.InnerAppendChecklistsFunc = func(works []work.WorkDetail, c *session.Session) error {
+			for i := range works {
+				works[i].CheckList = []checklist.CheckItem{{Name: "test1"}}
+			}
+			return nil
 		}
 
 		detail, err := work.DetailWork(w.ID.String(), testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
@@ -298,16 +301,43 @@ func TestDetailWork(t *testing.T) {
 		Expect(err.Error()).To(Equal(gorm.ErrRecordNotFound.Error()))
 	})
 
-	// t.Run("should return error when workflow not found", func(t *testing.T) {
-	// 	defer teardown(t)
-	// 	setup(t)
-	// })
+	t.Run("should popup extend work error", func(t *testing.T) {
+		defer teardown(t, testDatabase)
+		flowDetail, _, project1, _, _, _ := setup(t, &testDatabase)
 
-	// t.Run("should return error when state is invalid", func(t *testing.T) {
-	// 	defer teardown(t)
-	// 	setup(t)
-	// })
+		creation := &domain.WorkCreation{Name: "test work", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name}
+		w, err := work.CreateWork(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
+		Expect(err).To(BeNil())
 
+		work.ExtendWorksFunc = func(workDetails []work.WorkDetail, s *session.Session) ([]work.WorkDetail, error) {
+			return nil, errors.New("error on extend works")
+		}
+
+		detail, err := work.DetailWork(w.ID.String(), testinfra.BuildSecCtx(200, domain.ProjectRoleManager+"_"+project1.ID.String()))
+		Expect(detail).To(BeNil())
+		Expect(err).ToNot(BeNil())
+		Expect(err.Error()).To(Equal("error on extend works"))
+	})
+
+	t.Run("should popup append check items failure", func(t *testing.T) {
+		defer teardown(t, testDatabase)
+		flowDetail, _, project1, _, _, _ := setup(t, &testDatabase)
+
+		creation := &domain.WorkCreation{Name: "test work", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name}
+		w, err := work.CreateWork(creation, testinfra.BuildSecCtx(100, domain.ProjectRoleManager+"_"+project1.ID.String()))
+		Expect(err).To(BeNil())
+
+		work.ExtendWorksFunc = func(workDetails []work.WorkDetail, s *session.Session) ([]work.WorkDetail, error) {
+			return workDetails, nil
+		}
+		work.InnerAppendChecklistsFunc = func(works []work.WorkDetail, c *session.Session) error {
+			return errors.New("error on append check lists")
+		}
+		detail, err := work.DetailWork(w.ID.String(), testinfra.BuildSecCtx(200, domain.ProjectRoleManager+"_"+project1.ID.String()))
+		Expect(detail).To(BeNil())
+		Expect(err).ToNot(BeNil())
+		Expect(err.Error()).To(Equal("error on append check lists"))
+	})
 }
 
 func TestArchiveWorks(t *testing.T) {
@@ -770,7 +800,7 @@ func TestExtendWorks(t *testing.T) {
 	})
 }
 
-func TestLoadWorks(t *testing.T) {
+func TestInnerLoadWorks(t *testing.T) {
 	RegisterTestingT(t)
 	var testDatabase *testinfra.TestDatabase
 
@@ -779,7 +809,7 @@ func TestLoadWorks(t *testing.T) {
 		setup(t, &testDatabase)
 
 		testDatabase.DS.GormDB(context.Background()).DropTable(&domain.Work{})
-		w, err := work.LoadWorks(1, 10)
+		w, err := work.InnerLoadWorks(1, 10)
 		Expect(w).To(BeNil())
 		Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".works' doesn't exist"))
 	})
@@ -800,26 +830,75 @@ func TestLoadWorks(t *testing.T) {
 			Expect(db.Save(&w).Error).To(BeNil())
 		}
 
-		ws, err := work.LoadWorks(2, 2)
+		ws, err := work.InnerLoadWorks(2, 2)
 		Expect(err).To(BeNil())
 		Expect(ws).To(Equal([]domain.Work{works[3], works[1]}))
 
-		ws, err = work.LoadWorks(-1, 2)
+		ws, err = work.InnerLoadWorks(-1, 2)
 		Expect(err).To(BeNil())
 		Expect(ws).To(Equal([]domain.Work{works[0], works[4]}))
-		ws, err = work.LoadWorks(0, 2)
+		ws, err = work.InnerLoadWorks(0, 2)
 		Expect(err).To(BeNil())
 		Expect(ws).To(Equal([]domain.Work{works[0], works[4]}))
-		ws, err = work.LoadWorks(1, 2)
+		ws, err = work.InnerLoadWorks(1, 2)
 		Expect(err).To(BeNil())
 		Expect(ws).To(Equal([]domain.Work{works[0], works[4]}))
 
-		ws, err = work.LoadWorks(3, 2)
+		ws, err = work.InnerLoadWorks(3, 2)
 		Expect(err).To(BeNil())
 		Expect(ws).To(Equal([]domain.Work{works[2]}))
 
-		ws, err = work.LoadWorks(4, 2)
+		ws, err = work.InnerLoadWorks(4, 2)
 		Expect(err).To(BeNil())
 		Expect(ws).To(Equal([]domain.Work{}))
+	})
+}
+
+func TestInnerAppendChecklists(t *testing.T) {
+	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
+
+	t.Run("should popup inner gorm error", func(t *testing.T) {
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
+
+		checklist.InnerListWorksCheckItemsFunc = func(workIds []types.ID, tx *gorm.DB) ([]checklist.CheckItem, error) {
+			return nil, errors.New("error on list works check items")
+		}
+
+		works := []work.WorkDetail{{Work: domain.Work{ID: 100}}}
+		s := &session.Session{Context: context.TODO()}
+		err := work.InnerAppendChecklists(works, s)
+		Expect(err.Error()).To(Equal("error on list works check items"))
+		Expect(works).To(Equal([]work.WorkDetail{{Work: domain.Work{ID: 100}}}))
+	})
+
+	t.Run("should be able to append check lists", func(t *testing.T) {
+		defer teardown(t, testDatabase)
+		setup(t, &testDatabase)
+
+		checklist.InnerListWorksCheckItemsFunc = func(workIds []types.ID, tx *gorm.DB) ([]checklist.CheckItem, error) {
+			list := []checklist.CheckItem{}
+			for _, id := range workIds {
+				ci := checklist.CheckItem{Name: "check-item-" + id.String(), WorkId: id}
+				list = append(list, ci)
+			}
+			return list, nil
+		}
+
+		works := []work.WorkDetail{
+			{Work: domain.Work{ID: 100}},
+			{Work: domain.Work{ID: 200}},
+		}
+
+		s := &session.Session{Context: context.TODO()}
+		err := work.InnerAppendChecklists(works, s)
+
+		wantedWorks := []work.WorkDetail{
+			{Work: domain.Work{ID: 100}, CheckList: []checklist.CheckItem{{WorkId: 100, Name: "check-item-100"}}},
+			{Work: domain.Work{ID: 200}, CheckList: []checklist.CheckItem{{WorkId: 200, Name: "check-item-200"}}},
+		}
+		Expect(works).To(Equal(wantedWorks))
+		Expect(err).To(BeNil())
 	})
 }

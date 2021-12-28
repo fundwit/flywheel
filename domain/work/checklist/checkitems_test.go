@@ -137,7 +137,7 @@ func TestCreateCheckitem(t *testing.T) {
 	})
 }
 
-func TestListCheckitems(t *testing.T) {
+func TestListWorkCheckitems(t *testing.T) {
 	RegisterTestingT(t)
 	var testDatabase *testinfra.TestDatabase
 
@@ -151,7 +151,7 @@ func TestListCheckitems(t *testing.T) {
 			Perms: authority.Permissions{"manager_" + p2.ID.String()}}
 
 		// case1: assert resource not found if work is not found
-		r, err := checklist.ListCheckItems(404, &c1)
+		r, err := checklist.ListWorkCheckItems(404, &c1)
 		Expect(r).To(BeNil())
 		Expect(err).To(Equal(gorm.ErrRecordNotFound))
 
@@ -159,7 +159,7 @@ func TestListCheckitems(t *testing.T) {
 		w1 := buildWork("test work 1", workflow1.ID, p1.ID, &c1)
 
 		// list check item with forbidden user
-		_, err = checklist.ListCheckItems(w1.ID, &c2)
+		_, err = checklist.ListWorkCheckItems(w1.ID, &c2)
 		// case2: assert access is forbidden
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 	})
@@ -175,7 +175,7 @@ func TestListCheckitems(t *testing.T) {
 		w1 := buildWork("test work 1", workflow1.ID, p1.ID, &c1)
 		w2 := buildWork("test work 2", workflow1.ID, p1.ID, &c1)
 
-		cs0, err := checklist.ListCheckItems(w1.ID, &c1)
+		cs0, err := checklist.ListWorkCheckItems(w1.ID, &c1)
 		Expect(err).To(BeNil())
 		Expect(len(cs0)).To(Equal(0))
 
@@ -187,24 +187,101 @@ func TestListCheckitems(t *testing.T) {
 		Expect(err).To(BeNil())
 
 		// list
-		cs1, err := checklist.ListCheckItems(w1.ID, &c1)
+		cs1, err := checklist.ListWorkCheckItems(w1.ID, &c1)
 		Expect(err).To(BeNil())
 		Expect(len(cs1)).To(Equal(2))
 		Expect(cs1[0]).To(Equal(*ci1))
 		Expect(cs1[1]).To(Equal(*ci3))
 
-		cs2, err := checklist.ListCheckItems(w2.ID, &c1)
+		cs2, err := checklist.ListWorkCheckItems(w2.ID, &c1)
 		Expect(err).To(BeNil())
 		Expect(len(cs2)).To(Equal(1))
 		Expect(cs2[0]).To(Equal(*ci2))
 
 		// be able to list checkitems with system permissions
-		cs2, err = checklist.ListCheckItems(w2.ID, &session.Session{
+		cs2, err = checklist.ListWorkCheckItems(w2.ID, &session.Session{
 			Identity: session.Identity{ID: 10, Name: "index-robot"},
 			Perms:    authority.Permissions{account.SystemViewPermission.ID}})
 		Expect(err).To(BeNil())
 		Expect(len(cs2)).To(Equal(1))
 		Expect(cs2[0]).To(Equal(*ci2))
+	})
+
+	t.Run("should return db error", func(t *testing.T) {
+		defer checkitemsTestTeardown(t, testDatabase)
+		workflow1, p1, _, _, _ := checkitemsTestSetup(t, &testDatabase)
+
+		c1 := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
+			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
+
+		// prepare work
+		w1 := buildWork("test work 1", workflow1.ID, p1.ID, &c1)
+
+		tx := testDatabase.DS.GormDB(context.Background())
+		tx.DropTable(&checklist.CheckItem{})
+
+		ret, err := checklist.ListWorkCheckItems(w1.ID, &c1)
+		Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".check_items' doesn't exist"))
+		Expect(ret).To(BeNil())
+	})
+}
+
+func TestInnerWorksListCheckitems(t *testing.T) {
+	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
+
+	t.Run("should return db error", func(t *testing.T) {
+		defer checkitemsTestTeardown(t, testDatabase)
+		checkitemsTestSetup(t, &testDatabase)
+
+		tx := testDatabase.DS.GormDB(context.Background())
+		tx.DropTable(&checklist.CheckItem{})
+
+		ret, err := checklist.InnerListWorksCheckItems([]types.ID{404}, tx)
+		Expect(err.Error()).To(Equal("Error 1146: Table '" + testDatabase.TestDatabaseName + ".check_items' doesn't exist"))
+		Expect(ret).To(BeNil())
+	})
+	t.Run("should be able to inner list check items for works", func(t *testing.T) {
+		defer checkitemsTestTeardown(t, testDatabase)
+		workflow1, p1, _, _, _ := checkitemsTestSetup(t, &testDatabase)
+
+		c1 := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
+			Perms: authority.Permissions{"manager_" + p1.ID.String()}}
+
+		// prepare work
+		w1 := buildWork("test work 1", workflow1.ID, p1.ID, &c1)
+		w2 := buildWork("test work 2", workflow1.ID, p1.ID, &c1)
+
+		tx := testDatabase.DS.GormDB(context.Background())
+		cs0, err := checklist.InnerListWorksCheckItems(nil, tx)
+		Expect(err).To(BeNil())
+		Expect(len(cs0)).To(Equal(0))
+
+		cs0, err = checklist.InnerListWorksCheckItems([]types.ID{}, tx)
+		Expect(err).To(BeNil())
+		Expect(len(cs0)).To(Equal(0))
+
+		cs0, err = checklist.InnerListWorksCheckItems([]types.ID{w1.ID, 404}, tx)
+		Expect(err).To(BeNil())
+		Expect(len(cs0)).To(Equal(0))
+
+		ci1, err := checklist.CreateCheckItem(checklist.CheckItemCreation{WorkId: w1.ID, Name: "item1"}, &c1)
+		Expect(err).To(BeNil())
+		_, err = checklist.CreateCheckItem(checklist.CheckItemCreation{WorkId: w2.ID, Name: "item3"}, &c1)
+		Expect(err).To(BeNil())
+		ci3, err := checklist.CreateCheckItem(checklist.CheckItemCreation{WorkId: w1.ID, Name: "item2"}, &c1)
+		Expect(err).To(BeNil())
+
+		// list
+		cs1, err := checklist.InnerListWorksCheckItems([]types.ID{w1.ID, 404}, tx)
+		Expect(err).To(BeNil())
+		Expect(len(cs1)).To(Equal(2))
+		Expect(cs1[0]).To(Equal(*ci1))
+		Expect(cs1[1]).To(Equal(*ci3))
+
+		cs2, err := checklist.InnerListWorksCheckItems([]types.ID{w1.ID, w2.ID, 404}, tx)
+		Expect(err).To(BeNil())
+		Expect(len(cs2)).To(Equal(3))
 	})
 }
 
@@ -273,7 +350,7 @@ func TestUpdateCheckitem(t *testing.T) {
 		Expect(checklist.UpdateCheckItem(ci1.ID, checklist.CheckItemUpdate{Name: "updated-name", Done: &doneState}, &c1)).To(BeNil())
 
 		// assert item changed
-		cs1, err := checklist.ListCheckItems(w1.ID, &c1)
+		cs1, err := checklist.ListWorkCheckItems(w1.ID, &c1)
 		Expect(err).To(BeNil())
 		Expect(len(cs1)).To(Equal(2))
 		ci1Updated := ci1
@@ -298,7 +375,7 @@ func TestUpdateCheckitem(t *testing.T) {
 		Expect(checklist.UpdateCheckItem(ci1.ID, checklist.CheckItemUpdate{Done: &doneState}, &c1)).To(BeNil())
 
 		// assert item changed
-		cs1, err = checklist.ListCheckItems(w1.ID, &c1)
+		cs1, err = checklist.ListWorkCheckItems(w1.ID, &c1)
 		Expect(err).To(BeNil())
 		Expect(len(cs1)).To(Equal(2))
 		ci1Updated = ci1
@@ -366,12 +443,12 @@ func TestDeleteCheckitems(t *testing.T) {
 		// delete
 		Expect(checklist.DeleteCheckItem(ci1.ID, &c1)).To(BeNil())
 
-		cs1, err := checklist.ListCheckItems(w1.ID, &c1)
+		cs1, err := checklist.ListWorkCheckItems(w1.ID, &c1)
 		Expect(err).To(BeNil())
 		Expect(len(cs1)).To(Equal(1))
 		Expect(cs1[0]).To(Equal(*ci3))
 
-		cs2, err := checklist.ListCheckItems(w2.ID, &c1)
+		cs2, err := checklist.ListWorkCheckItems(w2.ID, &c1)
 		Expect(err).To(BeNil())
 		Expect(len(cs2)).To(Equal(1))
 		Expect(cs2[0]).To(Equal(*ci2))
@@ -446,11 +523,11 @@ func TestCleanWorkCheckitems(t *testing.T) {
 		// clean
 		Expect(checklist.CleanWorkCheckItems(w1.ID, &c1)).To(BeNil())
 
-		cs1, err := checklist.ListCheckItems(w1.ID, &c1)
+		cs1, err := checklist.ListWorkCheckItems(w1.ID, &c1)
 		Expect(err).To(BeNil())
 		Expect(len(cs1)).To(Equal(0))
 
-		cs2, err := checklist.ListCheckItems(w2.ID, &c1)
+		cs2, err := checklist.ListWorkCheckItems(w2.ID, &c1)
 		Expect(err).To(BeNil())
 		Expect(len(cs2)).To(Equal(1))
 		Expect(cs2[0]).To(Equal(*ci2))

@@ -18,12 +18,13 @@ var (
 	checkitemIdWorker = sonyflake.NewSonyflake(sonyflake.Settings{})
 
 	CreateCheckItemFunc     = CreateCheckItem
-	ListCheckItemsFunc      = ListCheckItems
+	ListWorkCheckItemsFunc  = ListWorkCheckItems
 	UpdateCheckItemFunc     = UpdateCheckItem
 	DeleteCheckItemFunc     = DeleteCheckItem
 	CleanWorkCheckItemsFunc = CleanWorkCheckItems
 
 	CleanWorkCheckItemsDirectlyFunc = CleanWorkCheckItemsDirectly
+	InnerListWorksCheckItemsFunc    = InnerListWorksCheckItems
 )
 
 type CheckItemState string
@@ -92,7 +93,7 @@ func CreateCheckItem(req CheckItemCreation, c *session.Session) (*CheckItem, err
 	return r, nil
 }
 
-func ListCheckItems(workId types.ID, c *session.Session) ([]CheckItem, error) {
+func ListWorkCheckItems(workId types.ID, c *session.Session) ([]CheckItem, error) {
 	var r []CheckItem
 	txErr := persistence.ActiveDataSourceManager.GormDB(c.Context).Transaction(func(tx *gorm.DB) error {
 		w, err := findWorkAndCheckPerms(tx, workId, c)
@@ -106,6 +107,18 @@ func ListCheckItems(workId types.ID, c *session.Session) ([]CheckItem, error) {
 	})
 	if txErr != nil {
 		return nil, txErr
+	}
+	return r, nil
+}
+
+func InnerListWorksCheckItems(workIds []types.ID, tx *gorm.DB) ([]CheckItem, error) {
+	var r []CheckItem
+
+	if len(workIds) == 0 {
+		return r, nil
+	}
+	if err := tx.Where("work_id IN (?)", workIds).Find(&r).Error; err != nil {
+		return nil, err
 	}
 	return r, nil
 }

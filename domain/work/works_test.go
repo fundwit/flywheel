@@ -34,7 +34,7 @@ func setup(t *testing.T, testDatabase **testinfra.TestDatabase) (*domain.Workflo
 	db := testinfra.StartMysqlTestDatabase("flywheel")
 	*testDatabase = db
 	Expect(db.DS.GormDB(context.Background()).AutoMigrate(&domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
-		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}, &checklist.CheckItem{}).Error).To(BeNil())
+		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}, &checklist.CheckItem{}, &work.WorkLabelRelation{}).Error).To(BeNil())
 
 	persistence.ActiveDataSourceManager = db.DS
 	var err error
@@ -569,6 +569,9 @@ func TestDeleteWork(t *testing.T) {
 			Expect(tx).ToNot(BeNil())
 			return nil
 		}
+		work.ClearWorkLabelRelationsFunc = func(workID types.ID, tx *gorm.DB) error {
+			return nil
+		}
 
 		// do delete work
 		err = work.DeleteWork(workToDelete.ID, sec)
@@ -618,6 +621,18 @@ func TestDeleteWork(t *testing.T) {
 			&domain.WorkCreation{Name: "test work1", ProjectID: project1.ID, FlowID: flowDetail.ID, InitialStateName: domain.StatePending.Name},
 			testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
 		Expect(err).To(BeZero())
+
+		work.ClearWorkLabelRelationsFunc = func(workID types.ID, tx *gorm.DB) error {
+			return errors.New("error on clear relations with label")
+		}
+		err = work.DeleteWork(detail.ID, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
+		Expect(err).To(Equal(errors.New("error on clear relations with label")))
+
+		checklist.CleanWorkCheckItemsDirectlyFunc = func(workId types.ID, tx *gorm.DB) error {
+			return errors.New("error on clear check-items")
+		}
+		err = work.DeleteWork(detail.ID, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))
+		Expect(err).To(Equal(errors.New("error on clear check-items")))
 
 		Expect(testDatabase.DS.GormDB(context.Background()).DropTable(&domain.WorkProcessStep{}).Error).To(BeNil())
 		err = work.DeleteWork(detail.ID, testinfra.BuildSecCtx(1, domain.ProjectRoleManager+"_"+project1.ID.String()))

@@ -1,4 +1,4 @@
-package work_test
+package work
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"flywheel/domain/flow"
 	"flywheel/domain/label"
 	"flywheel/domain/namespace"
-	"flywheel/domain/work"
 	"flywheel/domain/work/checklist"
 	"flywheel/event"
 	"flywheel/persistence"
@@ -29,7 +28,7 @@ func workLabelsTestSetup(t *testing.T, testDatabase **testinfra.TestDatabase) (*
 	db := testinfra.StartMysqlTestDatabase("flywheel")
 	*testDatabase = db
 	// migration
-	Expect(db.DS.GormDB(context.Background()).AutoMigrate(&work.WorkLabelRelation{}, &label.Label{}, &domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
+	Expect(db.DS.GormDB(context.Background()).AutoMigrate(&WorkLabelRelation{}, &label.Label{}, &domain.Project{}, &domain.ProjectMember{}, &domain.Work{}, &domain.WorkProcessStep{},
 		&domain.Workflow{}, &domain.WorkflowState{}, &domain.WorkflowStateTransition{}, &checklist.CheckItem{}).Error).To(BeNil())
 
 	persistence.ActiveDataSourceManager = db.DS
@@ -85,7 +84,7 @@ func TestCreateWorkLabelRelation(t *testing.T) {
 			Perms: authority.Permissions{"manager_" + p2.ID.String()}}
 
 		// case1: assert resource not found if work is not found
-		r, err := work.CreateWorkLabelRelation(work.WorkLabelRelationReq{WorkId: 404, LabelId: 404}, &c1)
+		r, err := CreateWorkLabelRelation(WorkLabelRelationReq{WorkId: 404, LabelId: 404}, &c1)
 		Expect(r).To(BeNil())
 		Expect(err).To(Equal(gorm.ErrRecordNotFound))
 
@@ -93,7 +92,7 @@ func TestCreateWorkLabelRelation(t *testing.T) {
 		w1 := buildWork("test work 1", workflow1.ID, p1.ID, &c1)
 
 		// create work-label-relation with forbidden user
-		_, err = work.CreateWorkLabelRelation(work.WorkLabelRelationReq{WorkId: w1.ID, LabelId: 404}, &c2)
+		_, err = CreateWorkLabelRelation(WorkLabelRelationReq{WorkId: w1.ID, LabelId: 404}, &c2)
 		// case2: assert access is forbidden
 		Expect(err).To(Equal(bizerror.ErrForbidden))
 
@@ -101,7 +100,7 @@ func TestCreateWorkLabelRelation(t *testing.T) {
 		l2, err := label.CreateLabel(label.LabelCreation{ProjectID: p2.ID, Name: "test label", ThemeColor: "red"}, &c2)
 		Expect(err).To(BeNil())
 
-		_, err = work.CreateWorkLabelRelation(work.WorkLabelRelationReq{WorkId: w1.ID, LabelId: l2.ID}, &c1)
+		_, err = CreateWorkLabelRelation(WorkLabelRelationReq{WorkId: w1.ID, LabelId: l2.ID}, &c1)
 		Expect(err).To(Equal(bizerror.ErrLabelNotFound))
 	})
 
@@ -119,17 +118,17 @@ func TestCreateWorkLabelRelation(t *testing.T) {
 		Expect(err).To(BeNil())
 
 		// create work-label-relation
-		req := work.WorkLabelRelationReq{WorkId: w.ID, LabelId: l.ID}
-		r, err := work.CreateWorkLabelRelation(req, &c)
+		req := WorkLabelRelationReq{WorkId: w.ID, LabelId: l.ID}
+		r, err := CreateWorkLabelRelation(req, &c)
 		Expect(err).To(BeNil())
 		Expect(time.Since(r.CreateTime.Time()) < time.Second).To(BeTrue())
 
-		q := work.WorkLabelRelation{}
-		Expect(testDatabase.DS.GormDB(context.Background()).Where(&work.WorkLabelRelation{WorkId: w.ID, LabelId: l.ID}).First(&q).Error).To(BeNil())
+		q := WorkLabelRelation{}
+		Expect(testDatabase.DS.GormDB(context.Background()).Where(&WorkLabelRelation{WorkId: w.ID, LabelId: l.ID}).First(&q).Error).To(BeNil())
 		Expect(q).To(Equal(*r))
 
 		q.CreateTime = types.Timestamp{}
-		Expect(q).To(Equal(work.WorkLabelRelation{WorkId: w.ID, LabelId: l.ID, CreatorId: c.Identity.ID}))
+		Expect(q).To(Equal(WorkLabelRelation{WorkId: w.ID, LabelId: l.ID, CreatorId: c.Identity.ID}))
 	})
 }
 
@@ -147,11 +146,11 @@ func TestDeleteWorkLabelRelation(t *testing.T) {
 			Perms: authority.Permissions{"manager_" + p2.ID.String()}}
 
 		// case1: assert param errors
-		Expect(work.DeleteWorkLabelRelation(work.WorkLabelRelationReq{}, &c1)).
+		Expect(DeleteWorkLabelRelation(WorkLabelRelationReq{}, &c1)).
 			To(Equal(bizerror.ErrInvalidArguments))
 
 		// case2: assert resource not found if work is not found
-		Expect(work.DeleteWorkLabelRelation(work.WorkLabelRelationReq{WorkId: 404, LabelId: 404}, &c1)).
+		Expect(DeleteWorkLabelRelation(WorkLabelRelationReq{WorkId: 404, LabelId: 404}, &c1)).
 			To(Equal(gorm.ErrRecordNotFound))
 
 		// prepare work
@@ -162,11 +161,11 @@ func TestDeleteWorkLabelRelation(t *testing.T) {
 		Expect(err).To(BeNil())
 
 		// prepare work-label-relation
-		_, err = work.CreateWorkLabelRelation(work.WorkLabelRelationReq{WorkId: w1.ID, LabelId: l1.ID}, &c1)
+		_, err = CreateWorkLabelRelation(WorkLabelRelationReq{WorkId: w1.ID, LabelId: l1.ID}, &c1)
 		Expect(err).To(BeNil())
 
 		// case3: assert access is forbidden
-		Expect(work.DeleteWorkLabelRelation(work.WorkLabelRelationReq{WorkId: w1.ID, LabelId: l1.ID}, &c2)).
+		Expect(DeleteWorkLabelRelation(WorkLabelRelationReq{WorkId: w1.ID, LabelId: l1.ID}, &c2)).
 			To(Equal(bizerror.ErrForbidden))
 	})
 
@@ -174,7 +173,7 @@ func TestDeleteWorkLabelRelation(t *testing.T) {
 		defer workLabelsTestTeardown(t, testDatabase)
 		workflow1, p1, _, _, _ := workLabelsTestSetup(t, &testDatabase)
 
-		label.LabelDeleteCheckFuncs = append(label.LabelDeleteCheckFuncs, work.IsLabelReferencedByWork)
+		label.LabelDeleteCheckFuncs = append(label.LabelDeleteCheckFuncs, IsLabelReferencedByWork)
 
 		// prepare work
 		c := session.Session{Identity: session.Identity{ID: 10, Name: "user 10"},
@@ -184,31 +183,74 @@ func TestDeleteWorkLabelRelation(t *testing.T) {
 		// prepare label
 		l, err := label.CreateLabel(label.LabelCreation{ProjectID: p1.ID, Name: "test label", ThemeColor: "red"}, &c)
 		Expect(err).To(BeNil())
-		Expect(work.IsLabelReferencedByWork(*l, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
+		Expect(IsLabelReferencedByWork(*l, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
 
 		// prepare work-label-relation
-		req := work.WorkLabelRelationReq{WorkId: w.ID, LabelId: l.ID}
-		_, err = work.CreateWorkLabelRelation(req, &c)
+		req := WorkLabelRelationReq{WorkId: w.ID, LabelId: l.ID}
+		_, err = CreateWorkLabelRelation(req, &c)
 		Expect(err).To(BeNil())
-		Expect(work.IsLabelReferencedByWork(*l, testDatabase.DS.GormDB(context.Background()))).To(Equal(bizerror.ErrLabelIsReferenced))
+		Expect(IsLabelReferencedByWork(*l, testDatabase.DS.GormDB(context.Background()))).To(Equal(bizerror.ErrLabelIsReferenced))
 		// assert LabelDeleteCheckFuncs is registered
 		Expect(label.DeleteLabel(l.ID, &c)).To(Equal(bizerror.ErrLabelIsReferenced))
 		// assert query label briefs of work
-		b, err := work.QueryLabelBriefsOfWork([]types.ID{w.ID}, &c)
+		b, err := QueryLabelBriefsOfWork([]types.ID{w.ID}, &c)
 		Expect(err).To(BeNil())
-		Expect(b).To(Equal([]work.WorkLabelBrief{{WorkID: w.ID, LabelID: l.ID, LabelName: l.Name, LabelThemeColor: l.ThemeColor}}))
+		Expect(b).To(Equal([]WorkLabelBrief{{WorkID: w.ID, LabelID: l.ID, LabelName: l.Name, LabelThemeColor: l.ThemeColor}}))
 
 		// do delete work-label-relation
-		Expect(work.DeleteWorkLabelRelation(req, &c)).To(BeNil())
-		Expect(work.IsLabelReferencedByWork(*l, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
+		Expect(DeleteWorkLabelRelation(req, &c)).To(BeNil())
+		Expect(IsLabelReferencedByWork(*l, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
 
-		b, err = work.QueryLabelBriefsOfWork([]types.ID{w.ID}, &c)
+		b, err = QueryLabelBriefsOfWork([]types.ID{w.ID}, &c)
 		Expect(err).To(BeNil())
 		Expect(len(b)).To(BeZero())
 
 		// assert relation already been delete from database
-		q := work.WorkLabelRelation{}
-		Expect(testDatabase.DS.GormDB(context.Background()).Where(&work.WorkLabelRelation{WorkId: w.ID, LabelId: l.ID}).
+		q := WorkLabelRelation{}
+		Expect(testDatabase.DS.GormDB(context.Background()).Where(&WorkLabelRelation{WorkId: w.ID, LabelId: l.ID}).
 			First(&q).Error).To(Equal(gorm.ErrRecordNotFound))
 	})
+}
+
+func TestClearWorkLabelRelations(t *testing.T) {
+	RegisterTestingT(t)
+	var testDatabase *testinfra.TestDatabase
+
+	t.Run("should be able to clear relations with label for a work", func(t *testing.T) {
+		defer workLabelsTestTeardown(t, testDatabase)
+		workLabelsTestSetup(t, &testDatabase)
+
+		// create work-label-relations
+		Expect(testDatabase.DS.GormDB(context.Background()).Save(
+			&WorkLabelRelation{WorkId: 100, LabelId: 10, CreateTime: types.CurrentTimestamp(), CreatorId: 1}).Error).
+			To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Save(
+			&WorkLabelRelation{WorkId: 100, LabelId: 20, CreateTime: types.CurrentTimestamp(), CreatorId: 1}).Error).
+			To(BeNil())
+		Expect(testDatabase.DS.GormDB(context.Background()).Save(
+			&WorkLabelRelation{WorkId: 110, LabelId: 10, CreateTime: types.CurrentTimestamp(), CreatorId: 1}).Error).
+			To(BeNil())
+
+		Expect(clearWorkLabelRelations(0, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
+		Expect(clearWorkLabelRelations(100, testDatabase.DS.GormDB(context.Background()))).To(BeNil())
+
+		left := []WorkLabelRelation{}
+		Expect(testDatabase.DS.GormDB(context.Background()).Model(&WorkLabelRelation{}).Find(&left).Error).To(BeNil())
+		Expect(len(left)).To(Equal(1))
+		Expect(left[0].WorkId).To(Equal(types.ID(110)))
+	})
+}
+
+func buildWork(workName string, flowId, gid types.ID, s *session.Session) *WorkDetail {
+	workCreation := &domain.WorkCreation{
+		Name:             workName,
+		ProjectID:        gid,
+		FlowID:           flowId,
+		InitialStateName: domain.StatePending.Name,
+	}
+	detail, err := CreateWork(workCreation, s)
+	Expect(err).To(BeNil())
+	Expect(detail).ToNot(BeNil())
+	Expect(detail.StateName).To(Equal("PENDING"))
+	return detail
 }

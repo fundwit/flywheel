@@ -1,6 +1,7 @@
 package es
 
 import (
+	"flywheel/infra/tracing"
 	"net/http"
 
 	"github.com/opentracing/opentracing-go"
@@ -26,9 +27,13 @@ func (t *TracingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 			// Inject the client span context into the headers
 			tracer.Inject(childSpan.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(req.Header))
 			res, err := t.Transport.RoundTrip(req)
-
-			ext.HTTPStatusCode.Set(childSpan, uint16(res.StatusCode))
-			ext.Error.Set(childSpan, res.StatusCode >= 400)
+			if err != nil {
+				ext.Error.Set(childSpan, true)
+				tracing.ErrorDetail.Set(childSpan, err.Error())
+			} else {
+				ext.HTTPStatusCode.Set(childSpan, uint16(res.StatusCode))
+				ext.Error.Set(childSpan, res.StatusCode >= 400)
+			}
 
 			return res, err
 		}

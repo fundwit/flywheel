@@ -1,4 +1,4 @@
-FROM busybox:1.31.1-glibc
+FROM busybox:1.36.1-glibc
 
 COPY flywheel /
 COPY buildInfo.json /
